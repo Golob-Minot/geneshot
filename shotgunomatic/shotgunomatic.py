@@ -5,6 +5,10 @@ import sys
 import luigi
 import sciluigi as sl
 import os
+import csv
+from collections import defaultdict
+
+log = logging.getLogger('sciluigi-interface')
 
 
 # Tasks
@@ -19,6 +23,62 @@ class LoadFile(sl.ExternalTask):
             file_format = None
 
         return sl.ContainerTargetInfo(self, self.path, format=file_format)
+
+
+class LoadPairedReads(sl.ExternalTask):
+    path_R1 = sl.Parameter()
+    path_R2 = sl.Parameter()
+    file_format = sl.Parameter(default='gzip')
+
+    def out_reads(self):
+        if self.file_format == 'gzip':
+            file_format = luigi.format.Gzip
+        else:
+            file_format = None
+
+        return {
+            'R1': sl.ContainerTargetInfo(self, self.path_R1, format=file_format),
+            'R2': sl.ContainerTargetInfo(self, self.path_R2, format=file_format)
+        }
+
+
+class LoadManifest(LoadFile):
+    def manifest(self):
+        # Load manifest as csv and return as a list of dicts
+        with self.out_file().open() as manifest_h:
+            return [r for r in csv.DictReader(manifest_h)]
+
+    def group_by_specimen(self):
+        manifest = self.manifest()
+        specimens = {r.get('specimen') for r in manifest}
+        log.info("{} specimens".format(
+            len(specimens))
+        )
+
+        for specimen in specimens:
+            yield((specimen, [
+                r for r in manifest
+                if r.get('specimen') == specimen
+            ]))
+
+    def get_columns(self):
+        with self.out_file().open() as manifest_h:
+            return set(csv.DictReader(manifest_h).fieldnames)
+
+    def is_paired(self):
+        return 'R2_path' in self.get_columns()
+
+    def is_valid(self):
+        columns = self.get_columns()
+        if 'R1_path' in columns and 'specmen' in columns:
+            return True
+        else:
+            return False
+
+    def get_specimens(self):
+        with self.out_file().open() as manifest_h:
+            return {r.get('specimen') for r in csv.DictReader(manifest_h)}
+
 
 class RemoveAdapters(sl.ContainerTask):
     container = 'golob/cutadapt:1.18__bcw.0.3.0_al38'
@@ -125,7 +185,7 @@ class MetaSPAdesAssembly(sl.ContainerTask):
 
         self.ex(
             command=(
-                'mkdir -p /working &&'
+                'mkdir -p /working && '
                 'metaspades.py '
                 '--meta '
                 '-1 $read_1 '
@@ -142,26 +202,95 @@ class MetaSPAdesAssembly(sl.ContainerTask):
             extra_params={
                 'vCPU': self.containerinfo.vcpu,
                 'mem': self.containerinfo.mem / 1024,
+                'tempdir': self.container_temp_dir,
             }
         )
 
 
 # Workflow
 class Workflow_SGOM(sl.WorkflowTask):
-    def workflow(self):
-        pass
-        # We need to load in a manifest, a CSV file with a line per pair of reads. 
-        # A given specimen (a microbial community) can have MULTIPLE paired reads.
-        # For each pair of reads, we need to:
-        # - QC with cutadapt to remove adapter seqs and low-quality reads
-        # - (Optionally): Remove human reads
+    slconfig = sl.Parameter()
+    manifest_path = sl.Parameter()
+    working_dir = sl.Parameter()
 
-        # Then *by specimen* we need to:
-        # - combine reads into a single pair of
-        # forward and revese files for the specimen
-        # - Assemble (metaspades)
-        # - extract 16S (emirge)
-        # - Compositional determination (Metaphlan2 / kraken / etc)
+    def workflow(self):
+        # Initialize our containerinfo classes from our SL-config file
+        light_containerinfo = sl.ContainerInfo()
+        light_containerinfo.from_config(
+            self.slconfig,
+            'light'
+        )
+        heavy_containerinfo = sl.ContainerInfo()
+        heavy_containerinfo.from_config(
+            self.slconfig,
+            'heavy'
+        )
+
+        # We need to load in a manifest, a CSV file with a line per pair of reads.
+        manifest = self.new_task(
+            'load_manifest',
+            LoadManifest,
+            path=self.manifest_path,
+        )
+
+        specimen_reads_tasks = defaultdict(lambda: defaultdict(dict))
+
+        for specimen, specimen_reads in manifest.group_by_specimen():
+            # A given specimen (a microbial community) can have MULTIPLE paired reads.
+            for sp_read_idx, read_pair in enumerate(specimen_reads):
+                # For each pair of reads, we need to:
+                # - QC with cutadapt to remove adapter seqs and low-quality reads
+                # - (Optionally): Remove human reads
+                specimen_reads_tasks[specimen]['raw_reads'][sp_read_idx] = self.new_task(
+                    'load.{}.{}'.format(specimen, sp_read_idx),
+                    LoadPairedReads,
+                    path_R1=read_pair['R1_path'],
+                    path_R2=read_pair['R2_path']
+                )
+
+                sp_read_path_base = os.path.join(
+                    self.working_dir,
+                    'qc',
+                    'noadapt',
+                    '{}.{}'.format(
+                        specimen,
+                        sp_read_idx
+                    )
+                )
+
+                specimen_reads_tasks[specimen]['noadapt'][sp_read_idx] = self.new_task(
+                    'noadapt.{}.{}'.format(specimen, sp_read_idx),
+                    RemoveAdapters,
+                    containertargetinfo=light_containerinfo,
+                    trimmed_R1_path="{}.R1.fastq.gz".format(sp_read_path_base),
+                    trimmed_R2_path="{}.R2.fastq.gz".format(sp_read_path_base),
+                    cutadapt_log_path="{}.cutadapt.log".format(sp_read_path_base),
+                )
+                specimen_reads_tasks[specimen]['noadapt'][sp_read_idx].in_reads = specimen_reads_tasks[specimen]['raw_reads'][sp_read_idx].out_reads
+                # remove human here
+
+            # Combine a given specimen's trimmed and human-depleted reads into one pair of reads
+            specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt'][0]
+
+            specimen_reads_tasks[specimen]['assembly'] = self.new_task(
+                'assemble.{}'.format(specimen),
+                MetaSPAdesAssembly,
+                containerinfo=heavy_containerinfo,
+                destination_dir=os.path.join(
+                    self.working_dir,
+                    'assembly',
+                    specimen
+                )
+            )
+
+            # - Assemble (metaspades)
+            specimen_reads_tasks[specimen]['assembly'].in_reads = specimen_combined_reads.out_reads
+
+
+            # - extract 16S (emirge)
+            # - Compositional determination (Metaphlan2 / kraken / etc)
+
+        return specimen_reads_tasks
 
 
 class SHOTGUNOMATIC:
@@ -170,19 +299,74 @@ class SHOTGUNOMATIC:
         parser = argparse.ArgumentParser(description="""
         Basic Pipeline for processing reads from shotgun-microbiome""")
 
-        if len(sys.argv) < 2:
-            parser.print_help()
-        else:
-            # Common options here
-            parser.add_argument(
-                '--luigi-manager',
-                help="""Run with luigi's work manager daemon (default False)""",
-                action='store_true',
-            )
+        # Common options here
+        parser.add_argument(
+            '--luigi-manager',
+            help="""Run with luigi's work manager daemon (default False)""",
+            action='store_true',
+        )
 
-            parser.add_argument(
-                '--workers',
-                help="""How many concurrent workers to use""",
-                type=int,
-                default=1,
+        parser.add_argument(
+            '--workers',
+            help="""How many concurrent workers to use (default=1)""",
+            type=int,
+            default=1,
+        )
+
+        parser.add_argument(
+            '--slconfig',
+            help="""Location of sciluigi config file""",
+            default=os.path.expanduser('~/.sciluigi/containerinfo.ini')
+        )
+
+        # Options specific to shotgunomatic
+        parser.add_argument(
+            '--manifest',
+            '-M',
+            help="""Location of manifest file in CSV format""",
+            required=True
+        )
+        parser.add_argument(
+            '--working-dir',
+            '-w',
+            help="""Directory into which we should place our working files""",
+            required=True,
+        )
+
+        # Unpack CLI options
+        args = parser.parse_args()
+        if args.luigi_manager:
+            local_scheduler = False
+        else:
+            local_scheduler = True
+
+        cmdline_args = [
+            '--workers={}'.format(
+                args.workers
+            ),
+            '--slconfig={}'.format(
+                args.slconfig
+            ),
+            '--manifest-path={}'.format(
+                args.manifest
+            ),
+            '--working-dir={}'.format(
+                args.working_dir,
             )
+        ]
+
+        # Run here
+        sl.run(
+            local_scheduler=local_scheduler,
+            main_task_cls=Workflow_SGOM,
+            cmdline_args=cmdline_args
+        )
+
+
+def main():
+    """Entrypoint for main script."""
+    SHOTGUNOMATIC()
+
+
+if __name__ == "__main__":
+    main()
