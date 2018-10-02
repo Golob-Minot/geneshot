@@ -88,8 +88,9 @@ class RemoveAdapters(sl.ContainerTask):
     cutadapt_log_path = sl.Parameter()
     # Default adapter sequences are for nextera, and from:
     # https://support.illumina.com/bulletins/2016/12/what-sequences-do-i-use-for-adapter-trimming.html
+    # Defaulted for nextera
     adapter_F = sl.Parameter(default='CTGTCTCTTATACACATCT')
-    adapter_R = sl.Parameter(default='AGATGTGTATAAGAGACAG')
+    adapter_R = sl.Parameter(default='CTGTCTCTTATACACATCT')
 
     def out_reads(self):
         return {
@@ -146,12 +147,13 @@ class MetaSPAdesAssembly(sl.ContainerTask):
     # runMetaSpades
 
     # Define the container (in docker-style repo format) to complete this task
-    container = 'golob/spades:3.12.0__bcw.0.3.0'
+    container = 'golob/spades:3.12.0__bcw.0.3.0A'
 
     in_reads = None
 
     destination_dir = sl.Parameter()
     container_temp_dir = sl.Parameter(default='/scratch/')
+    phred_offset = sl.Parameter(default='33')
 
     def out_contigs(self):
         return sl.ContainerTargetInfo(
@@ -188,6 +190,7 @@ class MetaSPAdesAssembly(sl.ContainerTask):
                 'mkdir -p /working && '
                 'metaspades.py '
                 '--meta '
+                '--phred-offset $phred_offset '
                 '-1 $read_1 '
                 '-2 $read_2 '
                 '-o /working/ '
@@ -201,8 +204,9 @@ class MetaSPAdesAssembly(sl.ContainerTask):
             output_targets=output_targets,
             extra_params={
                 'vCPU': self.containerinfo.vcpu,
-                'mem': self.containerinfo.mem / 1024,
+                'mem': int(self.containerinfo.mem / 1024),
                 'tempdir': self.container_temp_dir,
+                'phred_offset': self.phred_offset
             }
         )
 
@@ -272,6 +276,7 @@ class Workflow_SGOM(sl.WorkflowTask):
             # Combine a given specimen's trimmed and human-depleted reads into one pair of reads
             specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt'][0]
 
+            spades_container_info = heavy_containerinfo
             specimen_reads_tasks[specimen]['assembly'] = self.new_task(
                 'assemble.{}'.format(specimen),
                 MetaSPAdesAssembly,
