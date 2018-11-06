@@ -211,6 +211,74 @@ class MetaSPAdesAssembly(sl.ContainerTask):
         )
 
 
+class Emirge16S(sl.ContainerTask):
+    # runMetaSpades
+
+    # Define the container (in docker-style repo format) to complete this task
+    container = 'golob/spades:3.12.0__bcw.0.3.0A'
+
+    in_reads = None
+
+    destination_dir = sl.Parameter()
+    container_temp_dir = sl.Parameter(default='/scratch/')
+    phred_offset = sl.Parameter(default='33')
+
+    def out_contigs(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                'contigs.fasta'
+            ),
+            format=luigi.format.Nop
+        )
+
+    def out_scaffolds(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                'scaffolds.fasta'
+            ),
+            format=luigi.format.Nop
+        )
+
+    def run(self):
+        input_targets = {
+            'read_1': self.in_reads()['R1'],
+            'read_2': self.in_reads()['R2']
+        }
+        output_targets = {
+            'contigs': self.out_contigs(),
+            'scaffolds': self.out_scaffolds(),
+        }
+
+        self.ex(
+            command=(
+                'mkdir -p /working && '
+                'metaspades.py '
+                '--meta '
+                '--phred-offset $phred_offset '
+                '-1 $read_1 '
+                '-2 $read_2 '
+                '-o /working/ '
+                '-t $vCPU '
+                '--memory $mem '
+                '--tmp-dir $tempdir '
+                '&& cp /working/contigs.fasta $contigs '
+                '&& cp /working/scaffolds.fasta $scaffolds '
+            ),
+            input_targets=input_targets,
+            output_targets=output_targets,
+            extra_params={
+                'vCPU': self.containerinfo.vcpu,
+                'mem': int(self.containerinfo.mem / 1024),
+                'tempdir': self.container_temp_dir,
+                'phred_offset': self.phred_offset
+            }
+        )
+
+
 # Workflow
 class Workflow_SGOM(sl.WorkflowTask):
     slconfig = sl.Parameter()
@@ -276,19 +344,18 @@ class Workflow_SGOM(sl.WorkflowTask):
             # Combine a given specimen's trimmed and human-depleted reads into one pair of reads
             specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt'][0]
 
+            # - Assemble (metaspades)
             spades_container_info = heavy_containerinfo
             specimen_reads_tasks[specimen]['assembly'] = self.new_task(
                 'assemble.{}'.format(specimen),
                 MetaSPAdesAssembly,
-                containerinfo=heavy_containerinfo,
+                containerinfo=spades_container_info,
                 destination_dir=os.path.join(
                     self.working_dir,
                     'assembly',
                     specimen
                 )
             )
-
-            # - Assemble (metaspades)
             specimen_reads_tasks[specimen]['assembly'].in_reads = specimen_combined_reads.out_reads
 
 
