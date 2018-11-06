@@ -5,6 +5,7 @@ import sciluigi as sl
 import os
 import csv
 from collections import defaultdict
+import uuid
 
 log = logging.getLogger('sciluigi-interface')
 
@@ -150,7 +151,10 @@ class MetaSPAdesAssembly(sl.ContainerTask):
     in_reads = None
 
     destination_dir = sl.Parameter()
-    container_temp_dir = sl.Parameter(default='/scratch/')
+    container_working_dir = sl.Parameter(default=os.path.join(
+        '/tmp',
+        str(uuid.uuid4())
+    ))
     phred_offset = sl.Parameter(default='33')
 
     def out_contigs(self):
@@ -185,25 +189,26 @@ class MetaSPAdesAssembly(sl.ContainerTask):
 
         self.ex(
             command=(
-                'mkdir -p /working && '
+                'mkdir -p $working_dir && '
                 'metaspades.py '
                 '--meta '
                 '--phred-offset $phred_offset '
                 '-1 $read_1 '
                 '-2 $read_2 '
-                '-o /working/ '
+                '-o $working_dir '
                 '-t $vCPU '
                 '--memory $mem '
-                '--tmp-dir $tempdir '
-                '&& cp /working/contigs.fasta $contigs '
-                '&& cp /working/scaffolds.fasta $scaffolds '
+                #'--tmp-dir $tempdir '
+                '&& cp $working_dir/contigs.fasta $contigs '
+                '&& cp $working_dir/scaffolds.fasta $scaffolds '
+                '&& rm -r $working_dir'
             ),
             input_targets=input_targets,
             output_targets=output_targets,
             extra_params={
                 'vCPU': self.containerinfo.vcpu,
                 'mem': int(self.containerinfo.mem / 1024),
-                'tempdir': self.container_temp_dir,
+                'working_dir': self.container_working_dir,
                 'phred_offset': self.phred_offset
             }
         )
