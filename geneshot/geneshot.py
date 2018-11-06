@@ -7,10 +7,10 @@ import sciluigi as sl
 import os
 import csv
 from collections import defaultdict
-from lib.tasks import LoadManifest
-from lib.tasks import LoadPairedReads
-from lib.tasks import RemoveAdapters
-from lib.tasks import MetaSPAdesAssembly
+from tasks.tasks import LoadManifest
+from tasks.tasks import LoadPairedReads
+from tasks.tasks import RemoveAdapters
+from tasks.tasks import MetaSPAdesAssembly
 
 log = logging.getLogger('sciluigi-interface')
 
