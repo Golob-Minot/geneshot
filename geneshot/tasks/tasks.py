@@ -198,7 +198,6 @@ class MetaSPAdesAssembly(sl.ContainerTask):
                 '-o $working_dir '
                 '-t $vCPU '
                 '--memory $mem '
-                #'--tmp-dir $tempdir '
                 '&& cp $working_dir/contigs.fasta $contigs '
                 '&& cp $working_dir/scaffolds.fasta $scaffolds '
                 '&& rm -r $working_dir'
