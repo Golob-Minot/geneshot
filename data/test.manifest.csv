@@ -1,2 +1,2 @@
 R1_path,R2_path,index,lane,seqnum,specimen
-../data/ATCC-Mock_GCTACGCT-ACTGCATA_L001_R1_002.reduced.fastq.gz,../data/ATCC-Mock_GCTACGCT-ACTGCATA_L001_R2_002..reduced.fastq.gz,GCTACGCT-ACTGCATA,1,2,ATCC-Mock
+../data/ATCC-Mock_GCTACGCT-ACTGCATA_L001_R1_002.reduced.fastq.gz,../data/ATCC-Mock_GCTACGCT-ACTGCATA_L001_R2_002.reduced.fastq.gz,GCTACGCT-ACTGCATA,1,2,ATCC-Mock
