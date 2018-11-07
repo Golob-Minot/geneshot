@@ -100,7 +100,7 @@ class Workflow_SGOM(sl.WorkflowTask):
         return specimen_reads_tasks
 
 
-class SHOTGUNOMATIC:
+class GENESHOT:
     def __init__(self):
         # Make a parser
         parser = argparse.ArgumentParser(description="""
@@ -126,7 +126,7 @@ class SHOTGUNOMATIC:
             default=os.path.expanduser('~/.sciluigi/containerinfo.ini')
         )
 
-        # Options specific to shotgunomatic
+        # Options specific to GeneShot
         parser.add_argument(
             '--manifest',
             '-M',
@@ -172,7 +172,7 @@ class SHOTGUNOMATIC:
 
 def main():
     """Entrypoint for main script."""
-    SHOTGUNOMATIC()
+    GENESHOT()
 
 
 if __name__ == "__main__":
