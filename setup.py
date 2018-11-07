@@ -17,7 +17,7 @@ setuptools.setup(
         'https://github.com/jgolob/sciluigi/tarball/containertask',
     ],
     install_requires=[
-        
+        'sciluigi'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
