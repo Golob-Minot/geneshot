@@ -213,6 +213,171 @@ class MetaSPAdesAssembly(sl.ContainerTask):
         )
 
 
+class ProkkaAnnotate(sl.ContainerTask):
+    container = 'golob/metaspades:v3.11.1--8A__bcw__0.3.0'
+    in_contigs = None
+    destination_dir = sl.Parameter()
+    prefix = sl.Parameter(default='prokka')
+    container_working_dir = sl.Parameter(default=os.path.join(
+        '/tmp',
+        str(uuid.uuid4())
+    ))
+
+    def out_tbl(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.tbl".format(self.prefix)
+            )
+        )
+
+    def out_err(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.err".format(self.prefix)
+            )
+        )
+
+    def out_faa(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.faa".format(self.prefix)
+            )
+        )
+
+    def out_ffn(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.ffn".format(self.prefix)
+            )
+        )
+
+    def out_fna(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.fna".format(self.prefix)
+            )
+        )
+
+    def out_fsa(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.fsa".format(self.prefix)
+            )
+        )
+
+    def out_gbk(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.gbk".format(self.prefix)
+            )
+        )
+
+    def out_gff(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.gff".format(self.prefix)
+            )
+        )
+
+    def out_log(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.log".format(self.prefix)
+            )
+        )
+
+    def out_sqn(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.sqn".format(self.prefix)
+            )
+        )
+
+    def out_tsv(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.tsv".format(self.prefix)
+            )
+        )
+
+    def out_txt(self):
+        return sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.destination_dir,
+                "{}.txt".format(self.prefix)
+            )
+        )
+
+    def run(self):
+        self.ex(
+            command=(
+                'mkdir -p $container_working_dir '
+                '&& prokka '
+                '--outdir $container_working_dir '
+                '--prefix prokka '
+                '--cpus $vcpu '
+                '--force '
+                '$contigs '
+                '&& mv $container_working_dir/prokka.tbl $tbl '
+                '&& mv $container_working_dir/prokka.err $err '
+                '&& mv $container_working_dir/prokka.faa $faa '
+                '&& mv $container_working_dir/prokka.ffn $ffn '
+                '&& mv $container_working_dir/prokka.fna $fna '
+                '&& mv $container_working_dir/prokka.fsa $fsa '
+                '&& mv $container_working_dir/prokka.gbk $gbk '
+                '&& mv $container_working_dir/prokka.gff $gff '
+                '&& mv $container_working_dir/prokka.log $log '
+                '&& mv $container_working_dir/prokka.sqn $sqn '
+                '&& mv $container_working_dir/prokka.tsv $tsv '
+                '&& mv $container_working_dir/prokka.txt $txt '
+                '&& rm -r $container_working_dir'
+            ),
+            input_targets={
+                'contigs': self.in_contigs(),
+            },
+            output_targets={
+                'tbl': self.out_tbl(),
+                'err': self.out_err(),
+                'faa': self.out_faa(),
+                'ffn': self.out_ffn(),
+                'fna': self.out_fna(),
+                'fsa': self.out_fsa(),
+                'gbk': self.out_gbk(),
+                'gff': self.out_gff(),
+                'log': self.out_log(),
+                'sqn': self.out_sqn(),
+                'tsv': self.out_tsv(),
+                'txt': self.out_txt(),
+            },
+            extra_params={
+                'vcpu': self.containerinfo.vcpu,
+                'container_working_dir': self.container_working_dir,
+            }
+        )    
+
 class Emirge16S(sl.ContainerTask):
     # runMetaSpades
 

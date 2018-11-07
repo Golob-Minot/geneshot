@@ -11,6 +11,7 @@ from tasks.tasks import LoadManifest
 from tasks.tasks import LoadPairedReads
 from tasks.tasks import RemoveAdapters
 from tasks.tasks import MetaSPAdesAssembly
+from tasks.tasks import ProkkaAnnotate
 
 log = logging.getLogger('sciluigi-interface')
 
@@ -26,6 +27,11 @@ class Workflow_SGOM(sl.WorkflowTask):
         light_containerinfo.from_config(
             self.slconfig,
             'light'
+        )
+        mid_cpu = sl.ContainerInfo()
+        mid_cpu.from_config(
+            self.slconfig,
+            'midcpu'
         )
         heavy_containerinfo = sl.ContainerInfo()
         heavy_containerinfo.from_config(
@@ -93,6 +99,20 @@ class Workflow_SGOM(sl.WorkflowTask):
             )
             specimen_reads_tasks[specimen]['assembly'].in_reads = specimen_combined_reads.out_reads
 
+            #  - Annotate Assembly (Prokka)
+            specimen_reads_tasks[specimen]['annotate'] = self.new_task(
+                'annotate.{}'.format(specimen),
+                ProkkaAnnotate,
+                containerinfo=mid_cpu,
+                destination_dir=os.path.join(
+                    self.working_dir,
+                    'annotate',
+                    'prokka',
+                    specimen
+                ),
+                prefix="".join(s for s in specimen if s.isalnum()),
+            )
+            specimen_reads_tasks[specimen]['annotate'].in_contigs = specimen_reads_tasks[specimen]['assembly'].out_scaffolds
 
             # - extract 16S (emirge)
             # - Compositional determination (Metaphlan2 / kraken / etc)
