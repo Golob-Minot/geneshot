@@ -167,7 +167,7 @@ class AlignReads(sl.ContainerTask):
         input_targets = {
             'read_1': self.in_reads()['R1'],
             'read_2': self.in_reads()['R2'],
-            'bwa_index': self.in_bwa_index.out_file()
+            'bwa_index': self.in_bwa_index()
         }
         output_targets = {
             'bam': self.out_bam()['bam'],
