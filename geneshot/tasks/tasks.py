@@ -142,6 +142,77 @@ class RemoveAdapters(sl.ContainerTask):
         )
 
 
+class RemoveHuman(sl.ContainerTask):
+    container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
+    in_reads = None
+    human_bwa_index = None
+    nohuman_R1_path = sl.Parameter()
+    nohuman_R2_path = sl.Parameter()
+    nohuman_log_path = sl.Parameter()
+
+    def out_reads(self):
+        return {
+            'R1': sl.ContainerTargetInfo(
+                self,
+                self.nohuman_R1_path,
+                format=luigi.format.Nop
+            ),
+            'R2': sl.ContainerTargetInfo(
+                self,
+                self.nohuman_R2_path,
+                format=luigi.format.Nop
+            ),
+            'log': sl.ContainerTargetInfo(
+                self,
+                self.nohuman_log_path,
+                format=luigi.format.Nop
+            )
+        }
+
+    def run(self):
+        input_targets = {
+            'read_1': self.in_reads()['R1'],
+            'read_2': self.in_reads()['R2'],
+            'human_genome_index': self.human_bwa_index.out_file()
+        }
+        output_targets = {
+            'nohuman_1': self.out_reads()['R1'],
+            'nohuman_2': self.out_reads()['R2'],
+            'log': self.out_reads()['log']
+        }
+        self.ex(
+            command=(
+                'bwa_index=$(tar -ztvf $human_genome_index | head -1 | sed \'s/.* //\' | sed \'s/.amb//\') && '
+                'echo BWA index file prefix is ${bwa_index} | tee $log && '
+                'tar xzvf $human_genome_index | tee $log && '
+                'echo Files in working directory: | tee $log && '
+                'ls -lh | tee $log && '
+                'echo Running BWA | tee $log && '
+                'bwa mem '
+                '-t $vCPU '
+                '-o human_alignment.sam '
+                '${bwa_index} '
+                '$read_1 '
+                '$read_2 | tee $log && '
+                'echo Extracting unaligned read pairs | tee $log && '
+                'samtools view -f 12 human_alignment.sam > human_unaligned.sam && '
+                'echo Extracting R1 | tee $log && '
+                'samtools view -f 64 human_unaligned.sam | samtools fastq - | gzip > $nohuman_1 && '
+                'echo There are $(cat $nohuman_1 | wc -l) lines in the unmapped R1 file | tee $log && '
+                'echo Extracting R2 | tee $log && '
+                'samtools view -F 64 human_unaligned.sam | samtools fastq - | gzip > $nohuman_2 && '
+                'echo There are $(cat $nohuman_2 | wc -l) lines in the unmapped R2 file | tee $log && '
+                'echo Done | tee $log'
+            ),
+            input_targets=input_targets,
+            output_targets=output_targets,
+            extra_params={
+                'vCPU': self.containerinfo.vcpu,
+                'human_bwa_index': self.human_bwa_index,
+            }
+        )
+
+
 class MetaSPAdesAssembly(sl.ContainerTask):
     # runMetaSpades
 

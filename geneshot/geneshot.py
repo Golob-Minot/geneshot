@@ -7,9 +7,11 @@ import sciluigi as sl
 import os
 import csv
 from collections import defaultdict
+from tasks.tasks import LoadFile
 from tasks.tasks import LoadManifest
 from tasks.tasks import LoadPairedReads
 from tasks.tasks import RemoveAdapters
+from tasks.tasks import RemoveHuman
 from tasks.tasks import MetaSPAdesAssembly
 
 log = logging.getLogger('sciluigi-interface')
@@ -19,6 +21,7 @@ class Workflow_SGOM(sl.WorkflowTask):
     slconfig = sl.Parameter()
     manifest_path = sl.Parameter()
     working_dir = sl.Parameter()
+    human_bwa_index = sl.Parameter()
 
     def workflow(self):
         # Initialize our containerinfo classes from our SL-config file
@@ -38,6 +41,13 @@ class Workflow_SGOM(sl.WorkflowTask):
             'load_manifest',
             LoadManifest,
             path=self.manifest_path,
+        )
+
+        # Load the file with the human genome
+        human_bwa_index = self.new_task(
+            'load_human_bwa_index',
+            LoadFile,
+            path=self.human_bwa_index,
         )
 
         specimen_reads_tasks = defaultdict(lambda: defaultdict(dict))
@@ -74,10 +84,33 @@ class Workflow_SGOM(sl.WorkflowTask):
                     cutadapt_log_path="{}.cutadapt.log".format(sp_read_path_base),
                 )
                 specimen_reads_tasks[specimen]['noadapt'][sp_read_idx].in_reads = specimen_reads_tasks[specimen]['raw_reads'][sp_read_idx].out_reads
-                # remove human here
 
-            # Combine a given specimen's trimmed and human-depleted reads into one pair of reads
-            specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt'][0]
+                # Specify the folder for the reads that have had adapters removed, and have also have had human removed                
+                sp_read_path_base = os.path.join(
+                    self.working_dir,
+                    'qc',
+                    'noadapt_nohuman',
+                    '{}.{}'.format(
+                        specimen,
+                        sp_read_idx
+                    )
+                )
+
+                # Remove human reads by aligning against the human genome
+                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx] = self.new_task(
+                    'noadapt_nohuman.{}.{}'.format(specimen, sp_read_idx),
+                    RemoveHuman,
+                    containertargetinfo=light_containerinfo,
+                    nohuman_R1_path="{}.R1.fastq.gz".format(sp_read_path_base),
+                    nohuman_R2_path="{}.R2.fastq.gz".format(sp_read_path_base),
+                    nohuman_log_path="{}.nohuman.log".format(sp_read_path_base),
+                )
+                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].human_bwa_index = human_bwa_index
+                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].in_reads = specimen_reads_tasks[specimen]['noadapt'][sp_read_idx].out_reads
+
+
+            # Combine a given specimen's trimmed and human-depleted reads into one pair of reads TODO
+            specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt_nohuman'][0]
 
             # - Assemble (metaspades)
             spades_container_info = heavy_containerinfo
@@ -133,6 +166,12 @@ class GENESHOT:
             help="""Location of manifest file in CSV format""",
             required=True
         )
+        # Human genome indexed with BWA and stored in a TGZ
+        parser.add_argument(
+            '--human-bwa-index',
+            help="""Location of human genome BWA index (TGZ)""",
+            required=True
+        )
         parser.add_argument(
             '--working-dir',
             '-w',
@@ -156,6 +195,9 @@ class GENESHOT:
             ),
             '--manifest-path={}'.format(
                 args.manifest
+            ),
+            '--human-bwa-index={}'.format(
+                args.human_bwa_index
             ),
             '--working-dir={}'.format(
                 args.working_dir,
