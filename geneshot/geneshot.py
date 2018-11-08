@@ -105,7 +105,7 @@ class Workflow_SGOM(sl.WorkflowTask):
                     nohuman_R2_path="{}.R2.fastq.gz".format(sp_read_path_base),
                     nohuman_log_path="{}.nohuman.log".format(sp_read_path_base),
                 )
-                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].human_bwa_index = human_bwa_index
+                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].in_human_bwa_index = human_bwa_index.out_file
                 specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].in_reads = specimen_reads_tasks[specimen]['noadapt'][sp_read_idx].out_reads
 
 

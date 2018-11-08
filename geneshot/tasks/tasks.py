@@ -145,7 +145,7 @@ class RemoveAdapters(sl.ContainerTask):
 class RemoveHuman(sl.ContainerTask):
     container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
     in_reads = None
-    human_bwa_index = None
+    in_human_bwa_index = None
     nohuman_R1_path = sl.Parameter()
     nohuman_R2_path = sl.Parameter()
     nohuman_log_path = sl.Parameter()
