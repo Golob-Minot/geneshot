@@ -193,8 +193,7 @@ class AlignReads(sl.ContainerTask):
             input_targets=input_targets,
             output_targets=output_targets,
             extra_params={
-                'vCPU': self.containerinfo.vcpu,
-                'in_bwa_index': self.in_bwa_index,
+                'vCPU': self.containerinfo.vcpu
             }
         )
 
