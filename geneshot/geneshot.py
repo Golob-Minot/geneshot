@@ -26,12 +26,18 @@ class Workflow_SGOM(sl.WorkflowTask):
 
     def workflow(self):
         # Initialize our containerinfo classes from our SL-config file
-        light_containerinfo = sl.ContainerInfo()
+        light_containerinfo = sl.ContainerInfo(
+            # Format is {'source_path': {'bind': '/container/path', 'mode': mode}} 
+            mounts={"docker_scratch": {"bind": "/tmp/", "mode": "rw"}}
+        )
         light_containerinfo.from_config(
             self.slconfig,
             'light'
         )
-        heavy_containerinfo = sl.ContainerInfo()
+        heavy_containerinfo = sl.ContainerInfo(
+            # Format is {'source_path': {'bind': '/container/path', 'mode': mode}}
+            mounts={"docker_scratch": {"bind": "/tmp/", "mode": "rw"}}
+        )
         heavy_containerinfo.from_config(
             self.slconfig,
             'heavy'

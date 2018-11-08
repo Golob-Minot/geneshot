@@ -148,6 +148,10 @@ class AlignReads(sl.ContainerTask):
     in_bwa_index = None
     bam_path = sl.Parameter()
     alignment_log_path = sl.Parameter()
+    container_working_dir = sl.Parameter(default=os.path.join(
+        '/tmp',
+        str(uuid.uuid4())
+    ))
 
     def out_bam(self):
         return {
@@ -175,25 +179,31 @@ class AlignReads(sl.ContainerTask):
         }
         self.ex(
             command=(
+                'mkdir -p $working_dir && '
+                'cd $working_dir && '
                 'bwa_index_prefix=$(tar -ztvf $bwa_index | head -1 | sed \'s/.* //\' | sed \'s/.amb//\') && '
-                'echo BWA index file prefix is ${bwa_index_prefix} | tee $log && '
-                'tar xzvf $bwa_index | tee $log && '
-                'echo Files in working directory: | tee $log && '
-                'ls -lh | tee $log && '
-                'echo Running BWA | tee $log && '
+                'echo BWA index file prefix is ${bwa_index_prefix} | tee - a $log && '
+                'tar xzvf $bwa_index | tee - a $log && '
+                'echo Files in working directory: | tee - a $log && '
+                'ls -lh | tee - a $log && '
+                'echo Running BWA | tee - a $log && '
                 'bwa mem '
                 '-t $vCPU '
                 '-o alignment.sam '
                 '${bwa_index_prefix} '
                 '$read_1 '
-                '$read_2 | tee $log && '
+                '$read_2 | tee - a $log && '
                 'echo Converting to BAM && '
-                'samtools view -bh -o $bam alignment.sam'
+                'samtools view -bh -o $bam alignment.sam && '
+                'echo Deleting temporary folder | tee -a $log && '
+                'rm -r $working_dir && '
+                'echo Done | tee -a $log'
             ),
             input_targets=input_targets,
             output_targets=output_targets,
             extra_params={
-                'vCPU': self.containerinfo.vcpu
+                'vCPU': self.containerinfo.vcpu,
+                'working_dir': self.container_working_dir,
             }
         )
 
@@ -204,6 +214,10 @@ class ExtractUnalignedPairs(sl.ContainerTask):
     unaligned_R1_path = sl.Parameter()
     unaligned_R2_path = sl.Parameter()
     unaligned_log_path = sl.Parameter()
+    container_working_dir = sl.Parameter(default=os.path.join(
+        '/tmp',
+        str(uuid.uuid4())
+    ))
 
     def out_reads(self):
         return {
@@ -235,20 +249,25 @@ class ExtractUnalignedPairs(sl.ContainerTask):
         }
         self.ex(
             command=(
-                'echo Extracting unaligned read pairs | tee $log && '
+                'mkdir -p $working_dir && '
+                'cd $working_dir && '
+                'echo Extracting unaligned read pairs | tee -a $log && '
                 'samtools view -f 12 $bam > unaligned.sam && '
-                'echo Extracting R1 | tee $log && '
+                'echo Extracting R1 | tee -a $log && '
                 'samtools view -f 64 unaligned.sam | samtools fastq - | gzip > $unaligned_1 && '
-                'echo There are $(cat $unaligned_1 | wc -l) lines in the unmapped R1 file | tee $log && '
-                'echo Extracting R2 | tee $log && '
+                'echo There are $(cat $unaligned_1 | wc -l) lines in the unmapped R1 file | tee -a $log && '
+                'echo Extracting R2 | tee -a $log && '
                 'samtools view -F 64 unaligned.sam | samtools fastq - | gzip > $unaligned_2 && '
-                'echo There are $(cat $unaligned_2 | wc -l) lines in the unmapped R2 file | tee $log && '
-                'echo Done | tee $log'
+                'echo There are $(cat $unaligned_2 | wc -l) lines in the unmapped R2 file | tee -a $log && '
+                'echo Deleting temporary folder && '
+                'rm -r $working_dir && '
+                'echo Done | tee -a $log'
             ),
             input_targets=input_targets,
             output_targets=output_targets,
             extra_params={
                 'vCPU': self.containerinfo.vcpu,
+                'working_dir': self.container_working_dir,
             }
         )
 
