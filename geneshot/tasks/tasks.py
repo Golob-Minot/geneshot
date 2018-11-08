@@ -213,6 +213,41 @@ class MetaSPAdesAssembly(sl.ContainerTask):
         )
 
 
+class EggnogMapperDownloadDB(sl.ContainerTask):
+    container = 'golob/eggnog-mapper:1.0.3__bcw.0.3.0'
+    db = sl.Parameter(default='none')
+    container_working_dir = sl.Parameter(default=os.path.join(
+        '/tmp',
+        str(uuid.uuid4())
+    ))
+    destination_tgz = sl.Parameter()
+
+    def out_eggnog_db_tgz(self):
+        return sl.ContainerTargetInfo(
+            self,
+            self.destination_tgz,
+            format=luigi.format.Nop
+        )        
+    
+    def run(self):
+        self.ex(
+            command=(
+                'mkdir -p $working_dir && '
+                'download_eggnog_data.py $db -y --data_dir $working_dir && '
+                'tar czvf $eggnog_db_tgz --directory $working_dir . && '
+                'rm -r $working_dir'
+            ),
+            output_targets={
+                'eggnog_db_tgz': self.out_eggnog_db_tgz()
+            },
+            extra_params={
+                'working_dir': self.container_working_dir,
+                'db': self.db
+            }
+        )
+
+
+
 class ProkkaAnnotate(sl.ContainerTask):
     container = 'golob/metaspades:v3.11.1--8A__bcw__0.3.0'
     in_contigs = None
