@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import argparse
 import logging
 import sys
@@ -7,9 +7,12 @@ import sciluigi as sl
 import os
 import csv
 from collections import defaultdict
+from tasks.tasks import LoadFile
 from tasks.tasks import LoadManifest
 from tasks.tasks import LoadPairedReads
 from tasks.tasks import RemoveAdapters
+from tasks.tasks import ExtractUnalignedPairs
+from tasks.tasks import AlignReads
 from tasks.tasks import MetaSPAdesAssembly
 from tasks.tasks import ProkkaAnnotate
 from tasks.tasks import EggnogMapperDownloadDB
@@ -21,20 +24,31 @@ class Workflow_SGOM(sl.WorkflowTask):
     slconfig = sl.Parameter()
     manifest_path = sl.Parameter()
     working_dir = sl.Parameter()
+    human_bwa_index = sl.Parameter()
 
     def workflow(self):
         # Initialize our containerinfo classes from our SL-config file
-        light_containerinfo = sl.ContainerInfo()
+        light_containerinfo = sl.ContainerInfo(
+            # Format is {'source_path': {'bind': '/container/path', 'mode': mode}} 
+            mounts={"docker_scratch": {"bind": "/tmp/", "mode": "rw"}}
+        )
         light_containerinfo.from_config(
             self.slconfig,
             'light'
         )
+<<<<<<< HEAD
         mid_cpu = sl.ContainerInfo()
         mid_cpu.from_config(
             self.slconfig,
             'midcpu'
         )
         heavy_containerinfo = sl.ContainerInfo()
+=======
+        heavy_containerinfo = sl.ContainerInfo(
+            # Format is {'source_path': {'bind': '/container/path', 'mode': mode}}
+            mounts={"docker_scratch": {"bind": "/tmp/", "mode": "rw"}}
+        )
+>>>>>>> align-to-human
         heavy_containerinfo.from_config(
             self.slconfig,
             'heavy'
@@ -45,6 +59,13 @@ class Workflow_SGOM(sl.WorkflowTask):
             'load_manifest',
             LoadManifest,
             path=self.manifest_path,
+        )
+
+        # Load the file with the human genome
+        human_bwa_index = self.new_task(
+            'load_human_bwa_index',
+            LoadFile,
+            path=self.human_bwa_index,
         )
 
         specimen_reads_tasks = defaultdict(lambda: defaultdict(dict))
@@ -92,10 +113,54 @@ class Workflow_SGOM(sl.WorkflowTask):
                     cutadapt_log_path="{}.cutadapt.log".format(sp_read_path_base),
                 )
                 specimen_reads_tasks[specimen]['noadapt'][sp_read_idx].in_reads = specimen_reads_tasks[specimen]['raw_reads'][sp_read_idx].out_reads
-                # remove human here
 
-            # Combine a given specimen's trimmed and human-depleted reads into one pair of reads
-            specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt'][0]
+                # Specify the folder for the alignment against the human genome
+                sp_read_path_base = os.path.join(
+                    self.working_dir,
+                    'qc',
+                    'noadapt_align_human',
+                    '{}.{}'.format(
+                        specimen,
+                        sp_read_idx
+                    )
+                )
+
+                # Aligning reads against the human genome, so that the unaligned ones can be removed
+                specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx] = self.new_task(
+                    'noadapt_align_human.{}.{}'.format(specimen, sp_read_idx),
+                    AlignReads,
+                    containertargetinfo=heavy_containerinfo,
+                    bam_path="{}.bam".format(sp_read_path_base),
+                    alignment_log_path="{}.log".format(sp_read_path_base)
+                )
+                specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx].in_bwa_index = human_bwa_index.out_file
+                specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx].in_reads = specimen_reads_tasks[specimen]['noadapt'][sp_read_idx].out_reads
+
+                # Specify the folder for the reads that have had adapters removed, and have also have had human removed                
+                sp_read_path_base = os.path.join(
+                    self.working_dir,
+                    'qc',
+                    'noadapt_nohuman',
+                    '{}.{}'.format(
+                        specimen,
+                        sp_read_idx
+                    )
+                )
+
+                # Aligning reads against the human genome, so that the unaligned ones can be removed
+                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx] = self.new_task(
+                    'noadapt_nohuman.{}.{}'.format(specimen, sp_read_idx),
+                    ExtractUnalignedPairs,
+                    containertargetinfo=light_containerinfo,
+                    unaligned_R1_path="{}.R1.fastq.gz".format(sp_read_path_base),
+                    unaligned_R2_path="{}.R2.fastq.gz".format(sp_read_path_base),
+                    unaligned_log_path="{}.log".format(sp_read_path_base)
+                )
+                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].in_bam = specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx].out_bam
+
+
+            # Combine a given specimen's trimmed and human-depleted reads into one pair of reads TODO
+            specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt_nohuman'][0]
 
             # - Assemble (metaspades)
             spades_container_info = heavy_containerinfo
@@ -135,7 +200,7 @@ class Workflow_SGOM(sl.WorkflowTask):
         return specimen_reads_tasks, eggnog_dbs
 
 
-class SHOTGUNOMATIC:
+class GENESHOT:
     def __init__(self):
         # Make a parser
         parser = argparse.ArgumentParser(description="""
@@ -161,11 +226,17 @@ class SHOTGUNOMATIC:
             default=os.path.expanduser('~/.sciluigi/containerinfo.ini')
         )
 
-        # Options specific to shotgunomatic
+        # Options specific to GeneShot
         parser.add_argument(
             '--manifest',
             '-M',
             help="""Location of manifest file in CSV format""",
+            required=True
+        )
+        # Human genome indexed with BWA and stored in a TGZ
+        parser.add_argument(
+            '--human-bwa-index',
+            help="""Location of human genome BWA index (TGZ)""",
             required=True
         )
         parser.add_argument(
@@ -192,6 +263,9 @@ class SHOTGUNOMATIC:
             '--manifest-path={}'.format(
                 args.manifest
             ),
+            '--human-bwa-index={}'.format(
+                args.human_bwa_index
+            ),
             '--working-dir={}'.format(
                 args.working_dir,
             )
@@ -207,7 +281,7 @@ class SHOTGUNOMATIC:
 
 def main():
     """Entrypoint for main script."""
-    SHOTGUNOMATIC()
+    GENESHOT()
 
 
 if __name__ == "__main__":
