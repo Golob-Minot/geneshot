@@ -154,18 +154,18 @@ class AlignReads(sl.ContainerTask):
     ))
 
     def out_bam(self):
-        return {
-            "bam": sl.ContainerTargetInfo(
-                self,
-                self.bam_path,
-                format=luigi.format.Nop
-            ),
-            "log": sl.ContainerTargetInfo(
+        return sl.ContainerTargetInfo(
                 self,
                 self.bam_path,
                 format=luigi.format.Nop
             )
-        }
+
+    def out_log(self):
+        return sl.ContainerTargetInfo(
+                self,
+                self.bam_path,
+                format=luigi.format.Nop
+            )
 
     def run(self):
         input_targets = {
@@ -174,8 +174,8 @@ class AlignReads(sl.ContainerTask):
             'bwa_index': self.in_bwa_index()
         }
         output_targets = {
-            'bam': self.out_bam()['bam'],
-            'log': self.out_bam()['log']
+            'bam': self.out_bam(),
+            'log': self.out_log()
         }
         self.ex(
             command=(
