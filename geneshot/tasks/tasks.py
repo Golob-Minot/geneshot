@@ -243,7 +243,7 @@ class AlignReads(sl.ContainerTask):
     def out_log(self):
         return sl.ContainerTargetInfo(
                 self,
-                self.bam_path,
+                self.alignment_log_path,
                 format=luigi.format.Nop
             )
 
@@ -335,10 +335,10 @@ class ExtractUnalignedPairs(sl.ContainerTask):
                 'samtools view -f 12 $bam > unaligned.sam && '
                 'echo Extracting R1 | tee -a $log && '
                 'samtools view -f 64 unaligned.sam | samtools fastq - | gzip > $unaligned_1 && '
-                'echo There are $(cat $unaligned_1 | wc -l) lines in the unmapped R1 file | tee -a $log && '
+                'echo There are $$(cat $unaligned_1 | wc -l) lines in the unmapped R1 file | tee -a $log && '
                 'echo Extracting R2 | tee -a $log && '
                 'samtools view -F 64 unaligned.sam | samtools fastq - | gzip > $unaligned_2 && '
-                'echo There are $(cat $unaligned_2 | wc -l) lines in the unmapped R2 file | tee -a $log && '
+                'echo There are $$(cat $unaligned_2 | wc -l) lines in the unmapped R2 file | tee -a $log && '
                 'echo Deleting temporary folder && '
                 'rm -r $working_dir && '
                 'echo Done | tee -a $log'
