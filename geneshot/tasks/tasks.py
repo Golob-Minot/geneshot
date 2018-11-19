@@ -141,10 +141,90 @@ class RemoveAdapters(sl.ContainerTask):
             }
         )
 
+class BWAIndexHumanGenome(sl.ContainerTask):
+    container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
+    container_working_dir = sl.Parameter(default=os.path.join(
+        '/tmp',
+        str(uuid.uuid4())
+    ))
+    genome_source = sl.Parameter(
+        default='ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.gz'
+    )
+    genome_index_source = sl.Parameter(
+        default='ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
+    )
+    exclude_EBV = sl.Parameter(
+        default=False
+    )
+    exclude_MT = sl.Parameter(
+        default=False
+    )
+    index_tgz_path = sl.Parameter()
+
+    def out_bwa_index(self):
+        return sl.ContainerTargetInfo(
+                self,
+                self.index_tgz_path,
+                format=luigi.format.Nop
+            )
+       
+    def run(self):
+        output_targets = {
+            'index_tgz': self.out_bwa_index()
+        }
+        if self.exclude_EBV is False and self.exclude_MT is False:
+            # We are just going to keep the complete genome build
+            self.ex(
+                command=(
+                    'wget $genome_index_source -O $index_tgz '
+                ),
+                output_targets=output_targets,
+                extra_params={
+                    'genome_index_source': self.genome_index_source
+                }
+            )
+        else:  # We ARE excluding portions of the genome
+            exclusion_str = ""
+            if self.exclude_EBV and self.exclude_MT:
+                exclusion_str = "if sr.id == 'chrEBV' or sr.id == 'chrM': continue"
+            elif self.exclude_EBV:
+                exclusion_str = "if sr.id == 'chrEBV': continue"
+            elif self.exclude_MT:
+                exclusion_str = "if sr.id == 'chrM': continue"
+
+            self.ex(
+                command=(
+                    'mkdir -p $working_dir && '
+                    'mkdir -p $working_dir/bwa_index &&'
+                    'cd $working_dir && '
+                    'wget $genome_source -O $working_dir/genome.fna.gz && '
+                    'echo -e "'
+                    'from Bio import SeqIO\n'
+                    'import gzip\n'
+                    "ofh = gzip.open('$working_dir/genome.filtered.fna.gz', 'wt')\n"
+                    "for sr in SeqIO.parse(gzip.open('$working_dir/genome.fna.gz', 'rt'), 'fasta'):\n"
+                    "\t$exclusion_str\n"
+                    "\tSeqIO.write(sr, ofh, 'fasta')\n"
+                    "\n"
+                    "ofh.close()\n"
+                    '" | python && '
+                    'cd $working_dir/bwa_index && '
+                    'bwa index -a bwtsw -p human_genome_bwa $working_dir/genome.filtered.fna.gz && '
+                    'tar czvf $index_tgz . '
+                ),
+                output_targets=output_targets,
+                extra_params={
+                    'working_dir': self.container_working_dir,
+                    'genome_source': self.genome_source,
+                    'exclusion_str': exclusion_str,
+                }
+            )
 
 class AlignReads(sl.ContainerTask):
     container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
     in_reads = None
+    # Human genome build can be found at:
+    # ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/ 
     in_bwa_index = None
     bam_path = sl.Parameter()
     alignment_log_path = sl.Parameter()
@@ -181,8 +261,8 @@ class AlignReads(sl.ContainerTask):
             command=(
                 'mkdir -p $working_dir && '
                 'cd $working_dir && '
-                'bwa_index_prefix=$(tar -ztvf $bwa_index | head -1 | sed \'s/.* //\' | sed \'s/.amb//\') && '
-                'echo BWA index file prefix is ${bwa_index_prefix} | tee - a $log && '
+                'bwa_index_prefix=$$(tar -ztvf $bwa_index | head -1 | sed \'s/.* //\' | sed \'s/.amb//\') && '
+                'echo BWA index file prefix is $${bwa_index_prefix} | tee - a $log && '
                 'tar xzvf $bwa_index | tee - a $log && '
                 'echo Files in working directory: | tee - a $log && '
                 'ls -lh | tee - a $log && '
@@ -190,7 +270,7 @@ class AlignReads(sl.ContainerTask):
                 'bwa mem '
                 '-t $vCPU '
                 '-o alignment.sam '
-                '${bwa_index_prefix} '
+                '$${bwa_index_prefix} '
                 '$read_1 '
                 '$read_2 | tee - a $log && '
                 'echo Converting to BAM && '
