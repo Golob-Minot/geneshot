@@ -350,7 +350,62 @@ class ExtractUnalignedPairs(sl.ContainerTask):
                 'working_dir': self.container_working_dir,
             }
         )
+    
 
+class CombineReads(sl.ContainerTask):
+    container = 'golob/fastatools:0.5__bcw.0.3.0'
+
+    in_reads_list = None
+    combined_R1_path = sl.Parameter()
+    combined_R2_path = sl.Parameter()
+
+    def out_reads(self):
+        return {
+            'R1': sl.ContainerTargetInfo(
+                self,
+                self.combined_R1_path,
+                format=luigi.format.Nop
+            ),
+            'R2': sl.ContainerTargetInfo(
+                self,
+                self.combined_R2_path,
+                format=luigi.format.Nop
+            ),
+        }
+
+    def run(self):
+        assert len(self.in_reads_list) > 2, "Less than two read pairs to combine. Nothing to do"
+        # Implicit else
+        input_targets = {}
+        R1_command_string = ""
+        R2_command_string = ""
+        for index, read_pair in enumerate(self.in_reads_list):
+            input_targets['p{}_R1'.format(index)] = read_pair()["R1"]
+            input_targets['p{}_R2'.format(index)] = read_pair()["R2"]
+            R1_command_string += 'p{}_R1'.format(index)
+            R2_command_string += 'p{}_R2'.format(index)
+        self.ex(
+            command=(
+                'combine_fasta.py '
+                '$R1_string '
+                '-q '
+                '-o $out_R1 &&'
+                'combine_fasta.py '
+                '$R2_string '
+                '-q '
+                '-o $out_R2'
+            ),
+            input_targets=input_targets,
+            output_targets={
+                'out_R1': self.out_reads()['R1'],
+                'out_R2': self.out_reads()['R2']
+            },
+            extra_params={
+                'R1_string': R1_command_string,
+                'R2_string': R2_command_string,
+            }
+        )
+        
 
 class MetaSPAdesAssembly(sl.ContainerTask):
     # runMetaSpades

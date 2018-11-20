@@ -16,6 +16,7 @@ from tasks.tasks import AlignReads
 from tasks.tasks import MetaSPAdesAssembly
 from tasks.tasks import ProkkaAnnotate
 from tasks.tasks import EggnogMapperDownloadDB
+from tasks.tasks import CombineReads
 
 log = logging.getLogger('sciluigi-interface')
 
@@ -157,7 +158,27 @@ class Workflow_SGOM(sl.WorkflowTask):
 
 
             # Combine a given specimen's trimmed and human-depleted reads into one pair of reads TODO
-            specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt_nohuman'][0]
+            if len(specimen_reads) < 2:
+                specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt_nohuman'][0]
+            else:
+                specimen_combined_reads = self.new_task(
+                    'combined_reads.{}'.format(specimen),
+                    CombineReads,
+                    containertargetinfo=light_containerinfo,
+                    combined_R1_path=os.path.join(
+                        self.working_dir,
+                        'qc',
+                        'combined',
+                        'combined_reads.{}.R1.fastq.gz'.format(specimen)
+                    ),
+                    combined_R2_path=os.path.join(
+                        self.working_dir,
+                        'qc',
+                        'combined',
+                        'combined_reads.{}.R2.fastq.gz'.format(specimen)
+                    )
+                )
+                specimen_combined_reads.in_reads_list = [v.out_reads for v in specimen_reads_tasks[specimen]['noadapt_nohuman'].values()]
 
             # - Assemble (metaspades)
             spades_container_info = heavy_containerinfo
