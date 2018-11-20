@@ -157,8 +157,9 @@ class Workflow_SGOM(sl.WorkflowTask):
                 specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].in_bam = specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx].out_bam
 
 
-            # Combine a given specimen's trimmed and human-depleted reads into one pair of reads TODO
-            if len(specimen_reads) < 2:
+            # Combine a given specimen's trimmed and human-depleted reads into one pair of reads
+            assert len(specimen_reads) == len(specimen_reads_tasks[specimen]['noadapt_nohuman']), "Mismatch in reads vs nohuman reads"
+            if len(specimen_reads_tasks[specimen]['noadapt_nohuman']) < 2:
                 specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt_nohuman'][0]
             else:
                 specimen_combined_reads = self.new_task(
