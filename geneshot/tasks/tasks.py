@@ -141,6 +141,7 @@ class RemoveAdapters(sl.ContainerTask):
             }
         )
 
+
 class BWAIndexHumanGenome(sl.ContainerTask):
     container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
     container_working_dir = sl.Parameter(default=os.path.join(
@@ -167,7 +168,7 @@ class BWAIndexHumanGenome(sl.ContainerTask):
                 self.index_tgz_path,
                 format=luigi.format.Nop
             )
-       
+
     def run(self):
         output_targets = {
             'index_tgz': self.out_bwa_index()
@@ -219,6 +220,7 @@ class BWAIndexHumanGenome(sl.ContainerTask):
                     'exclusion_str': exclusion_str,
                 }
             )
+
 
 class AlignReads(sl.ContainerTask):
     container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
@@ -437,8 +439,8 @@ class EggnogMapperDownloadDB(sl.ContainerTask):
             self,
             self.destination_tgz,
             format=luigi.format.Nop
-        )        
-    
+        )   
+
     def run(self):
         self.ex(
             command=(
@@ -455,7 +457,6 @@ class EggnogMapperDownloadDB(sl.ContainerTask):
                 'db': self.db
             }
         )
-
 
 
 class ProkkaAnnotate(sl.ContainerTask):
@@ -622,6 +623,7 @@ class ProkkaAnnotate(sl.ContainerTask):
                 'container_working_dir': self.container_working_dir,
             }
         )    
+
 
 class Emirge16S(sl.ContainerTask):
     # runMetaSpades

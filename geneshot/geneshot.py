@@ -19,6 +19,7 @@ from tasks.tasks import EggnogMapperDownloadDB
 
 log = logging.getLogger('sciluigi-interface')
 
+
 # Workflow
 class Workflow_SGOM(sl.WorkflowTask):
     slconfig = sl.Parameter()
@@ -28,10 +29,7 @@ class Workflow_SGOM(sl.WorkflowTask):
 
     def workflow(self):
         # Initialize our containerinfo classes from our SL-config file
-        light_containerinfo = sl.ContainerInfo(
-            # Format is {'source_path': {'bind': '/container/path', 'mode': mode}} 
-            #mounts={"docker_scratch": {"bind": "/tmp/", "mode": "rw"}}
-        )
+        light_containerinfo = sl.ContainerInfo()
         light_containerinfo.from_config(
             self.slconfig,
             'light'
@@ -42,10 +40,6 @@ class Workflow_SGOM(sl.WorkflowTask):
             'midcpu'
         )
         heavy_containerinfo = sl.ContainerInfo()
-        #heavy_containerinfo = sl.ContainerInfo(
-        #    # Format is {'source_path': {'bind': '/container/path', 'mode': mode}}
-            #mounts={"docker_scratch": {"bind": "/tmp/", "mode": "rw"}}
-        #)
         heavy_containerinfo.from_config(
             self.slconfig,
             'heavy'
@@ -154,7 +148,6 @@ class Workflow_SGOM(sl.WorkflowTask):
                     unaligned_log_path="{}.log".format(sp_read_path_base)
                 )
                 specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].in_bam = specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx].out_bam
-
 
             # Combine a given specimen's trimmed and human-depleted reads into one pair of reads TODO
             specimen_combined_reads = specimen_reads_tasks[specimen]['noadapt_nohuman'][0]
