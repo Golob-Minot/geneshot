@@ -168,7 +168,7 @@ class BWAIndexHumanGenome(sl.ContainerTask):
                 self.index_tgz_path,
                 format=luigi.format.Nop
             )
-       
+
     def run(self):
         output_targets = {
             'index_tgz': self.out_bwa_index()
@@ -681,6 +681,7 @@ class ProkkaAnnotate(sl.ContainerTask):
                 'container_working_dir': self.container_working_dir,
             }
         )
+
 
 
 class Emirge16S(sl.ContainerTask):
