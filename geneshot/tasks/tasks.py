@@ -164,10 +164,10 @@ class BWAIndexHumanGenome(sl.ContainerTask):
 
     def out_bwa_index(self):
         return sl.ContainerTargetInfo(
-                self,
-                self.index_tgz_path,
-                format=luigi.format.Nop
-            )
+            self,
+            self.index_tgz_path,
+            format=luigi.format.Nop
+        )
 
     def run(self):
         output_targets = {
@@ -226,7 +226,7 @@ class AlignReads(sl.ContainerTask):
     container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
     in_reads = None
     # Human genome build can be found at:
-    # ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/ 
+    # ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/
     in_bwa_index = None
     bam_path = sl.Parameter()
     alignment_log_path = sl.Parameter()
@@ -237,17 +237,17 @@ class AlignReads(sl.ContainerTask):
 
     def out_bam(self):
         return sl.ContainerTargetInfo(
-                self,
-                self.bam_path,
-                format=luigi.format.Nop
-            )
+            self,
+            self.bam_path,
+            format=luigi.format.Nop
+        )
 
     def out_log(self):
         return sl.ContainerTargetInfo(
-                self,
-                self.alignment_log_path,
-                format=luigi.format.Nop
-            )
+            self,
+            self.alignment_log_path,
+            format=luigi.format.Nop
+        )
 
     def run(self):
         input_targets = {
@@ -681,7 +681,6 @@ class ProkkaAnnotate(sl.ContainerTask):
                 'container_working_dir': self.container_working_dir,
             }
         )
-
 
 
 class Emirge16S(sl.ContainerTask):
