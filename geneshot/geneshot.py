@@ -20,6 +20,7 @@ from tasks.tasks import CombineReads
 
 log = logging.getLogger('sciluigi-interface')
 
+
 # Workflow
 class Workflow_SGOM(sl.WorkflowTask):
     slconfig = sl.Parameter()

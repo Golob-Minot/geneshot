@@ -141,6 +141,7 @@ class RemoveAdapters(sl.ContainerTask):
             }
         )
 
+
 class BWAIndexHumanGenome(sl.ContainerTask):
     container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
     container_working_dir = sl.Parameter(default=os.path.join(
@@ -219,6 +220,7 @@ class BWAIndexHumanGenome(sl.ContainerTask):
                     'exclusion_str': exclusion_str,
                 }
             )
+
 
 class AlignReads(sl.ContainerTask):
     container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
@@ -350,10 +352,10 @@ class ExtractUnalignedPairs(sl.ContainerTask):
                 'working_dir': self.container_working_dir,
             }
         )
-    
+
 
 class CombineReads(sl.ContainerTask):
-    container = 'golob/fastatools:0.5__bcw.0.3.0'
+    container = 'golob/fastatools:0.6.2__bcw.0.3.0'
 
     in_reads_list = None
     combined_R1_path = sl.Parameter()
@@ -385,14 +387,12 @@ class CombineReads(sl.ContainerTask):
             R1_command_string += '$p{}_R1 '.format(index)
             R2_command_string += '$p{}_R2 '.format(index)
         command = (
-            'combine_fasta.py '
-            '{} '
-            '-q '
-            '-o $out_R1 && '
-            'combine_fasta.py '
-            '{} '
-            '-q '
-            '-o $out_R2'
+            'combine_fastq_pairs.py '
+            '-1 {} '
+            '-2 {} '
+            '--normalize-ids '
+            '-o1 $out_R1 '
+            '-o2 $out_R2'
         ).format(
             R1_command_string,
             R2_command_string
@@ -496,8 +496,8 @@ class EggnogMapperDownloadDB(sl.ContainerTask):
             self,
             self.destination_tgz,
             format=luigi.format.Nop
-        )        
-    
+        )
+
     def run(self):
         self.ex(
             command=(
@@ -514,7 +514,6 @@ class EggnogMapperDownloadDB(sl.ContainerTask):
                 'db': self.db
             }
         )
-
 
 
 class ProkkaAnnotate(sl.ContainerTask):
@@ -641,6 +640,7 @@ class ProkkaAnnotate(sl.ContainerTask):
                 'mkdir -p $container_working_dir '
                 '&& prokka '
                 '--outdir $container_working_dir '
+                '--centre UoM --compliant '
                 '--prefix prokka '
                 '--cpus $vcpu '
                 '--force '
@@ -680,7 +680,8 @@ class ProkkaAnnotate(sl.ContainerTask):
                 'vcpu': self.containerinfo.vcpu,
                 'container_working_dir': self.container_working_dir,
             }
-        )    
+        )
+
 
 class Emirge16S(sl.ContainerTask):
     # runMetaSpades
