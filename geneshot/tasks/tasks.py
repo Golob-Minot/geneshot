@@ -355,7 +355,7 @@ class ExtractUnalignedPairs(sl.ContainerTask):
 
 
 class CombineReads(sl.ContainerTask):
-    container = 'golob/fastatools:0.6.2__bcw.0.3.0'
+    container = 'golob/fastatools:0.6.4__bcw.0.3.0'
 
     in_reads_list = None
     combined_R1_path = sl.Parameter()
