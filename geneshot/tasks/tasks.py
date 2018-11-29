@@ -482,6 +482,51 @@ class MetaSPAdesAssembly(sl.ContainerTask):
         )
 
 
+class EggnogMapperMap(sl.ContainerTask):
+    container = 'golob/eggnog-mapper:1.0.3__bcw.0.3.0'
+    container_working_dir = sl.Parameter(default=os.path.join(
+        '/tmp',
+        str(uuid.uuid4())
+    ))
+    # Where to put the gzipped annotations
+    annotation_path_gz = sl.Parameter()
+    in_db_tgz = None
+    in_fna = None
+
+    def out_annotations(self):
+        return sl.ContainerTargetInfo(
+            self,
+            self.annotation_path_gz,
+            format=luigi.format.Nop
+        )
+
+    def run(self):
+        self.ex(
+            command=(
+                'mkdir -p $working_dir/emdb'
+                '&& tar -C $working_dir/emdb/ xvf $db_tgz eggnog.db eggnog_proteins.dmnd '
+                '&& emapper.py '
+                '-i $fna '
+                '-m diamond '
+                '--dmnd_db $working_dir/embd/eggnog_proteins.dmnd '
+                '--data_dir $working_dir/emdb/ '
+                '--cpu $vcpu '
+                '--temp_dir $working_dir '
+                '-o $working_dir/egm '
+                '&& gzip -c $working_dir/egm.emapper.annotations > $annot_gz '
+                '; rm -r $working_dir'
+            ),
+            input_targets={
+                'fna': self.in_fna(),
+                'db_tgz': self.in_db_tgz(),
+            },
+            output_targets={
+                'annot_gz': self.out_annotations(),
+            },
+            input_mount_point=self.container_working_dir,
+        )
+
+
 class EggnogMapperDownloadDB(sl.ContainerTask):
     container = 'golob/eggnog-mapper:1.0.3__bcw.0.3.0'
     db = sl.Parameter(default='none')
@@ -521,6 +566,7 @@ class ProkkaAnnotate(sl.ContainerTask):
     in_contigs = None
     destination_dir = sl.Parameter()
     prefix = sl.Parameter(default='prokka')
+    center = sl.Parameter(default='geneshot')
     container_working_dir = sl.Parameter(default=os.path.join(
         '/tmp',
         str(uuid.uuid4())
@@ -531,7 +577,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.tbl".format(self.prefix)
+                "{}.tbl.gz".format(self.prefix)
             )
         )
 
@@ -540,7 +586,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.err".format(self.prefix)
+                "{}.err.gz".format(self.prefix)
             )
         )
 
@@ -549,7 +595,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.faa".format(self.prefix)
+                "{}.faa.gz".format(self.prefix)
             )
         )
 
@@ -558,7 +604,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.ffn".format(self.prefix)
+                "{}.ffn.gz".format(self.prefix)
             )
         )
 
@@ -567,7 +613,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.fna".format(self.prefix)
+                "{}.fna.gz".format(self.prefix)
             )
         )
 
@@ -576,7 +622,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.fsa".format(self.prefix)
+                "{}.fsa.gz".format(self.prefix)
             )
         )
 
@@ -585,7 +631,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.gbk".format(self.prefix)
+                "{}.gbk.gz".format(self.prefix)
             )
         )
 
@@ -594,7 +640,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.gff".format(self.prefix)
+                "{}.gff.gz".format(self.prefix)
             )
         )
 
@@ -603,7 +649,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.log".format(self.prefix)
+                "{}.log.gz".format(self.prefix)
             )
         )
 
@@ -612,7 +658,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.sqn".format(self.prefix)
+                "{}.sqn.gz".format(self.prefix)
             )
         )
 
@@ -621,7 +667,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.tsv".format(self.prefix)
+                "{}.tsv.gz".format(self.prefix)
             )
         )
 
@@ -630,7 +676,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             self,
             os.path.join(
                 self.destination_dir,
-                "{}.txt".format(self.prefix)
+                "{}.txt.gz".format(self.prefix)
             )
         )
 
@@ -640,23 +686,26 @@ class ProkkaAnnotate(sl.ContainerTask):
                 'mkdir -p $container_working_dir '
                 '&& prokka '
                 '--outdir $container_working_dir '
-                '--centre UoM --compliant '
+                '--centre $center '
+                '--compliant '
                 '--prefix prokka '
                 '--cpus $vcpu '
+                '--noanno '
+                '--metagenome '
                 '--force '
                 '$contigs '
-                '&& mv $container_working_dir/prokka.tbl $tbl '
-                '&& mv $container_working_dir/prokka.err $err '
-                '&& mv $container_working_dir/prokka.faa $faa '
-                '&& mv $container_working_dir/prokka.ffn $ffn '
-                '&& mv $container_working_dir/prokka.fna $fna '
-                '&& mv $container_working_dir/prokka.fsa $fsa '
-                '&& mv $container_working_dir/prokka.gbk $gbk '
-                '&& mv $container_working_dir/prokka.gff $gff '
-                '&& mv $container_working_dir/prokka.log $log '
-                '&& mv $container_working_dir/prokka.sqn $sqn '
-                '&& mv $container_working_dir/prokka.tsv $tsv '
-                '&& mv $container_working_dir/prokka.txt $txt '
+                '&& gzip -c $container_working_dir/prokka.tbl > $tbl '
+                '&& gzip -c $container_working_dir/prokka.err > $err '
+                '&& gzip -c $container_working_dir/prokka.faa > $faa '
+                '&& gzip -c $container_working_dir/prokka.ffn > $ffn '
+                '&& gzip -c $container_working_dir/prokka.fna > $fna '
+                '&& gzip -c $container_working_dir/prokka.fsa > $fsa '
+                '&& gzip -c $container_working_dir/prokka.gbk > $gbk '
+                '&& gzip -c $container_working_dir/prokka.gff > $gff '
+                '&& gzip -c $container_working_dir/prokka.log > $log '
+                '&& gzip -c $container_working_dir/prokka.sqn > $sqn '
+                '&& gzip -c $container_working_dir/prokka.tsv > $tsv '
+                '&& gzip -c $container_working_dir/prokka.txt > $txt '
                 '&& rm -r $container_working_dir'
             ),
             input_targets={
@@ -679,6 +728,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             extra_params={
                 'vcpu': self.containerinfo.vcpu,
                 'container_working_dir': self.container_working_dir,
+                'center': self.center,
             }
         )
 

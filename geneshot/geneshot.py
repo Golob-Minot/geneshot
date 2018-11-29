@@ -40,6 +40,11 @@ class Workflow_SGOM(sl.WorkflowTask):
             self.slconfig,
             'midcpu'
         )
+        highmem_ci = sl.ContainerInfo()
+        highmem_ci.from_config(
+            self.slconfig,
+            'highmem'
+        )
         heavy_containerinfo = sl.ContainerInfo()
         heavy_containerinfo.from_config(
             self.slconfig,
@@ -192,7 +197,7 @@ class Workflow_SGOM(sl.WorkflowTask):
             specimen_reads_tasks[specimen]['annotate'] = self.new_task(
                 'annotate.{}'.format(specimen),
                 ProkkaAnnotate,
-                containerinfo=mid_cpu,
+                containerinfo=highmem_ci,
                 destination_dir=os.path.join(
                     self.working_dir,
                     'annotate',
