@@ -376,7 +376,6 @@ class CombineReads(sl.ContainerTask):
         }
 
     def run(self):
-        assert len(self.in_reads_list) >= 2, "Less than two read pairs to combine. Nothing to do"
         # Implicit else
         input_targets = {}
         R1_command_string = ""
@@ -503,14 +502,14 @@ class EggnogMapperMap(sl.ContainerTask):
     def run(self):
         self.ex(
             command=(
-                'mkdir -p $working_dir/emdb'
-                '&& tar -C $working_dir/emdb/ xvf $db_tgz eggnog.db eggnog_proteins.dmnd '
+                'mkdir -p $working_dir/emdb && mkdir -p $working_dir/egm/ '
+                '&& tar -C $working_dir/emdb/ -xzf $db_tgz ./eggnog.db ./eggnog_proteins.dmnd '
                 '&& emapper.py '
                 '-i $fna '
                 '-m diamond '
-                '--dmnd_db $working_dir/embd/eggnog_proteins.dmnd '
+                '--dmnd_db $working_dir/emdb/eggnog_proteins.dmnd '
                 '--data_dir $working_dir/emdb/ '
-                '--cpu $vcpu '
+                '--cpu $vcpu ' 
                 '--temp_dir $working_dir '
                 '-o $working_dir/egm '
                 '&& gzip -c $working_dir/egm.emapper.annotations > $annot_gz '
@@ -523,7 +522,14 @@ class EggnogMapperMap(sl.ContainerTask):
             output_targets={
                 'annot_gz': self.out_annotations(),
             },
-            input_mount_point=self.container_working_dir,
+#            input_mount_point=os.path.join(
+#                self.container_working_dir,
+#                'inputs'
+#            ),
+            extra_params={
+                'vcpu': self.containerinfo.vcpu,
+                'working_dir': self.container_working_dir,
+            }
         )
 
 

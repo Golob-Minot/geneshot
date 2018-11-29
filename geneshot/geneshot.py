@@ -17,6 +17,7 @@ from tasks.tasks import MetaSPAdesAssembly
 from tasks.tasks import ProkkaAnnotate
 from tasks.tasks import EggnogMapperDownloadDB
 from tasks.tasks import CombineReads
+from tasks.tasks import EggnogMapperMap
 
 log = logging.getLogger('sciluigi-interface')
 
@@ -194,7 +195,7 @@ class Workflow_SGOM(sl.WorkflowTask):
             specimen_reads_tasks[specimen]['assembly'].in_reads = specimen_combined_reads.out_reads
 
             #  - Annotate Assembly (Prokka)
-            specimen_reads_tasks[specimen]['annotate'] = self.new_task(
+            specimen_reads_tasks[specimen]['prokka'] = self.new_task(
                 'annotate.{}'.format(specimen),
                 ProkkaAnnotate,
                 containerinfo=highmem_ci,
@@ -206,10 +207,22 @@ class Workflow_SGOM(sl.WorkflowTask):
                 ),
                 prefix="".join(s for s in specimen if s.isalnum()),
             )
-            specimen_reads_tasks[specimen]['annotate'].in_contigs = specimen_reads_tasks[specimen]['assembly'].out_scaffolds
+            specimen_reads_tasks[specimen]['prokka'].in_contigs = specimen_reads_tasks[specimen]['assembly'].out_scaffolds
 
             #  - eggnog map annotated peptides
-
+            specimen_reads_tasks[specimen]['eggnog_map'] = self.new_task(
+                'eggnog_map.{}'.format(specimen),
+                EggnogMapperMap,
+                containerinfo=heavy_containerinfo,
+                annotation_path_gz=os.path.join(
+                    self.working_dir,
+                    'annotate',
+                    'eggnog',
+                    "{}.eggnog.annotate.gz".format("".join(s for s in specimen if s.isalnum()))
+                ),
+            )
+            specimen_reads_tasks[specimen]['eggnog_map'].in_db_tgz = eggnog_dbs.out_eggnog_db_tgz
+            specimen_reads_tasks[specimen]['eggnog_map'].in_fna = specimen_reads_tasks[specimen]['prokka'].out_fna
 
             # - extract 16S (emirge)
             # - Compositional determination (Metaphlan2 / kraken / etc)
