@@ -218,11 +218,11 @@ class Workflow_SGOM(sl.WorkflowTask):
                     self.working_dir,
                     'annotate',
                     'eggnog',
-                    "{}.eggnog.annotate.gz".format("".join(s for s in specimen if s.isalnum()))
+                    "{}.eggnog.annotate.tsv.gz".format("".join(s for s in specimen if s.isalnum()))
                 ),
             )
             specimen_reads_tasks[specimen]['eggnog_map'].in_db_tgz = eggnog_dbs.out_eggnog_db_tgz
-            specimen_reads_tasks[specimen]['eggnog_map'].in_fna = specimen_reads_tasks[specimen]['prokka'].out_fna
+            specimen_reads_tasks[specimen]['eggnog_map'].in_faa = specimen_reads_tasks[specimen]['prokka'].out_faa
 
             # - extract 16S (emirge)
             # - Compositional determination (Metaphlan2 / kraken / etc)

@@ -490,7 +490,7 @@ class EggnogMapperMap(sl.ContainerTask):
     # Where to put the gzipped annotations
     annotation_path_gz = sl.Parameter()
     in_db_tgz = None
-    in_fna = None
+    in_faa = None
 
     def out_annotations(self):
         return sl.ContainerTargetInfo(
@@ -505,7 +505,7 @@ class EggnogMapperMap(sl.ContainerTask):
                 'mkdir -p $working_dir/emdb && mkdir -p $working_dir/egm/ '
                 '&& tar -C $working_dir/emdb/ -xzf $db_tgz ./eggnog.db ./eggnog_proteins.dmnd '
                 '&& emapper.py '
-                '-i $fna '
+                '-i $faa '
                 '-m diamond '
                 '--dmnd_db $working_dir/emdb/eggnog_proteins.dmnd '
                 '--data_dir $working_dir/emdb/ '
@@ -516,7 +516,7 @@ class EggnogMapperMap(sl.ContainerTask):
                 '; rm -r $working_dir'
             ),
             input_targets={
-                'fna': self.in_fna(),
+                'faa': self.in_faa(),
                 'db_tgz': self.in_db_tgz(),
             },
             output_targets={
