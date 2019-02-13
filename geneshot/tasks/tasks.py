@@ -482,7 +482,7 @@ class MetaSPAdesAssembly(sl.ContainerTask):
 
 
 class EggnogMapperMap(sl.ContainerTask):
-    container = 'golob/eggnog-mapper:1.0.3__bcw.0.3.0'
+    container = 'golob/eggnog-mapper:1.0.3__bcw.0.3.1'
     container_working_dir = sl.Parameter(default=os.path.join(
         '/tmp',
         str(uuid.uuid4())
@@ -522,10 +522,10 @@ class EggnogMapperMap(sl.ContainerTask):
             output_targets={
                 'annot_gz': self.out_annotations(),
             },
-#            input_mount_point=os.path.join(
-#                self.container_working_dir,
-#                'inputs'
-#            ),
+            input_mount_point=os.path.join(
+                self.container_working_dir,
+                'inputs'
+            ),
             extra_params={
                 'vcpu': self.containerinfo.vcpu,
                 'working_dir': self.container_working_dir,
