@@ -143,11 +143,8 @@ class RemoveAdapters(sl.ContainerTask):
 
 
 class BWAIndexHumanGenome(sl.ContainerTask):
-    container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
-    container_working_dir = sl.Parameter(default=os.path.join(
-        '/tmp',
-        str(uuid.uuid4())
-    ))
+    container = 'golob/bwa:0.7.17__bcw.0.3.0C'
+
     genome_source = sl.Parameter(
         default='ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.gz'
     )
@@ -170,6 +167,10 @@ class BWAIndexHumanGenome(sl.ContainerTask):
         )
 
     def run(self):
+        container_working_dir = os.path.join(
+            self.containerinfo.container_working_dir,
+            str(uuid.uuid4().hex)
+        )
         output_targets = {
             'index_tgz': self.out_bwa_index()
         }
@@ -215,7 +216,7 @@ class BWAIndexHumanGenome(sl.ContainerTask):
                 ),
                 output_targets=output_targets,
                 extra_params={
-                    'working_dir': self.container_working_dir,
+                    'working_dir': container_working_dir,
                     'genome_source': self.genome_source,
                     'exclusion_str': exclusion_str,
                 }
@@ -223,17 +224,13 @@ class BWAIndexHumanGenome(sl.ContainerTask):
 
 
 class AlignReads(sl.ContainerTask):
-    container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
+    container = 'golob/bwa:0.7.17__bcw.0.3.0C'
     in_reads = None
     # Human genome build can be found at:
     # ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/
     in_bwa_index = None
     bam_path = sl.Parameter()
     alignment_log_path = sl.Parameter()
-    container_working_dir = sl.Parameter(default=os.path.join(
-        '/tmp',
-        str(uuid.uuid4())
-    ))
 
     def out_bam(self):
         return sl.ContainerTargetInfo(
@@ -250,6 +247,10 @@ class AlignReads(sl.ContainerTask):
         )
 
     def run(self):
+        container_working_dir = os.path.join(
+            self.containerinfo.container_working_dir,
+            str(uuid.uuid4().hex)
+        )
         input_targets = {
             'read_1': self.in_reads()['R1'],
             'read_2': self.in_reads()['R2'],
@@ -285,21 +286,17 @@ class AlignReads(sl.ContainerTask):
             output_targets=output_targets,
             extra_params={
                 'vCPU': self.containerinfo.vcpu,
-                'working_dir': self.container_working_dir,
+                'working_dir': container_working_dir,
             }
         )
 
 
 class ExtractUnalignedPairs(sl.ContainerTask):
-    container = 'quay.io/fhcrc-microbiome/bwa:v0.7.17--4'
+    container = 'golob/bwa:0.7.17__bcw.0.3.0C'
     in_bam = None
     unaligned_R1_path = sl.Parameter()
     unaligned_R2_path = sl.Parameter()
     unaligned_log_path = sl.Parameter()
-    container_working_dir = sl.Parameter(default=os.path.join(
-        '/tmp',
-        str(uuid.uuid4())
-    ))
 
     def out_reads(self):
         return {
@@ -321,6 +318,10 @@ class ExtractUnalignedPairs(sl.ContainerTask):
         }
 
     def run(self):
+        container_working_dir = os.path.join(
+            self.containerinfo.container_working_dir,
+            str(uuid.uuid4().hex)
+        )
         input_targets = {
             'bam': self.in_bam()
         }
@@ -331,31 +332,19 @@ class ExtractUnalignedPairs(sl.ContainerTask):
         }
         self.ex(
             command=(
-                'mkdir -p $working_dir && '
-                'cd $working_dir && '
-                'echo Extracting unaligned read pairs | tee -a $log && '
-                'samtools view -f 12 $bam > unaligned.sam && '
-                'echo Extracting R1 | tee -a $log && '
-                'samtools view -f 64 unaligned.sam | samtools fastq - | gzip > $unaligned_1 && '
-                'echo There are $$(cat $unaligned_1 | wc -l) lines in the unmapped R1 file | tee -a $log && '
-                'echo Extracting R2 | tee -a $log && '
-                'samtools view -F 64 unaligned.sam | samtools fastq - | gzip > $unaligned_2 && '
-                'echo There are $$(cat $unaligned_2 | wc -l) lines in the unmapped R2 file | tee -a $log && '
-                'echo Deleting temporary folder && '
-                'rm -r $working_dir && '
-                'echo Done | tee -a $log'
+                'samtools fastq $bam -f 12 --threads $vCPU -1 $unaligned_1 -2 $unaligned_2 > $log'
             ),
             input_targets=input_targets,
             output_targets=output_targets,
             extra_params={
-                'vCPU': self.containerinfo.vcpu,
-                'working_dir': self.container_working_dir,
+                'vCPU': str(int(self.containerinfo.vcpu) - 1),
+                'working_dir': container_working_dir,
             }
         )
 
 
 class CombineReads(sl.ContainerTask):
-    container = 'golob/fastatools:0.6.4__bcw.0.3.0'
+    container = 'golob/fastatools:0.6.2__bcw.0.3.0'
 
     in_reads_list = None
     combined_R1_path = sl.Parameter()
@@ -376,6 +365,7 @@ class CombineReads(sl.ContainerTask):
         }
 
     def run(self):
+        assert len(self.in_reads_list) >= 2, "Less than two read pairs to combine. Nothing to do"
         # Implicit else
         input_targets = {}
         R1_command_string = ""
@@ -419,10 +409,7 @@ class MetaSPAdesAssembly(sl.ContainerTask):
     in_reads = None
 
     destination_dir = sl.Parameter()
-    container_working_dir = sl.Parameter(default=os.path.join(
-        '/tmp',
-        str(uuid.uuid4())
-    ))
+
     phred_offset = sl.Parameter(default='33')
 
     def out_contigs(self):
@@ -446,6 +433,10 @@ class MetaSPAdesAssembly(sl.ContainerTask):
         )
 
     def run(self):
+        container_working_dir = os.path.join(
+            self.containerinfo.container_working_dir,
+            str(uuid.uuid4().hex)
+        )
         input_targets = {
             'read_1': self.in_reads()['R1'],
             'read_2': self.in_reads()['R2']
@@ -475,7 +466,7 @@ class MetaSPAdesAssembly(sl.ContainerTask):
             extra_params={
                 'vCPU': self.containerinfo.vcpu,
                 'mem': int(self.containerinfo.mem / 1024),
-                'working_dir': self.container_working_dir,
+                'working_dir': container_working_dir,
                 'phred_offset': self.phred_offset
             }
         )
@@ -483,10 +474,7 @@ class MetaSPAdesAssembly(sl.ContainerTask):
 
 class EggnogMapperMap(sl.ContainerTask):
     container = 'golob/eggnog-mapper:1.0.3__bcw.0.3.1'
-    container_working_dir = sl.Parameter(default=os.path.join(
-        '/tmp',
-        str(uuid.uuid4())
-    ))
+
     # Where to put the gzipped annotations
     annotation_path_gz = sl.Parameter()
     in_db_tgz = None
@@ -500,6 +488,10 @@ class EggnogMapperMap(sl.ContainerTask):
         )
 
     def run(self):
+        container_working_dir = os.path.join(
+            self.containerinfo.container_working_dir,
+            str(uuid.uuid4().hex)
+        )
         self.ex(
             command=(
                 'mkdir -p $working_dir/emdb && mkdir -p $working_dir/egm/ '
@@ -528,7 +520,7 @@ class EggnogMapperMap(sl.ContainerTask):
             ),
             extra_params={
                 'vcpu': self.containerinfo.vcpu,
-                'working_dir': self.container_working_dir,
+                'working_dir': container_working_dir,
             }
         )
 
@@ -536,10 +528,7 @@ class EggnogMapperMap(sl.ContainerTask):
 class EggnogMapperDownloadDB(sl.ContainerTask):
     container = 'golob/eggnog-mapper:1.0.3__bcw.0.3.0'
     db = sl.Parameter(default='none')
-    container_working_dir = sl.Parameter(default=os.path.join(
-        '/tmp',
-        str(uuid.uuid4())
-    ))
+
     destination_tgz = sl.Parameter()
 
     def out_eggnog_db_tgz(self):
@@ -550,6 +539,10 @@ class EggnogMapperDownloadDB(sl.ContainerTask):
         )
 
     def run(self):
+        container_working_dir = os.path.join(
+            self.containerinfo.container_working_dir,
+            str(uuid.uuid4().hex)
+        )
         self.ex(
             command=(
                 'mkdir -p $working_dir && '
@@ -561,7 +554,7 @@ class EggnogMapperDownloadDB(sl.ContainerTask):
                 'eggnog_db_tgz': self.out_eggnog_db_tgz()
             },
             extra_params={
-                'working_dir': self.container_working_dir,
+                'working_dir': container_working_dir,
                 'db': self.db
             }
         )
@@ -573,10 +566,6 @@ class ProkkaAnnotate(sl.ContainerTask):
     destination_dir = sl.Parameter()
     prefix = sl.Parameter(default='prokka')
     center = sl.Parameter(default='geneshot')
-    container_working_dir = sl.Parameter(default=os.path.join(
-        '/tmp',
-        str(uuid.uuid4())
-    ))
 
     def out_tbl(self):
         return sl.ContainerTargetInfo(
@@ -687,6 +676,10 @@ class ProkkaAnnotate(sl.ContainerTask):
         )
 
     def run(self):
+        container_working_dir = os.path.join(
+            self.containerinfo.container_working_dir,
+            str(uuid.uuid4().hex)
+        )
         self.ex(
             command=(
                 'mkdir -p $container_working_dir '
@@ -696,8 +689,6 @@ class ProkkaAnnotate(sl.ContainerTask):
                 '--compliant '
                 '--prefix prokka '
                 '--cpus $vcpu '
-                '--noanno '
-                '--metagenome '
                 '--force '
                 '$contigs '
                 '&& gzip -c $container_working_dir/prokka.tbl > $tbl '
@@ -733,7 +724,7 @@ class ProkkaAnnotate(sl.ContainerTask):
             },
             extra_params={
                 'vcpu': self.containerinfo.vcpu,
-                'container_working_dir': self.container_working_dir,
+                'container_working_dir': container_working_dir,
                 'center': self.center,
             }
         )

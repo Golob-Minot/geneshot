@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="geneshot",
-    version="0.0.1",
+    version="0.0.2",
     author="Jonathan Golob",
     author_email="j-dev@golob.org",
     description="A gene-level metagenomics pipeline",
@@ -17,11 +17,14 @@ setuptools.setup(
         'https://github.com/jgolob/sciluigi/tarball/containertask',
     ],
     install_requires=[
-        'sciluigi'
+        'sciluigi==2.0.0-ct'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
+    entry_points={
+        'console_scripts': ['geneshot=geneshot.geneshot:main']
+    }
 )

@@ -7,19 +7,21 @@ import sciluigi as sl
 import os
 import csv
 from collections import defaultdict
-from tasks.tasks import LoadFile
-from tasks.tasks import LoadManifest
-from tasks.tasks import LoadPairedReads
-from tasks.tasks import RemoveAdapters
-from tasks.tasks import ExtractUnalignedPairs
-from tasks.tasks import AlignReads
-from tasks.tasks import MetaSPAdesAssembly
-from tasks.tasks import ProkkaAnnotate
-from tasks.tasks import EggnogMapperDownloadDB
-from tasks.tasks import CombineReads
-from tasks.tasks import EggnogMapperMap
+from .tasks.tasks import LoadFile
+from .tasks.tasks import LoadManifest
+from .tasks.tasks import LoadPairedReads
+from .tasks.tasks import RemoveAdapters
+from .tasks.tasks import ExtractUnalignedPairs
+from .tasks.tasks import AlignReads
+from .tasks.tasks import MetaSPAdesAssembly
+from .tasks.tasks import ProkkaAnnotate
+from .tasks.tasks import EggnogMapperDownloadDB
+from .tasks.tasks import CombineReads
+from .tasks.tasks import EggnogMapperMap
 
 log = logging.getLogger('sciluigi-interface')
+logging.getLogger().setLevel(logging.INFO)
+log.setLevel(logging.INFO)
 
 
 # Workflow
@@ -179,7 +181,10 @@ class Workflow_SGOM(sl.WorkflowTask):
                     )
                 )
                 specimen_combined_reads.in_reads_list = [v.out_reads for v in specimen_reads_tasks[specimen]['noadapt_nohuman'].values()]
-
+        
+        
+        return specimen_reads_tasks
+        """
             # - Assemble (metaspades)
             spades_container_info = heavy_containerinfo
             specimen_reads_tasks[specimen]['assembly'] = self.new_task(
@@ -228,7 +233,7 @@ class Workflow_SGOM(sl.WorkflowTask):
             # - Compositional determination (Metaphlan2 / kraken / etc)
 
         return specimen_reads_tasks, eggnog_dbs
-
+        """
 
 class GENESHOT:
     def __init__(self):
