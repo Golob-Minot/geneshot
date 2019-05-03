@@ -6,6 +6,8 @@ import os
 import csv
 from collections import defaultdict
 import uuid
+import gzip
+import tarfile
 
 log = logging.getLogger('sciluigi-interface')
 
@@ -18,6 +20,8 @@ class LoadFile(sl.ExternalTask):
     def out_file(self):
         if self.file_format == 'gzip':
             file_format = luigi.format.Gzip
+        elif self.file_format == 'Nop':
+            file_format = luigi.format.Nop
         else:
             file_format = None
 
@@ -221,6 +225,100 @@ class BWAIndexHumanGenome(sl.ContainerTask):
                     'exclusion_str': exclusion_str,
                 }
             )
+
+
+class RemoveHuman(sl.ContainerTask):
+    # Human genome build can be found at:
+    # ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/
+
+    container = 'golob/bwa:0.7.17__bcw.0.3.0C'
+    # Dependencies / inputs
+    in_reads = None
+    in_bwa_index = None
+
+    # Path parameters
+    R1_path = sl.Parameter()
+    R2_path = sl.Parameter()
+    log_path = sl.Parameter()
+
+    # Alignment parameters
+    min_align_score = sl.Parameter(default=30)
+
+    def out_reads(self):
+        return {
+            'R1': sl.ContainerTargetInfo(
+                self,
+                self.R1_path,
+                format=luigi.format.Nop
+            ),
+            'R2': sl.ContainerTargetInfo(
+                self,
+                self.R2_path,
+                format=luigi.format.Nop
+            ),
+        }
+
+    def out_log(self):
+        return sl.ContainerTargetInfo(
+            self,
+            self.log_path,
+            format=luigi.format.Nop
+        )
+
+    def run(self):
+        container_working_dir = os.path.join(
+            self.containerinfo.container_working_dir,
+            str(uuid.uuid4().hex)
+        )
+        input_targets = {
+            'read_1': self.in_reads()['R1'],
+            'read_2': self.in_reads()['R2'],
+            'bwa_index': self.in_bwa_index()
+        }
+        output_targets = {
+            'unaligned_1': self.out_reads()['R1'],
+            'unaligned_2': self.out_reads()['R2'],
+            'log': self.out_log()
+        }
+        with self.in_bwa_index().open('rb') as bwa_i_h:
+            bwa_i_tar = tarfile.open(
+                fileobj=bwa_i_h,
+                mode='r'
+            )
+            first_in_index = bwa_i_tar.next()
+            first_in_index_sp = first_in_index.name.split('.')
+            bwa_index_prefix = ".".join(first_in_index_sp[0:len(first_in_index_sp)-1])
+
+        self.ex(
+            command=(
+                'mkdir -p $working_dir && '
+                'cd $working_dir && '
+                'echo BWA index file prefix is $bwa_index_prefix | tee -a $log && '
+                'tar xzvf $bwa_index | tee - a $log && '
+                'echo Files in working directory: | tee - a $log && '
+                'ls -lh | tee - a $log && '
+                'echo Running BWA | tee - a $log && '
+                'bwa mem '
+                '-t $vCPU '
+                '-o alignment.sam '
+                '$bwa_index_prefix '
+                '$read_1 '
+                '$read_2 | tee - a $log && '
+                'echo Extracting Unaligned Pairs && '
+                'samtools fastq alignment.sam -f 12 --threads $vCPU -1 $unaligned_1 -2 $unaligned_2 > $log && '
+                'echo Deleting temporary folder | tee -a $log && '
+                'rm -r $working_dir && '
+                'echo Done | tee -a $log'
+            ),
+            input_targets=input_targets,
+            output_targets=output_targets,
+            extra_params={
+                'vCPU': self.containerinfo.vcpu,
+                'working_dir': container_working_dir,
+                'min_aln_score': self.min_align_score,
+                'bwa_index_prefix': bwa_index_prefix
+            }
+        )
 
 
 class AlignReads(sl.ContainerTask):

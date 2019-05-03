@@ -11,6 +11,7 @@ from .tasks.tasks import LoadFile
 from .tasks.tasks import LoadManifest
 from .tasks.tasks import LoadPairedReads
 from .tasks.tasks import RemoveAdapters
+from .tasks.tasks import RemoveHuman
 from .tasks.tasks import ExtractUnalignedPairs
 from .tasks.tasks import AlignReads
 from .tasks.tasks import MetaSPAdesAssembly
@@ -65,6 +66,7 @@ class Workflow_SGOM(sl.WorkflowTask):
         human_bwa_index = self.new_task(
             'load_human_bwa_index',
             LoadFile,
+            file_format='Nop',
             path=self.human_bwa_index,
         )
 
@@ -114,28 +116,6 @@ class Workflow_SGOM(sl.WorkflowTask):
                 )
                 specimen_reads_tasks[specimen]['noadapt'][sp_read_idx].in_reads = specimen_reads_tasks[specimen]['raw_reads'][sp_read_idx].out_reads
 
-                # Specify the folder for the alignment against the human genome
-                sp_read_path_base = os.path.join(
-                    self.working_dir,
-                    'qc',
-                    'noadapt_align_human',
-                    '{}.{}'.format(
-                        specimen,
-                        sp_read_idx
-                    )
-                )
-
-                # Aligning reads against the human genome, so that the unaligned ones can be removed
-                specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx] = self.new_task(
-                    'noadapt_align_human.{}.{}'.format(specimen, sp_read_idx),
-                    AlignReads,
-                    containertargetinfo=heavy_containerinfo,
-                    bam_path="{}.bam".format(sp_read_path_base),
-                    alignment_log_path="{}.log".format(sp_read_path_base)
-                )
-                specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx].in_bwa_index = human_bwa_index.out_file
-                specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx].in_reads = specimen_reads_tasks[specimen]['noadapt'][sp_read_idx].out_reads
-
                 # Specify the folder for the reads that have had adapters removed, and have also have had human removed                
                 sp_read_path_base = os.path.join(
                     self.working_dir,
@@ -150,13 +130,14 @@ class Workflow_SGOM(sl.WorkflowTask):
                 # Aligning reads against the human genome, so that the unaligned ones can be removed
                 specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx] = self.new_task(
                     'noadapt_nohuman.{}.{}'.format(specimen, sp_read_idx),
-                    ExtractUnalignedPairs,
-                    containertargetinfo=light_containerinfo,
-                    unaligned_R1_path="{}.R1.fastq.gz".format(sp_read_path_base),
-                    unaligned_R2_path="{}.R2.fastq.gz".format(sp_read_path_base),
-                    unaligned_log_path="{}.log".format(sp_read_path_base)
+                    RemoveHuman,
+                    containertargetinfo=heavy_containerinfo,
+                    R1_path="{}.R1.fastq.gz".format(sp_read_path_base),
+                    R2_path="{}.R2.fastq.gz".format(sp_read_path_base),
+                    log_path="{}.log".format(sp_read_path_base)
                 )
-                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].in_bam = specimen_reads_tasks[specimen]['noadapt_align_human'][sp_read_idx].out_bam
+                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].in_reads = specimen_reads_tasks[specimen]['noadapt'][sp_read_idx].out_reads
+                specimen_reads_tasks[specimen]['noadapt_nohuman'][sp_read_idx].in_bwa_index = human_bwa_index.out_file
 
             #  Combine a given specimen's trimmed and human-depleted reads into one pair of reads
             assert len(specimen_reads) == len(specimen_reads_tasks[specimen]['noadapt_nohuman']), "Mismatch in reads vs nohuman reads"
