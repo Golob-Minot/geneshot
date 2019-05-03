@@ -272,7 +272,7 @@ class GENESHOT:
         parser.add_argument(
             '--human-bwa-index',
             help="""Location of human genome BWA index (TGZ)""",
-            required=True
+            required=False
         )
         parser.add_argument(
             '--working-dir',
