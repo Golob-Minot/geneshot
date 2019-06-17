@@ -144,7 +144,7 @@ process metaphlan2 {
     memory "32 GB"
 
     input:
-    set val(sample_name) file(input_fastq) from metaphlan_ch
+    set val(sample_name), file(input_fastq) from metaphlan_ch
     
     output:
     file "${sample_name}.metaphlan.tsv" into metaphlan_for_summary
@@ -164,7 +164,7 @@ process diamond {
     errorStrategy "retry"
     
     input:
-    set val(sample_name) file(input_fastq) from diamond_ch
+    set val(sample_name), file(input_fastq) from diamond_ch
     file refdb from file(params.ref_dmnd)
     val min_id from 90
     val query_cover from 50
