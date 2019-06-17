@@ -58,8 +58,8 @@ if ( params.paired ){
 
   process interleave {
     container "ubuntu:16.04"
-    cpus 1
-    memory "2 GB"
+    cpus 4
+    memory "8 GB"
     errorStrategy "retry"
 
     input:
