@@ -111,6 +111,7 @@ process concatenate {
 
   """
 set -e
+ls -lahtr
 cat ${fastq_list} > TEMP && mv TEMP ${sample_name}.fastq.gz
   """
 
