@@ -98,8 +98,9 @@ else {
 // Concatenate reads by sample name
 process concatenate {
   container "ubuntu:16.04"
-  cpus 1
-  memory "4 GB"
+  cpus 4
+  memory "8 GB"
+  errorStrategy "retry"
   
   input:
   set sample_name, file(fastq_list) from concatenate_ch.groupTuple()
