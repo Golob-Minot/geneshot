@@ -246,6 +246,7 @@ process summarizeExperiment {
 
     output:
     file "${output_prefix}.hdf5"
+    file "${output_prefix}.*.csv"
 
     afterScript "rm *"
 
@@ -269,19 +270,75 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 
+# Get all of the files with a given ending
+def get_file_list(suffix, folder="."):
+    for fp in os.listdir(folder):
+        if fp.endswith(suffix):
+            yield fp.replace(suffix, ""), fp
+
 # Read in all of the FAMLI results
-allele_abund = {}
-for fp in os.listdir("./"):
-    if fp.endswith(".json.gz"):
-        sample_name = fp.replace(".json.gz", "")
-        print("Reading in %s" % (fp))
-        allele_abund[sample_name] = [
-            dict([
-                ("id": r["id"]),
-                ("depth": r["depth"])
-            ])
-            for r in json.load(gzip.open(fp, "rt"))
-        ]
+def read_famli_json(sample_name, fp):
+    logging.info("Reading in %s" % (fp))
+    df = pd.DataFrame(
+        json.load(gzip.open(fp, "rt"))
+    )
+    # Add the sample name
+    df["sample"] = sample_name
+    return df
+
+allele_abund = pd.concat([
+    read_famli_json(sample_name, fp)
+    for sample_name, fp in get_file_list(".json.gz")
+])
+
+# Write out the FAMLI results
+allele_abund.to_csv("${output_prefix}.alleles.csv", sep=",", index=None)
+
+# Read in all of the MetaPhlAn2 results
+def read_metaphlan(sample_name, fp):
+    logging.info("Reading in %s" % (fp))
+    d = pd.read_csv(
+        fp, 
+        sep="\\t"
+    ).rename(columns=dict([
+        "Metaphlan2_Analysis", "abund"
+    ]))
+    # Transform into a proportion
+    d["abund"] = d["abund"].apply(float) / 100
+
+    # Add the taxonomic rank
+    tax_code = dict([
+        ("k", "kingdom"),
+        ("p", "phylum"),
+        ("c", "class"),
+        ("o", "order"),
+        ("f", "family"),
+        ("g", "genus"),
+        ("s", "species"),
+        ("t", "strain")
+    ])
+
+    d["rank"] = d["#SampleID"].apply(
+        lambda s: tax_code[s.split("|")[-1][0]]
+    )
+
+    # Parse out the name of the organism
+    d["org_name"] = d["#SampleID"].apply(
+        lambda s: s.split("|")[-1][3:].replace("_", " ")
+    )
+    del d["#SampleID"]
+
+    # Add the sample name
+    d["sample"] = sample_name
+    return d
+
+metaphlan_abund = pd.concat([
+    read_metaphlan(sample_name, fp)
+    for sample_name, fp in get_file_list(".metaphlan.tsv")
+])
+
+# Write out the MetaPhlAn2 results
+metaphlan_abund.to_csv("${output_prefix}.metaphlan.csv", sep=",", index=None)
 
 """
 
