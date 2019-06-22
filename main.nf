@@ -270,6 +270,15 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 
+# Rename the reference HDF5 to use as the output HDF5
+assert os.path.exists("${ref_hdf5}")
+if "${ref_hdf5}" != "${output_prefix}.hdf5":
+    logging.info("Renaming ${ref_hdf5} to ${output_prefix}.hdf5")
+    os.rename("${ref_hdf5}", "${output_prefix}.hdf5")
+assert os.path.exists("${output_prefix}.hdf5")
+# Open a connection to the output HDF5
+store = pd.HDFStore("${output_prefix}.hdf5", mode="a")
+
 # Get all of the files with a given ending
 def get_file_list(suffix, folder="."):
     for fp in os.listdir(folder):
@@ -293,6 +302,7 @@ allele_abund = pd.concat([
 
 # Write out the FAMLI results
 allele_abund.to_csv("${output_prefix}.alleles.csv", sep=",", index=None)
+allele_abund.to_hdf(store, "alleles", format="table", data_columns=["sample", "id"])
 
 # Read in all of the MetaPhlAn2 results
 def read_metaphlan(sample_name, fp):
@@ -339,6 +349,7 @@ metaphlan_abund = pd.concat([
 
 # Write out the MetaPhlAn2 results
 metaphlan_abund.to_csv("${output_prefix}.metaphlan.csv", sep=",", index=None)
+metaphlan_abund.to_hdf(store, "metaphlan", format="table", data_columns=["sample", "rank", "org_name"])
 
 """
 
