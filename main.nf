@@ -380,8 +380,8 @@ ko_abund = pd.concat([
 ])
 
 # Write out the proportional abundance by KEGG KO
-ko_abund.to_csv("${output_prefix}.kegg_ko.csv", sep=",", index=None)
-ko_abund.to_hdf(store, "abund/kegg_ko", format="table", data_columns=["sample", "ko"], complevel=5)
+ko_abund.to_csv("${output_prefix}.KEGG_KO.csv", sep=",", index=None)
+ko_abund.to_hdf(store, "abund/KEGG_KO", format="table", data_columns=["sample", "ko"], complevel=5)
 
 # Function to summarize abundances by arbitrary groups (e.g. CAGs)
 def summarize_alleles_by_group(group_key, prefix="/groups/"):
