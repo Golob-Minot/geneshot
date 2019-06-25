@@ -286,7 +286,7 @@ def get_file_list(suffix, folder="."):
             yield fp.replace(suffix, ""), fp
 
 # Read in the KEGG KO labels
-kegg_ko = pd.read_hdf(store, "/groups/KEGG_KO").set_index("allele")["KO"]
+kegg_ko = pd.read_hdf(store, "/groups/KEGG_KO")
 
 # Read in the NCBI taxid labels
 taxid = pd.read_hdf(store, "/groups/NCBI_TAXID").set_index("allele")["taxid"]
@@ -302,9 +302,6 @@ def read_famli_json(sample_name, fp):
 
     # Calculate the proportional abundance
     df["prop"] = df["depth"] / df["depth"].sum()
-
-    # Add the KEGG KO annotation
-    df["ko"] = df["id"].apply(kegg_ko.get)
 
     # Add the taxonomic annotation
     df["taxid"] = df["id"].apply(taxid.get)
@@ -327,7 +324,7 @@ def read_metaphlan(sample_name, fp):
         fp, 
         sep="\\t"
     ).rename(columns=dict([
-        "Metaphlan2_Analysis", "abund"
+        ("Metaphlan2_Analysis", "abund")
     ]))
     # Transform into a proportion
     d["abund"] = d["abund"].apply(float) / 100
@@ -368,7 +365,19 @@ metaphlan_abund.to_csv("${output_prefix}.metaphlan.csv", sep=",", index=None)
 metaphlan_abund.to_hdf(store, "abund/metaphlan", format="table", data_columns=["sample", "rank", "org_name"], complevel=5)
 
 # Summarize abundance by KEGG KO
-ko_abund = allele_abund.groupby(["sample", "ko"])["prop"].sum().reset_index()
+def summarize_ko_depth(sample_name, sample_allele_abund):
+    logging.info("Summarizing KO abundance for %s" % (sample_name))
+    sample_allele_prop = sample_allele_abund.set_index("id")["prop"]
+    sample_ko = kegg_ko.copy()
+    sample_ko["sample"] = sample_name
+    sample_ko["prop"] = sample_ko["allele"].apply(sample_allele_prop.get)
+    return sample_ko.groupby(["sample", "KO"])["prop"].sum().reset_index()
+
+
+ko_abund = pd.concat([
+    summarize_ko_depth(sample_name, sample_allele_abund)
+    for sample_name, sample_allele_abund in allele_abund.groupby("sample")
+])
 
 # Write out the proportional abundance by KEGG KO
 ko_abund.to_csv("${output_prefix}.kegg_ko.csv", sep=",", index=None)
@@ -378,6 +387,7 @@ ko_abund.to_hdf(store, "abund/kegg_ko", format="table", data_columns=["sample", 
 def summarize_alleles_by_group(group_key, prefix="/groups/"):
     assert group_key.startswith(prefix)
     group_name = group_key.replace(prefix, "")
+    logging.info("Summarizing abundance by %s" % (group_name))
 
     # Read in the groupings
     group_df = pd.read_hdf(store, group_key)
@@ -402,7 +412,7 @@ def summarize_alleles_by_group(group_key, prefix="/groups/"):
 
     
 for key in store.keys():
-    if key.startswith("/groups/"):
+    if key.startswith("/groups/") and key != "/groups/KEGG_KO" and key != "/groups/NCBI_TAXID":
         summarize_alleles_by_group(key)
 
 
