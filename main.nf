@@ -134,6 +134,9 @@ process countReads {
 
   """
 set -e
+
+[[ -s ${fastq} ]]
+
 n=\$(gunzip -c "${fastq}" | awk 'NR % 4 == 1' | wc -l)
 echo "${sample_name},total_reads,\$n" > "${sample_name}.countReads.csv"
   """
