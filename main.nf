@@ -123,6 +123,7 @@ process countReads {
   container "ubuntu:16.04"
   cpus 1
   memory "4 GB"
+  errorStrategy "retry"
   
   input:
   set sample_name, file(fastq) from count_reads
@@ -138,7 +139,7 @@ set -e
 [[ -s ${fastq} ]]
 
 n=\$(gunzip -c "${fastq}" | awk 'NR % 4 == 1' | wc -l)
-echo "${sample_name},total_reads,\$n" > "${sample_name}.countReads.csv"
+echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
   """
 
 }
@@ -161,7 +162,8 @@ process countReadsSummary {
   """
 set -e
 
-cat *csv > TEMP && mv TEMP ${output_prefix}.readcounts.csv
+echo name,n_reads > TEMP
+cat *csv >> TEMP && mv TEMP ${output_prefix}.readcounts.csv
   """
 
 }
