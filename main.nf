@@ -155,7 +155,7 @@ process countReadsSummary {
   val output_prefix from params.output_prefix
   
   output:
-  file "${output_prefix}.readcounts.csv"
+  file "${output_prefix}.readcounts.csv" into readcounts_csv
 
   afterScript "rm *"
 
@@ -270,6 +270,7 @@ process summarizeExperiment {
     file metaphlan_tsv_list from metaphlan_for_summary.collect()
     file famli_json_list from famli_json_for_summary.collect()
     file ref_hdf5 from file(params.ref_hdf5)
+    file readcounts_csv
     val output_prefix from params.output_prefix
 
     output:
@@ -437,6 +438,10 @@ def summarize_alleles_by_group(group_key, prefix="/groups/"):
     # Write out the abundance table
     group_abund.to_csv("${output_prefix}.%s.csv" % (group_name), sep=",", index=None)
     group_abund.to_hdf(store, "abund/%s" % (group_name), format="table", data_columns=["sample", "group"], complevel=5)
+
+
+# Write the summary of read counts
+pd.read_csv("${readcounts_csv}").to_hdf(store, "readcounts", format="table")
 
     
 for key in store.keys():
