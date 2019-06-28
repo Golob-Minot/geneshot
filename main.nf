@@ -140,6 +140,29 @@ echo "${sample_name},total_reads,\$n" > "${sample_name}.countReads.csv"
 
 }
 
+process countReadsSummary {
+  container "ubuntu:16.04"
+  cpus 1
+  memory "4 GB"
+  publishDir "${params.output_folder}"
+
+  input:
+  file readcount_csv_list from total_counts.collect()
+  val output_prefix from params.output_prefix
+  
+  output:
+  file "${output_prefix}.readcounts.csv"
+
+  afterScript "rm *"
+
+  """
+set -e
+
+cat *csv > TEMP && mv TEMP ${output_prefix}.readcounts.csv
+  """
+
+}
+
 process metaphlan2 {
     container "quay.io/fhcrc-microbiome/metaphlan@sha256:51b416458088e83d0bd8d840a5a74fb75066b2435d189c5e9036277d2409d7ea"
     cpus 16
