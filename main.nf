@@ -106,7 +106,7 @@ process concatenate {
   set sample_name, file(fastq_list) from concatenate_ch.groupTuple()
   
   output:
-  set sample_name, file("${sample_name}.fastq.gz") into count_reads, metaphlan_ch, diamond_ch
+  set sample_name, file("${sample_name}.fastq.gz") into correct_headers_ch
 
   afterScript "rm *"
 
@@ -114,6 +114,32 @@ process concatenate {
 set -e
 ls -lahtr
 cat ${fastq_list} > TEMP && mv TEMP ${sample_name}.fastq.gz
+  """
+
+}
+
+// Make sure that every read has a unique name
+process correctHeaders {
+  container "ubuntu:16.04"
+  cpus 4
+  memory "8 GB"
+  errorStrategy "retry"
+  
+  input:
+  set sample_name, file(fastq) from correct_headers_ch.groupTuple()
+  
+  output:
+  set sample_name, file("${sample_name}.unique.headers.fastq.gz") into count_reads, metaphlan_ch, diamond_ch
+
+  afterScript "rm *"
+
+  """
+set -e
+
+gunzip -c ${fastq} | \
+awk '{if(NR % 4 == 1){print("@" 1 + ((NR - 1) / 4))}else{print}}' | \
+gzip -c > \
+${sample_name}.unique.headers.fastq.gz
   """
 
 }
