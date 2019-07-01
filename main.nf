@@ -466,8 +466,21 @@ def summarize_alleles_by_group(group_key, prefix="/groups/"):
     group_abund.to_hdf(store, "abund/%s" % (group_name), format="table", data_columns=["sample", "group"], complevel=5)
 
 
-# Write the summary of read counts
-pd.read_csv("${readcounts_csv}").to_hdf(store, "readcounts", format="table")
+# Get the summary of read counts
+readcounts = pd.read_csv("${readcounts_csv}")
+assert "name" in readcounts.columns.values
+assert "n_reads" in readcounts.columns.values
+
+# Calculate the number of aligned reads
+aligned_reads = allele_abund.groupby("sample")["nreads"].sum()
+
+# Add the column
+readcounts["aligned_reads"] = readcounts["name"].apply(aligned_reads.get)
+assert readcounts["aligned_reads"].isnull().sum() == 0, readcounts["aligned_reads"]
+
+# Write to HDF and CSV
+readcounts.to_hdf(store, "readcounts", format="table")
+readcounts.to_csv("${output_prefix}.readcounts.csv", sep=",", index=None)
 
     
 for key in store.keys():
