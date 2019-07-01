@@ -423,10 +423,14 @@ metaphlan_abund.to_hdf(store, "abund/metaphlan", format="table", data_columns=["
 def summarize_ko_depth(sample_name, sample_allele_abund):
     logging.info("Summarizing KO abundance for %s" % (sample_name))
     sample_allele_prop = sample_allele_abund.set_index("id")["prop"]
-    sample_ko = kegg_ko.copy()
+    sample_allele_nreads = sample_allele_abund.set_index("id")["nreads"]
+    sample_ko = kegg_ko.loc[
+        kegg_ko["allele"].isin(set(sample_allele_abund["id"].tolist()))
+    ].copy()
     sample_ko["sample"] = sample_name
     sample_ko["prop"] = sample_ko["allele"].apply(sample_allele_prop.get)
-    return sample_ko.groupby(["sample", "KO"])["prop"].sum().reset_index()
+    sample_ko["nreads"] = sample_ko["allele"].apply(sample_allele_nreads.get)
+    return sample_ko.groupby(["sample", "KO"])[["prop", "nreads"]].sum().reset_index()
 
 
 ko_abund = pd.concat([
