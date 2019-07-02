@@ -189,7 +189,7 @@ process countReadsSummary {
 set -e
 
 echo name,n_reads > TEMP
-cat *csv >> TEMP && mv TEMP ${output_prefix}.readcounts.csv
+cat ${readcount_csv_list} >> TEMP && mv TEMP ${output_prefix}.readcounts.csv
   """
 
 }
