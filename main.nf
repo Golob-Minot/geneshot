@@ -175,6 +175,7 @@ process countReadsSummary {
   cpus 1
   memory "4 GB"
   publishDir "${params.output_folder}"
+  errorStrategy "retry"
 
   input:
   file readcount_csv_list from total_counts.collect()
