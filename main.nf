@@ -58,6 +58,8 @@ if ( params.from_ncbi_sra ){
           [sample.name, sample.run]}
         .set{ accession_ch }
 
+  accession_ch.println { "Received: $it" }
+
   // Download the FASTQ files
   process downloadSraFastq {
       container "quay.io/fhcrc-microbiome/get_sra:v0.4"
