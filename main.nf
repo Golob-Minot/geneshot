@@ -55,7 +55,7 @@ if ( params.from_ncbi_sra ){
   Channel.from(file(params.batchfile))
         .splitCsv(header: true, sep: ",")
         .map { sample ->
-          [sample["accession"], sample["name"]]}
+          tuple(sample.name, sample.accession)}
         .set{ accession_ch }
 
   accession_ch.println { "Received: $it" }
@@ -68,7 +68,7 @@ if ( params.from_ncbi_sra ){
       errorStrategy "retry"
 
       input:
-      set val(accession), val(sample_name) from accession_ch
+      set val(sample_name), val(accession) from accession_ch
 
       output:
       set val(sample_name), file("${accession}.fastq.gz") into concatenate_ch
