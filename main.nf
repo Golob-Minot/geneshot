@@ -65,7 +65,7 @@ if ( params.from_ncbi_sra ){
       errorStrategy "retry"
 
       input:
-      set sample_name, accession from accession_ch
+      set val(sample_name), val(accession) from accession_ch
 
       output:
       set sample_name, file("${accession}.fastq.gz") into concatenate_ch
@@ -187,7 +187,7 @@ process correctHeaders {
   set sample_name, file(fastq) from correct_headers_ch.groupTuple()
   
   output:
-  set sample_name, file("${sample_name}.unique.headers.fastq.gz") into count_reads, metaphlan_ch, diamond_ch
+  set sample_name, file("${sample_name}.unique.headers.fastq.gz") into count_reads, metaphlan_ch, diamond_ch, humann_ch
 
   afterScript "rm *"
 
