@@ -701,7 +701,7 @@ for key in store.keys():
 
 }
 
-if params.humann {
+if (params.humann) {
   process addHUMAnN2toHDF {
       container "quay.io/fhcrc-microbiome/python-pandas:latest"
       cpus 16
