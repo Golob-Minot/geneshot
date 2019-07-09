@@ -54,7 +54,8 @@ if ( params.from_ncbi_sra ){
 
   Channel.from(file(params.batchfile))
         .splitCsv(header: true, sep: ",")
-        .map { sample -> [sample.name, sample.run] }
+        .map { sample ->
+          [sample.name, sample.run]}
         .set{ accession_ch }
 
   // Download the FASTQ files
@@ -68,7 +69,7 @@ if ( params.from_ncbi_sra ){
       set val(sample_name), val(accession) from accession_ch
 
       output:
-      set sample_name, file("${accession}.fastq.gz") into concatenate_ch
+      set val(sample_name), file("${accession}.fastq.gz") into concatenate_ch
 
       afterScript "rm -rf *"
 
