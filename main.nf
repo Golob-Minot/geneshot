@@ -408,57 +408,6 @@ logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.pathcoverage.csv"))
     """
   }
 
-  process addHUMAnN2toHDF {
-      container "quay.io/fhcrc-microbiome/python-pandas:latest"
-      cpus 16
-      memory "32 GB"
-      publishDir "${params.output_folder}"
-
-      input:
-      file humann_genefamilies_csv
-      file humann_pathabundance_csv
-      file humann_pathcoverage_csv
-      file output_hdf
-
-      output:
-      file "${output_hdf}"
-
-      afterScript "rm *"
-
-"""
-#!/usr/bin/env python3
-import gzip
-import json
-import logging
-import os
-import pandas as pd
-
-# Set up logging
-logFormatter = logging.Formatter(
-    '%(asctime)s %(levelname)-8s [addHUMAnN2toHDF] %(message)s'
-)
-rootLogger = logging.getLogger()
-rootLogger.setLevel(logging.INFO)
-
-# Write logs to STDOUT
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(logFormatter)
-rootLogger.addHandler(consoleHandler)
-
-# Open a connection to the output HDF5
-store = pd.HDFStore("${output_hdf}", mode="a")
-
-for fp, key in [
-    ("${humann_genefamilies_csv}", "/abund/humann_genefamilies"),
-    ("${humann_pathabundance_csv}", "/abund/humann_pathabundance"),
-    ("${humann_pathcoverage_csv}", "/abund/humann_pathcoverage")
-]:
-    df = pd.read_csv(fp, sep=",")
-    df.to_hdf(store, key, complevel=5)
-
-store.close()
-"""
-  }
 }
 
 process diamond {
@@ -750,4 +699,58 @@ for key in store.keys():
 
 """
 
+}
+
+if params.humann {
+  process addHUMAnN2toHDF {
+      container "quay.io/fhcrc-microbiome/python-pandas:latest"
+      cpus 16
+      memory "32 GB"
+      publishDir "${params.output_folder}"
+
+      input:
+      file humann_genefamilies_csv
+      file humann_pathabundance_csv
+      file humann_pathcoverage_csv
+      file output_hdf
+
+      output:
+      file "${output_hdf}"
+
+      afterScript "rm *"
+
+"""
+#!/usr/bin/env python3
+import gzip
+import json
+import logging
+import os
+import pandas as pd
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [addHUMAnN2toHDF] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+# Open a connection to the output HDF5
+store = pd.HDFStore("${output_hdf}", mode="a")
+
+for fp, key in [
+    ("${humann_genefamilies_csv}", "/abund/humann_genefamilies"),
+    ("${humann_pathabundance_csv}", "/abund/humann_pathabundance"),
+    ("${humann_pathcoverage_csv}", "/abund/humann_pathcoverage")
+]:
+    df = pd.read_csv(fp, sep=",")
+    df.to_hdf(store, key, complevel=5)
+
+store.close()
+"""
+  }
 }
