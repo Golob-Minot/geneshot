@@ -275,7 +275,7 @@ process metaphlan2 {
     """
 }
 
-if params.humann {
+if (params.humann) {
   process HUMAnN2_DB {
     container "quay.io/fhcrc-microbime/humann2:v0.11.2--1"
     cpus 16
