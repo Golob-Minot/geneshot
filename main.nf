@@ -277,7 +277,7 @@ process metaphlan2 {
 
 if (params.humann) {
   process HUMAnN2_DB {
-    container "quay.io/fhcrc-microbime/humann2:v0.11.2--1"
+    container "quay.io/fhcrc-microbiome/humann2:v0.11.2--1"
     cpus 16
     memory "120 GB"
 
@@ -303,7 +303,7 @@ tar cvf HUMANn2_DB.tar HUMANn2_DB
   }
 
   process HUMAnN2 {
-    container "quay.io/fhcrc-microbime/humann2:v0.11.2--1"
+    container "quay.io/fhcrc-microbiome/humann2:v0.11.2--1"
     cpus 16
     memory "120 GB"
 
