@@ -55,7 +55,7 @@ if ( params.from_ncbi_sra ){
   Channel.from(file(params.batchfile))
         .splitCsv(header: true, sep: ",")
         .map { sample ->
-          [sample.accession, sample.name]}
+          [sample["accession"], sample["name"]]}
         .set{ accession_ch }
 
   accession_ch.println { "Received: $it" }
