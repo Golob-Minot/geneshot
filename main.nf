@@ -3,6 +3,7 @@
 // Default values for boolean flags
 params.interleaved = false
 params.paired = false
+params.from_ncbi_sra = false
 params.help = false
 
 def helpMessage() {
@@ -12,21 +13,23 @@ def helpMessage() {
     nextflow run fredhutch/geneshot <ARGUMENTS>
     
     Arguments:
-      --batchfile                   CSV file listing samples to analyze (see below)
-      --ref_dmnd                    Path to reference database in DIAMOND (.dmnd) format
-      --ref_hdf5                    Path to HDF5 file containing reference database metadata
-      --output_folder               Folder to place outputs
-      --output_prefix               Name for output files
+      --batchfile        CSV file listing samples to analyze (see below)
+      --ref_dmnd         Path to reference database in DIAMOND (.dmnd) format
+      --ref_hdf5         Path to HDF5 file containing reference database metadata
+      --output_folder    Folder to place outputs
+      --output_prefix    Name for output files
 
     Options:
-      --paired                      Input data is paired-end FASTQ in two files (otherwise treat as single-ended)
-      --interleaved                 Input data is interleaved paired-end FASTQ in one file (otherwise treat as single-ended)
+      --paired           Input data is paired-end FASTQ in two files (otherwise treat as single-ended)
+      --interleaved      Input data is interleaved paired-end FASTQ in one file (otherwise treat as single-ended)
+      --from_ncbi_sra    Input data is specified as NCBI SRA accessions (*RR*) in the `run` column
 
     Batchfile:
       The batchfile is a CSV with a header indicating which samples correspond to which files.
       The file must contain a column `name`. 
       Default is to expect a single column `fastq` pointing to a single-ended or interleaved FASTQ.
       If data is --paired, reads are specified by two columns, `fastq1` and `fastq2`.
+      If data is --from_ncbi_sra, accessions are specified in the `run` column.
 
     """.stripIndent()
 }
@@ -47,52 +50,107 @@ params.output_folder = "./"
 params.output_prefix = "geneshot_output"
 
 // Logic to handle different types of input data
-if ( params.paired ){
-  assert !params.interleaved: "--paired cannot be specified together with --interleaved"
+if ( params.from_ncbi_sra ){
 
   Channel.from(file(params.batchfile))
         .splitCsv(header: true, sep: ",")
-        .map { sample ->
-        [sample.name, file(sample.fastq1), file(sample.fastq2)]}
-        .set{ interleave_ch }
+        .map { sample -> [sample.name, sample.run] }
+        .set{ accession_ch }
 
-  process interleave {
-    container "ubuntu:16.04"
-    cpus 4
-    memory "8 GB"
-    errorStrategy "retry"
+  // Download the FASTQ files
+  process downloadSraFastq {
+      container "quay.io/fhcrc-microbiome/get_sra:v0.4"
+      cpus 4
+      memory "8 GB"
+      errorStrategy "retry"
 
-    input:
-    set sample_name, file(fastq1), file(fastq2) from interleave_ch
+      input:
+      set sample_name, accession from accession_ch
 
-    output:
-    set sample_name, file("${fastq1}.interleaved.fastq.gz") into concatenate_ch
+      output:
+      set sample_name, file("${accession}.fastq.gz") into concatenate_ch
 
-    afterScript "rm *"
+      afterScript "rm -rf *"
 
-    """
-    set -e
+"""
+# Cache to the local folder
+mkdir -p ~/.ncbi
+mkdir cache
+echo '/repository/user/main/public/root = "\$PWD/cache"' > ~/.ncbi/user-settings.mkfg
 
-    # Some basic checks that the files exist and the line numbers match
-    [[ -s "${fastq1}" ]]
-    [[ -s "${fastq2}" ]]
-    (( \$(gunzip -c ${fastq1} | wc -l) == \$(gunzip -c ${fastq2} | wc -l) ))
+# Get each read
+echo "Get the FASTQ files"
+fastq-dump --split-files --defline-seq '@\$ac.\$si.\$sg/\$ri' --defline-qual + --outdir \$PWD ${accession}
 
-    # Now interleave the files
-    paste <(gunzip -c ${fastq1}) <(gunzip -c ${fastq2}) | paste - - - - | awk -v OFS="\\n" -v FS="\\t" '{print(\$1,\$3,\$5,\$7,\$2,\$4,\$6,\$8)}' | gzip -c > "${fastq1}.interleaved.fastq.gz"
-    """
-      
+r1=_1.fastq
+r2=_2.fastq
+
+# If there is a second read, interleave them
+if [[ -s ${accession}\$r2 ]]; then
+    echo "Making paired reads"
+    fastq_pair ${accession}\$r1 ${accession}\$r2
+    
+    echo "Interleave"
+    paste ${accession}\$r1.paired.fq ${accession}\$r2.paired.fq | paste - - - - | awk -v OFS="\\n" -v FS="\\t" '{print(\$1,\$3,\$5,\$7,\$2,\$4,\$6,\$8)}' | gzip -c > "${accession}.fastq.gz"
+else
+    echo "Compressing"
+    mv ${accession}\$r1 ${accession}.fastq
+    gzip ${accession}.fastq
+fi
+
+rm -f ${accession}\$r1 ${accession}\$r2 ${accession}\$r1.paired.fq ${accession}\$r2.paired.fq
+
+"""
   }
-
 }
 else {
-    // For either `interleaved` or `single` (no flags), just put the FASTQ into the same analysis queue
-    Channel.from(file(params.batchfile))
-        .splitCsv(header: true, sep: ",")
-        .map { sample ->
-        [sample.name, file(sample.fastq)]}
-        .set{ concatenate_ch }
+  if ( params.paired ){
+    assert !params.interleaved: "--paired cannot be specified together with --interleaved"
 
+    Channel.from(file(params.batchfile))
+          .splitCsv(header: true, sep: ",")
+          .map { sample ->
+          [sample.name, file(sample.fastq1), file(sample.fastq2)]}
+          .set{ interleave_ch }
+
+    process interleave {
+      container "ubuntu:16.04"
+      cpus 4
+      memory "8 GB"
+      errorStrategy "retry"
+
+      input:
+      set sample_name, file(fastq1), file(fastq2) from interleave_ch
+
+      output:
+      set sample_name, file("${fastq1}.interleaved.fastq.gz") into concatenate_ch
+
+      afterScript "rm *"
+
+      """
+      set -e
+
+      # Some basic checks that the files exist and the line numbers match
+      [[ -s "${fastq1}" ]]
+      [[ -s "${fastq2}" ]]
+      (( \$(gunzip -c ${fastq1} | wc -l) == \$(gunzip -c ${fastq2} | wc -l) ))
+
+      # Now interleave the files
+      paste <(gunzip -c ${fastq1}) <(gunzip -c ${fastq2}) | paste - - - - | awk -v OFS="\\n" -v FS="\\t" '{print(\$1,\$3,\$5,\$7,\$2,\$4,\$6,\$8)}' | gzip -c > "${fastq1}.interleaved.fastq.gz"
+      """
+        
+    }
+
+  }
+  else {
+      // For either `interleaved` or `single` (no flags), just put the FASTQ into the same analysis queue
+      Channel.from(file(params.batchfile))
+          .splitCsv(header: true, sep: ",")
+          .map { sample ->
+          [sample.name, file(sample.fastq)]}
+          .set{ concatenate_ch }
+
+  }
 }
 
 // Concatenate reads by sample name
