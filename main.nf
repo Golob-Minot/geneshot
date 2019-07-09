@@ -385,13 +385,7 @@ def combine_outputs(suffix, header):
             d["sample"] = fp.replace(suffix, "")
             all_dat.append(d)
     logging.info("Concatenating all data")
-    all_data = pd.concat(all_dat)
-    logging.info("Transforming into wide format")
-    return all_data.pivot_table(
-        columns="sample",
-        index=header[0],
-        values=header[1]
-    ).fillna(0)
+    return pd.concat(all_dat)
 
 combine_outputs(
     "_genefamilies.tsv",
