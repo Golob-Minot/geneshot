@@ -4,6 +4,7 @@
 params.interleaved = false
 params.paired = false
 params.from_ncbi_sra = false
+params.humann = false
 params.help = false
 
 def helpMessage() {
@@ -23,6 +24,7 @@ def helpMessage() {
       --paired           Input data is paired-end FASTQ in two files (otherwise treat as single-ended)
       --interleaved      Input data is interleaved paired-end FASTQ in one file (otherwise treat as single-ended)
       --from_ncbi_sra    Input data is specified as NCBI SRA accessions (*RR*) in the `run` column
+      --humann           Run the HUMAnN2 pipeline on all samples.
 
     Batchfile:
       The batchfile is a CSV with a header indicating which samples correspond to which files.
@@ -263,7 +265,7 @@ process metaphlan2 {
     set val(sample_name), file(input_fastq) from metaphlan_ch
     
     output:
-    file "${sample_name}.metaphlan.tsv" into metaphlan_for_summary
+    file "${sample_name}.metaphlan.tsv" into metaphlan_for_summary, metaphlan_for_humann
 
     afterScript "rm *"
 
@@ -271,6 +273,146 @@ process metaphlan2 {
     set -e
     metaphlan2.py --input_type fastq --tmp_dir ./ -o ${sample_name}.metaphlan.tsv ${input_fastq}
     """
+}
+
+if params.humann {
+  process HUMAnN2_DB {
+    container "quay.io/fhcrc-microbime/humann2:v0.11.2--1"
+    cpus 16
+    memory "120 GB"
+
+    output:
+    file "HUMANn2_DB.tar" into humann_db
+
+    afterScript "rm -rf *"
+
+    """
+set -e
+
+# Make a folder for the database files
+mkdir HUMANn2_DB
+
+# Download the databases
+humann2_databases --download chocophlan full HUMANn2_DB
+humann2_databases --download uniref uniref90_diamond HUMANn2_DB
+
+# Tar up the database
+tar cvf HUMANn2_DB.tar HUMANn2_DB
+
+    """
+  }
+
+  process HUMAnN2 {
+    container "quay.io/fhcrc-microbime/humann2:v0.11.2--1"
+    cpus 16
+    memory "120 GB"
+
+    input:
+    set sample_name, file(fastq), file(metaphlan_output) from humann_ch.join(metaphlan_for_humann)
+    val threads from 16
+    file humann_db
+
+    output:
+    set file("${sample_name}_genefamilies.tsv"), file("${sample_name}_pathabundance.tsv"), file("${sample_name}_pathcoverage.tsv") into humann_summary
+
+    """
+set -e
+
+# Untar the database
+tar xzvf ${humann_db}
+
+# Folder for output
+mkdir output
+
+humann2 \
+  --input ${fastq} \
+  --output output \
+  --nucleotide-database HUMANn2_DB/chocophlan \
+  --protein-database HUMANn2_DB/uniref \
+  --threads ${threads} \
+  --taxonomic-profile ${metaphlan_output}
+
+mv output/*_genefamilies.tsv ${sample_name}_genefamilies.tsv
+mv output/*_pathabundance.tsv ${sample_name}_pathabundance.tsv
+mv output/*_pathcoverage.tsv ${sample_name}_pathcoverage.tsv
+    """
+  }
+
+  process HUMAnN2summary {
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    cpus 4
+    memory "8 GB"
+    publishDir "${params.output_folder}"
+
+    input:
+    file humann_tsv_list from humann_summary.toSortedList().flatten()
+    val output_prefix from params.output_prefix
+
+    output:
+    file "${output_prefix}.HUMAnN2.genefamilies.csv"
+    file "${output_prefix}.HUMAnN2.pathabundance.csv"
+    file "${output_prefix}.HUMAnN2.pathcoverage.csv"
+
+    """
+#!/usr/bin/env python3
+import logging
+import os
+import pandas as pd
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [HUMAnN2summary] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+def combine_outputs(suffix, header):
+    all_dat = []
+    for fp in os.listdir("."):
+        if fp.endswith(suffix):
+            logging.info("Reading in %s" % (fp))
+            d = pd.read_csv(
+                fp, 
+                sep="\\t", 
+                comment="#",
+                names=header
+            )
+            d["sample"] = fp.replace(suffix, "")
+            all_dat.append(d)
+    logging.info("Concatenating all data")
+    all_data = pd.concat(all_dat)
+    logging.info("Transforming into wide format")
+    return all_data.pivot_table(
+        columns="sample",
+        index=header[0],
+        values=header[1]
+    ).fillna(0)
+
+combine_outputs(
+    "_genefamilies.tsv",
+    ["gene_family", "RPK"]
+).to_csv("${output_prefix}.HUMAnN2.genefamilies.csv")
+logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.genefamilies.csv"))
+
+combine_outputs(
+    "_pathabundance.tsv",
+    ["pathway", "abund"]
+).to_csv("${output_prefix}.HUMAnN2.pathabundance.csv")
+logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.pathabundance.csv"))
+
+combine_outputs(
+    "_pathcoverage.tsv",
+    ["pathway", "cov"]
+).to_csv("${output_prefix}.HUMAnN2.pathcoverage.csv")
+logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.pathcoverage.csv"))
+
+    """
+  }
 }
 
 process diamond {
