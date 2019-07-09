@@ -355,6 +355,7 @@ process summarizeExperiment {
     file metaphlan_tsv_list from metaphlan_for_summary.collect()
     file famli_json_list from famli_json_for_summary.collect()
     file ref_hdf5 from file(params.ref_hdf5)
+    file batchfile from file(params.batchfile)
     file readcounts_csv
     val output_prefix from params.output_prefix
 
@@ -392,6 +393,12 @@ if "${ref_hdf5}" != "${output_prefix}.hdf5":
 assert os.path.exists("${output_prefix}.hdf5")
 # Open a connection to the output HDF5
 store = pd.HDFStore("${output_prefix}.hdf5", mode="a")
+
+# Write the batchfile to "metadata"
+logging.info("Reading in %s" % ("${batchfile}"))
+metadata = pd.read_csv("${batchfile}", sep=",")
+logging.info("Writing metadata to HDF")
+metadata.to_hdf(store, "metadata")
 
 # Get all of the files with a given ending
 def get_file_list(suffix, folder="."):
