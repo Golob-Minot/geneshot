@@ -302,13 +302,17 @@ tar cvf HUMANn2_DB.tar HUMANn2_DB
     """
   }
 
+  metaphlan_for_humann
+    .map{ mpn -> tuple(mpn.replaceFirst(/.metaphlan.tsv/, ""), mpn) }
+    .set(keyed_metaphlan_for_humann)
+
   process HUMAnN2 {
     container "quay.io/fhcrc-microbiome/humann2:v0.11.2--1"
     cpus 16
     memory "120 GB"
 
     input:
-    set sample_name, file(fastq), file(metaphlan_output) from humann_ch.join(metaphlan_for_humann)
+    set sample_name, file(fastq), file(metaphlan_output) from humann_ch.join(keyed_metaphlan_for_humann)
     val threads from 16
     file humann_db
 
