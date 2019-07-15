@@ -323,7 +323,7 @@ tar cvf HUMANn2_DB.tar HUMANn2_DB
 set -e
 
 # Untar the database
-tar xzvf ${humann_db}
+tar xvf ${humann_db}
 
 # Folder for output
 mkdir output
