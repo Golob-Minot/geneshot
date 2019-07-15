@@ -303,7 +303,7 @@ tar cvf HUMANn2_DB.tar HUMANn2_DB
   }
 
   metaphlan_for_humann
-    .map{ mpn -> tuple(mpn.replaceFirst(/.metaphlan.tsv/, ""), mpn) }
+    .map{ mpn -> tuple(mpn.name.replaceFirst(/.metaphlan.tsv/, ""), mpn) }
     .set{ keyed_metaphlan_for_humann }
 
   process HUMAnN2 {
