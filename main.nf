@@ -349,7 +349,7 @@ mv output/*_pathcoverage.tsv ${sample_name}_pathcoverage.tsv
     publishDir "${params.output_folder}"
 
     input:
-    file humann_tsv_list from humann_summary.toSortedList()
+    file humann_tsv_list from humann_summary.flatten().collect()
     val output_prefix from params.output_prefix
 
     output:
