@@ -11,7 +11,7 @@ def helpMessage() {
     log.info"""
     Usage:
 
-    nextflow run fredhutch/geneshot <ARGUMENTS>
+    nextflow run jgolob/geneshot <ARGUMENTS>
     
     Arguments:
       --batchfile        CSV file listing samples to analyze (see below)
