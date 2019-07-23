@@ -601,7 +601,8 @@ def read_metaphlan(sample_name, fp):
         ("f", "family"),
         ("g", "genus"),
         ("s", "species"),
-        ("t", "strain")
+        ("t", "strain"),
+        ("u", "unclassified")
     ])
 
     d["rank"] = d["#SampleID"].apply(
@@ -610,7 +611,7 @@ def read_metaphlan(sample_name, fp):
 
     # Parse out the name of the organism
     d["org_name"] = d["#SampleID"].apply(
-        lambda s: s.split("|")[-1][3:].replace("_", " ")
+        lambda s: "unclassified" if s == "unclassified" else s.split("|")[-1][3:].replace("_", " ")
     )
     del d["#SampleID"]
 
