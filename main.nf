@@ -1,12 +1,15 @@
 #!/usr/bin/env nextflow
 
 // Default values for boolean flags
+// If these are not set by the user, then they will be set to the values below
+// This is useful for the if/then control syntax below
 params.interleaved = false
 params.paired = false
 params.from_ncbi_sra = false
 params.humann = false
 params.help = false
 
+// Function which prints help message text
 def helpMessage() {
     log.info"""
     Usage:
@@ -40,20 +43,29 @@ def helpMessage() {
  * SET UP CONFIGURATION VARIABLES
  */
 
-// Show help message
+// Show help message if the user specifies the --help flag at runtime
 if (params.help){
+    // Invoke the function above which prints the help message
     helpMessage()
+    // Exit out and do not run anything else
     exit 0
 }
 // --output_folder is the folder in which to place the results
+// By default, we use the current working directory, but this will be replaced 
+// with whatever value the user specifies at runtime with --output_folder
 params.output_folder = "./"
 
 // --output_prefix is the name to prepend to all output files
+// Again, below is the default value, which will be replaced with whatever the user specifies
 params.output_prefix = "geneshot_output"
 
 // Logic to handle different types of input data
+// Only execute the following block if the user specifies --from_ncbi_sra
 if ( params.from_ncbi_sra ){
 
+  // Create a channel from the --batchfile which contains a tuple with the values 
+  // from the 'name' and 'run' column for each row.
+  // This channel will be named `accession_ch` and is consumed by the process downloadSraFastq
   Channel.from(file(params.batchfile))
         .splitCsv(header: true, sep: ",")
         .map { sample ->
@@ -62,17 +74,27 @@ if ( params.from_ncbi_sra ){
 
   // Download the FASTQ files
   process downloadSraFastq {
+      // Docker container used to execude the command below
       container "quay.io/fhcrc-microbiome/get_sra:v0.4"
+      // Number of CPUs allotted for this process
       cpus 4
+      // Amount of memory allotted for this process
       memory "8 GB"
+      // If the process fails, automatically restart it
       errorStrategy "retry"
 
+      // This block defines the set of inputs that are provided to the task
+      // The variables 'sample_name' and 'accession' are automatically filled into the script below
       input:
       set val(sample_name), val(accession) from accession_ch
 
+      // At the end of execution, the file ${accession}.fastq.gz will be retrieved as the output
+      // The value sample_name and the file ${accession}.fastq.gz will be placed into the 
+      // concatenate_ch Channel, which will be consumed by another process downstream
       output:
       set val(sample_name), file("${accession}.fastq.gz") into concatenate_ch
 
+      // After the output files are retrieved, everything in the working folder will be deleted
       afterScript "rm -rf *"
 
 """
@@ -231,14 +253,20 @@ echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
 
 }
 
+// Make a single file which summarizes the number of reads across all samples
+// This is only run after all of the samples are done processing through the
+// 'total_counts' channel, which is transformed by the .collect() command into
+// a single list containing all of the data from all samples.
 process countReadsSummary {
   container "ubuntu:16.04"
   cpus 1
   memory "4 GB"
+  // The output from this process will be copied to the --output_folder specified by the user
   publishDir "${params.output_folder}"
   errorStrategy "retry"
 
   input:
+  // Because the input channel has been collected into a single list, this process will only be run once
   file readcount_csv_list from total_counts.collect()
   val output_prefix from params.output_prefix
   
@@ -256,6 +284,7 @@ cat ${readcount_csv_list} >> TEMP && mv TEMP ${output_prefix}.readcounts.csv
 
 }
 
+// Process to quantify the microbial species present using the metaphlan2 tool
 process metaphlan2 {
     container "quay.io/fhcrc-microbiome/metaphlan@sha256:51b416458088e83d0bd8d840a5a74fb75066b2435d189c5e9036277d2409d7ea"
     cpus 16
@@ -275,7 +304,10 @@ process metaphlan2 {
     """
 }
 
+// If the user specifies --humann, run the tasks below
 if (params.humann) {
+
+  // Download the HUMAnN2 reference database
   process HUMAnN2_DB {
     container "quay.io/fhcrc-microbiome/humann2:v0.11.2--1"
     cpus 16
@@ -302,18 +334,23 @@ tar cvf HUMANn2_DB.tar HUMANn2_DB
     """
   }
 
+  // Make a channel which links the sample name to the metaphlan output
+  // so that it can be combined with the raw reads for the HUMAnN2 execution
   metaphlan_for_humann
     .map{ mpn -> tuple(mpn.name.replaceFirst(/.metaphlan.tsv/, ""), mpn) }
     .set{ keyed_metaphlan_for_humann }
 
+  // Run HUMAnN2
   process HUMAnN2 {
     container "quay.io/fhcrc-microbiome/humann2:v0.11.2--1"
     cpus 16
     memory "120 GB"
 
+    // The .join() call below combines the FASTQ and metaphlan output which share the same sample name
     input:
     set sample_name, file(fastq), file(metaphlan_output) from humann_ch.join(keyed_metaphlan_for_humann)
     val threads from 16
+    // Reference database from above
     file humann_db
 
     output:
@@ -342,6 +379,7 @@ mv output/*_pathcoverage.tsv ${sample_name}_pathcoverage.tsv
     """
   }
 
+  // Summarize all of the HUMAnN2 results
   process HUMAnN2summary {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     cpus 4
@@ -414,6 +452,7 @@ logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.pathcoverage.csv"))
 
 }
 
+// Align each sample against the reference database of genes using DIAMOND
 process diamond {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     cpus 32
@@ -457,7 +496,7 @@ process diamond {
 
 }
 
-
+// Filter the alignments with the FAMLI algorithm
 process famli {
     container "quay.io/fhcrc-microbiome/famli@sha256:241a7db60cb735abd59f4829e8ddda0451622b6eb2321f176fd9d76297d8c9e7"
     cpus 16
@@ -487,6 +526,7 @@ process famli {
 
 }
 
+// Summarize all of the results from the experiment
 process summarizeExperiment {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     cpus 16
@@ -706,6 +746,7 @@ for key in store.keys():
 
 }
 
+// Add the HUMAnN2 results to the summary of the experiment, if specified
 if (params.humann) {
   process addHUMAnN2toHDF {
       container "quay.io/fhcrc-microbiome/python-pandas:latest"
