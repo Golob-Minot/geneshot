@@ -91,7 +91,7 @@ process cutadapt {
 
   """
   cutadapt \
-  -j ${params.process.cpus} \
+  -j ${task.cpus} \
    -a ${params.adapter_F} -A ${params.adapter_R} \
   -o ${fastq1}.noadapt.R1.fastq.gz -p ${fastq2}.noadapt.R2.fastq.gz \
   ${fastq1} ${fastq2} > ${fastq1}.cutadapt.log
@@ -138,7 +138,7 @@ process remove_human {
   echo Files in working directory: | tee -a ${fastq1}.nohuman.log && \
   tree -h | tee -a ${fastq1}.nohuman.log && \
   echo Running BWA | tee -a ${fastq1}.nohuman.log && \
-  bwa mem -t ${params.process.cpus} \
+  bwa mem -t ${task.cpus} \
   -T ${params.min_hg_align_score} \
   -o alignment.sam \
   hg_index/\$bwa_index_prefix \
