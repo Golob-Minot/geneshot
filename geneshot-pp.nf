@@ -75,6 +75,8 @@ if (params.index) {
       output:
         set specimen, file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz") into demupltiplexed_ch
       """
+      set -e
+
       barcodecop \
       ${I1} ${I2} \
       --match-filter \
@@ -112,6 +114,8 @@ process cutadapt {
   set sample_name, file("${fastq1}.noadapt.R1.fq.gz"), file("${fastq2}.noadapt.R2.fq.gz"), file("${fastq1}.cutadapt.log") into noadapt_ch
 
   """
+  set -e 
+
   cutadapt \
   -j ${task.cpus} \
    -a ${params.adapter_F} -A ${params.adapter_R} \
@@ -137,7 +141,7 @@ process download_hg_index {
 
 // Step 3B.
 process remove_human {
-  container "golob/bwa:0.7.17__bcw.0.3.0C"
+  container "golob/bwa:0.7.17__bcw.0.3.0D"
   cpus 2
   memory "4 GB"
   errorStrategy "retry"
@@ -153,11 +157,13 @@ process remove_human {
   afterScript "rm -rf hg_index/*"
 
   """
+  set - e
+
   bwa_index_prefix=\$(tar -ztvf ${hg_index_tgz} | head -1 | sed \'s/.* //\' | sed \'s/.amb//\') && \
   echo BWA index file prefix is \${bwa_index_prefix} | tee -a ${fastq1}.nohuman.log && \
   echo Extracting BWA index | tee -a ${fastq1}.nohuman.log && \
   mkdir -p hg_index/ && \
-  tar xzvf ${hg_index_tgz} -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
+  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
   echo Files in index directory: | tee -a ${fastq1}.nohuman.log && \
   ls -l -h hg_index | tee -a ${fastq1}.nohuman.log && \
   echo Running BWA | tee -a ${fastq1}.nohuman.log && \
