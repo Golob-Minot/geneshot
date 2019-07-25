@@ -7,9 +7,7 @@
     2) cutadapt to remove adapters.
     3) remove human reads via
       3A) downloading the cached human genome index
-      3B) aligning against the human genome
-      3C) extracting unpaired reads
-
+      3B) aligning against the human genome and extracting unpaired reads
 */
 
 // Default values for boolean flags
@@ -133,10 +131,11 @@ process remove_human {
   """
   bwa_index_prefix=\$(tar -ztvf ${hg_index_tgz} | head -1 | sed \'s/.* //\' | sed \'s/.amb//\') && \
   echo BWA index file prefix is \${bwa_index_prefix} | tee -a ${fastq1}.nohuman.log && \
+  echo Extracting BWA index | tee -a ${fastq1}.nohuman.log && \
   mkdir -p hg_index/ && \
   tar xzvf ${hg_index_tgz} -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
-  echo Files in working directory: | tee -a ${fastq1}.nohuman.log && \
-  tree -h | tee -a ${fastq1}.nohuman.log && \
+  echo Files in index directory: | tee -a ${fastq1}.nohuman.log && \
+  ls -l -h hg_index | tee -a ${fastq1}.nohuman.log && \
   echo Running BWA | tee -a ${fastq1}.nohuman.log && \
   bwa mem -t ${task.cpus} \
   -T ${params.min_hg_align_score} \
