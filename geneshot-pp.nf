@@ -40,9 +40,10 @@ def helpMessage() {
 
     Batchfile:
       The manifest is a CSV with a header indicating which samples correspond to which files.
-      The file must contain a column `name`. 
-      Reads are specified by two columns, `fastq1` and `fastq2`.
-      If index reads are provided, the column titles should be 'index1' and 'index2'
+      The file must contain a column `specimen`. This can be repeated. 
+      Data is only accepted as paired reads.
+      Reads are specified by columns, `R1` and `R2`.
+      If index reads are provided, the column titles should be 'I1' and 'I2'
 
     """.stripIndent()
 }
@@ -59,18 +60,41 @@ if (params.index) {
     Channel.from(file(params.manifest))
         .splitCsv(header: true, sep: ",")
         .map { sample ->
-        [sample.name, file(sample.fastq1), file(sample.fastq2), file(sample.index1), file(sample.index2)]}
+        [sample.specimen, file(sample.R1), file(sample.R2), file(sample.I1), file(sample.I2)]}
         .set{ input_ch }
-    // implement barcodecop here
+    // Step 1: barcodecop
+    process barcodecop {
+      container "golob/barcodecop:0.4.1__bcw_0.3.0"
+      cpus 1
+      memory "1 GB"
+      errorStrategy "retry"
+
+      input:
+        set specimen, file(R1), file(R2), file(I1), file(I2) from input_ch
+      
+      output:
+        set specimen, file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz") into demupltiplexed_ch
+      """
+      barcodecop \
+      ${I1} ${I2} \
+      --match-filter \
+      -f ${R1} \
+      -o ${R1}.bcc.fq.gz &&
+      barcodecop \
+      ${I1} ${I2} \
+      --match-filter \
+      -f ${R2} \
+      -o ${R2}.bcc.fq.gz
+      """
+    }
 }
 else {
     Channel.from(file(params.manifest))
         .splitCsv(header: true, sep: ",")
         .map { sample ->
-        [sample.name, file(sample.fastq1), file(sample.fastq2)]}
+        [sample.specimen, file(sample.R1), file(sample.R2)]}
         .set{ demupltiplexed_ch }
 }
-// Step 1: barcodecop
 
 // Step 2
 process cutadapt {
@@ -85,13 +109,13 @@ process cutadapt {
   set sample_name, file(fastq1), file(fastq2) from demupltiplexed_ch
   
   output:
-  set sample_name, file("${fastq1}.noadapt.R1.fastq.gz"), file("${fastq2}.noadapt.R2.fastq.gz"), file("${fastq1}.cutadapt.log") into noadapt_ch
+  set sample_name, file("${fastq1}.noadapt.R1.fq.gz"), file("${fastq2}.noadapt.R2.fq.gz"), file("${fastq1}.cutadapt.log") into noadapt_ch
 
   """
   cutadapt \
   -j ${task.cpus} \
    -a ${params.adapter_F} -A ${params.adapter_R} \
-  -o ${fastq1}.noadapt.R1.fastq.gz -p ${fastq2}.noadapt.R2.fastq.gz \
+  -o ${fastq1}.noadapt.R1.fq.gz -p ${fastq2}.noadapt.R2.fq.gz \
   ${fastq1} ${fastq2} > ${fastq1}.cutadapt.log
   """
 }
@@ -124,7 +148,7 @@ process remove_human {
     set sample_name, file(fastq1), file(fastq2), file(cutadapt_log) from noadapt_ch
   
   output:
-    set sample_name, file("${fastq1}.nohuman.R1.fastq.gz"), file("${fastq2}.nohuman.R2.fastq.gz"), file("${fastq1}.nohuman.log") into nohuman_ch
+    set sample_name, file("${fastq1}.nohuman.R1.fq.gz"), file("${fastq2}.nohuman.R2.fq.gz"), file("${fastq1}.nohuman.log") into nohuman_ch
 
   afterScript "rm -rf hg_index/*"
 
@@ -144,8 +168,9 @@ process remove_human {
   ${fastq1} ${fastq2} \
   | tee -a ${fastq1}.nohuman.log && \
   echo Extracting Unaligned Pairs | tee -a ${fastq1}.nohuman.log && \
-  samtools fastq alignment.sam -f 12 \
-  -1 ${fastq1}.nohuman.R1.fastq.gz -2 ${fastq2}.nohuman.R2.fastq.gz \
+  samtools fastq alignment.sam \
+  --threads ${task.cpus} -f 12 \
+  -1 ${fastq1}.nohuman.R1.fq.gz -2 ${fastq2}.nohuman.R2.fq.gz \
   | tee -a ${fastq1}.nohuman.log && \
   echo Done | tee -a ${fastq1}.nohuman.log
   """
