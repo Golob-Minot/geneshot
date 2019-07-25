@@ -162,10 +162,7 @@ class Workflow_SGOM(sl.WorkflowTask):
                     )
                 )
                 specimen_combined_reads.in_reads_list = [v.out_reads for v in specimen_reads_tasks[specimen]['noadapt_nohuman'].values()]
-        
-        
-        return specimen_reads_tasks
-        """
+
             # - Assemble (metaspades)
             spades_container_info = heavy_containerinfo
             specimen_reads_tasks[specimen]['assembly'] = self.new_task(
@@ -193,7 +190,7 @@ class Workflow_SGOM(sl.WorkflowTask):
                 ),
                 prefix="".join(s for s in specimen if s.isalnum()),
             )
-            specimen_reads_tasks[specimen]['prokka'].in_contigs = specimen_reads_tasks[specimen]['assembly'].out_scaffolds
+            specimen_reads_tasks[specimen]['prokka'].in_contigs = specimen_reads_tasks[specimen]['assembly'].out_contigs
 
             #  - eggnog map annotated peptides
             specimen_reads_tasks[specimen]['eggnog_map'] = self.new_task(
@@ -214,7 +211,7 @@ class Workflow_SGOM(sl.WorkflowTask):
             # - Compositional determination (Metaphlan2 / kraken / etc)
 
         return specimen_reads_tasks, eggnog_dbs
-        """
+
 
 class GENESHOT:
     def __init__(self):

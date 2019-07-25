@@ -82,6 +82,88 @@ class LoadManifest(LoadFile):
         with self.out_file().open() as manifest_h:
             return {r.get('specimen') for r in csv.DictReader(manifest_h)}
 
+class BCCSpecimenReads(sl.ContainerTask):
+    # Use barcodecop to verify reads were properly demultiplexed
+    container = 'golob/barcodecop:0.4.1__bcw_0.3.0'
+
+    # For dependencies
+    in_reads = None
+
+    specimen = sl.Parameter()
+    path = sl.Parameter()
+
+    def out_reads(self):
+        reads_dict = {}
+        reads_dict['R1'] = sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.path,
+                "{}.R1.bcc.fq.gz".format(self.specimen)
+            ),
+            format=luigi.format.Nop
+        )
+        reads_dict['R2'] = sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.path,
+                "{}.R2.bcc.fq.gz".format(self.specimen)
+            ),
+            format=luigi.format.Nop
+        )
+        return reads_dict
+    """
+    def out_stats(self):
+        stats_dict = {}
+        stats_dict['R1'] = sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.path,
+                "{}.R1.bcc.stats.csv".format(self.specimen)
+            ),
+            format=luigi.format.Nop
+        )
+        stats_dict['R2'] = sl.ContainerTargetInfo(
+            self,
+            os.path.join(
+                self.path,
+                "{}.R2.bcc.stats.csv".format(self.specimen)
+            ),
+            format=luigi.format.Nop
+        )
+        return stats_dict
+    """
+
+    def run(self):
+        input_targets={
+            'read_1': self.in_reads().get('R1'),
+            'read_2': self.in_reads().get('R2'),
+            'index_1': self.in_reads().get('I1'),
+            'index_2': self.in_reads().get('I2'),
+        }
+        output_targets={
+            'bcc_read_1': self.out_reads()['R1'],
+            'bcc_read_2': self.out_reads()['R2'],
+            #'bcc_stat_1': self.out_stats()['R1'],
+            #'bcc_stat_2': self.out_stats()['R2']
+        }
+        self.ex(
+            command=(
+                'barcodecop'
+                ' $index_1 $index_2'
+                ' --match-filter'
+                ' -f $read_1'
+                ' -o $bcc_read_1'
+            #    ' -C $bcc_stat_1'
+                ' && barcodecop'
+                ' $index_1 $index_2'
+                ' --match-filter'
+                ' -f $read_2'
+                ' -o $bcc_read_2'
+            #    ' -C $bcc_stat_2'
+            ),
+            input_targets=input_targets,
+            output_targets=output_targets,
+        )
 
 class RemoveAdapters(sl.ContainerTask):
     container = 'golob/cutadapt:1.18__bcw.0.3.0_al38'
@@ -599,7 +681,7 @@ class EggnogMapperMap(sl.ContainerTask):
                 '-m diamond '
                 '--dmnd_db $working_dir/emdb/eggnog_proteins.dmnd '
                 '--data_dir $working_dir/emdb/ '
-                '--cpu $vcpu ' 
+                '--cpu $vcpu '
                 '--temp_dir $working_dir '
                 '-o $working_dir/egm '
                 '&& gzip -c $working_dir/egm.emapper.annotations > $annot_gz '
@@ -612,10 +694,6 @@ class EggnogMapperMap(sl.ContainerTask):
             output_targets={
                 'annot_gz': self.out_annotations(),
             },
-            input_mount_point=os.path.join(
-                self.container_working_dir,
-                'inputs'
-            ),
             extra_params={
                 'vcpu': self.containerinfo.vcpu,
                 'working_dir': container_working_dir,
@@ -659,7 +737,7 @@ class EggnogMapperDownloadDB(sl.ContainerTask):
 
 
 class ProkkaAnnotate(sl.ContainerTask):
-    container = 'golob/metaspades:v3.11.1--8A__bcw__0.3.0'
+    container = 'golob/metaspades:v3.11.1--8B__bcw__0.3.0'
     in_contigs = None
     destination_dir = sl.Parameter()
     prefix = sl.Parameter(default='prokka')
@@ -781,6 +859,7 @@ class ProkkaAnnotate(sl.ContainerTask):
         self.ex(
             command=(
                 'mkdir -p $container_working_dir '
+                '&& ls -l $contigs '
                 '&& prokka '
                 '--outdir $container_working_dir '
                 '--centre $center '
