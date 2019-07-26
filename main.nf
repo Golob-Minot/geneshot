@@ -530,7 +530,7 @@ process famli {
 process summarizeExperiment {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     cpus 16
-    memory "32 GB"
+    memory "120 GB"
     publishDir "${params.output_folder}"
 
     input:
