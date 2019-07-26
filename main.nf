@@ -730,7 +730,7 @@ aligned_reads = allele_abund.groupby("sample")["nreads"].sum()
 
 # Add the column
 readcounts["aligned_reads"] = readcounts["name"].apply(aligned_reads.get)
-assert readcounts["aligned_reads"].isnull().sum() == 0, (readcounts.head(), aligned_reads.head())
+assert readcounts["aligned_reads"].isnull().sum() == 0, (readcounts.loc[readcounts["aligned_reads"].isnull()])
 
 # Write to HDF and CSV
 readcounts.to_hdf(store, "readcounts", format="table")
