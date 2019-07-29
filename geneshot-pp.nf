@@ -17,7 +17,8 @@ params.index = false
 params.help = false
 params.adapter_F = "CTGTCTCTTATACACATCT"
 params.adapter_R = "CTGTCTCTTATACACATCT"
-params.hg_index = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
+params.hg_index_url = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
+params.hg_index = false
 params.min_hg_align_score = 30
 
 params.output_folder = '.'
@@ -36,7 +37,8 @@ def helpMessage() {
 
     Options:
       --index            Index reads are provided (default: false)
-      --hg_index         URL for human genome index, defaults to current HG
+      --hg_index_url     URL for human genome index, defaults to current HG
+      --hg_index         Cached copy of the bwa indexed human genome, TGZ format.
       -w                 Working directory. Defaults to `./work`
 
     Batchfile:
@@ -124,18 +126,23 @@ process cutadapt {
 }
 
 // Step 3A.
-process download_hg_index {
-  container "golob/bwa:0.7.17__bcw.0.3.0C"
-  errorStrategy "retry"
-  label 'io_limited'
+if (!params.hg_index) {
+  process download_hg_index {
+    container "golob/bwa:0.7.17__bcw.0.3.0C"
+    errorStrategy "retry"
+    label 'io_limited'
 
-  output:
-    file 'hg_index.tar.gz' into hg_index_tgz
-  
-  """
-  wget ${params.hg_index} -O hg_index.tar.gz
-  """
+    output:
+      file 'hg_index.tar.gz' into hg_index_tgz
+    
+    """
+    wget ${params.hg_index_url} -O hg_index.tar.gz
+    """
+  }
+} else {
+  hg_index_tgz = file(params.hg_index)
 }
+
 
 // Step 3B.
 process remove_human {
