@@ -66,8 +66,7 @@ if (params.index) {
     // Step 1: barcodecop
     process barcodecop {
       container "golob/barcodecop:0.4.1__bcw_0.3.0"
-      cpus 1
-      memory "1 GB"
+      label 'io_limited'
       errorStrategy "retry"
 
       input:
@@ -102,8 +101,7 @@ else {
 // Step 2
 process cutadapt {
   container "golob/cutadapt:1.18__bcw.0.3.0_al38"
-  cpus 1
-  memory "4 GB"
+  label 'io_limited'
   errorStrategy "retry"
 
   //publishDir "${params.output_folder}/noadapt/"
@@ -128,9 +126,8 @@ process cutadapt {
 // Step 3A.
 process download_hg_index {
   container "golob/bwa:0.7.17__bcw.0.3.0C"
-  cpus 1
-  memory "1 GB"
   errorStrategy "retry"
+  label 'io_limited'
 
   output:
     file 'hg_index.tar.gz' into hg_index_tgz
@@ -142,12 +139,13 @@ process download_hg_index {
 
 // Step 3B.
 process remove_human {
-  container "golob/bwa:0.7.17__bcw.0.3.0F"
-  cpus 1
-  memory "16 GB"
+  container "golob/bwa:0.7.17__bcw.0.3.0H"
+  //container "quay.io/fhcrc-microbiome/bwa:v0.7.17--4"
   errorStrategy "retry"
   publishDir "${params.output_folder}/nohuman/"
-  
+  label 'mem_veryhigh'
+
+
   input:
     file hg_index_tgz from hg_index_tgz
     set sample_name, file(fastq1), file(fastq2), file(cutadapt_log) from noadapt_ch

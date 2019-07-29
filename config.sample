@@ -1,0 +1,75 @@
+profiles{
+    // IN this system, use docker locally by default
+    standard {
+        process {
+            executor = 'local'
+            withLabel: 'io_limited' {
+                cpus = 1
+                memory = 4.GB
+            }
+            withLabel: 'mem_veryhigh' {
+                cpus = 2
+                memory = 16.GB
+            }
+        }
+        docker {
+            enabled = true
+            temp = 'auto'
+        }
+    }
+    pilot {
+        executor.queueSize = 1
+    }
+    // Hybrid uses docker for io / limited tasks, AWS for the remainder
+    hybrid {
+        process {
+            executor = 'local'
+            withLabel: 'io_limited' {
+                cpus = 1
+                memory = 4.GB
+            }
+            withLabel: 'mem_veryhigh' {
+                executor = 'awsbatch'
+                queue = 'spot-test'
+                cpus = 32
+                memory = 128.GB
+            }
+        }
+        executor.awscli = '/home/ec2-user/miniconda/bin/aws'
+        docker {
+            enabled = true
+            temp = 'auto'
+        }
+        aws {
+            region = 'us-west-2'
+            batch {
+                jobRole = 'replace'
+                volumes = ['/docker_scratch:/tmp:rw']
+            }
+        }
+
+    } // end hybrid profile
+    aws {
+        process {
+            executor = 'awsbatch'
+            withLabel: 'io_limited' {
+                queue = 'spot-test'
+                cpus = 1
+                memory = 4.GB
+            }
+            withLabel: 'mem_veryhigh' {
+                queue = 'spot-test'
+                cpus = 32
+                memory = 128.GB
+            }
+        }
+        executor.awscli = '/home/ec2-user/miniconda/bin/aws'
+        aws {
+            region = 'us-west-2'
+            batch {
+                jobRole = 'arn:aws:iam::064561331775:role/fh-pi-fredricks-d-batchtask'
+                volumes = ['/docker_scratch:/tmp:rw']
+            }
+        }
+    } // end hybrid profile
+}
