@@ -37,6 +37,7 @@ def helpMessage() {
     Options:
       --index            Index reads are provided (default: false)
       --hg_index         URL for human genome index, defaults to current HG
+      -w                 Working directory. Defaults to `./work`
 
     Batchfile:
       The manifest is a CSV with a header indicating which samples correspond to which files.
@@ -141,9 +142,9 @@ process download_hg_index {
 
 // Step 3B.
 process remove_human {
-  container "golob/bwa:0.7.17__bcw.0.3.0D"
-  cpus 2
-  memory "4 GB"
+  container "golob/bwa:0.7.17__bcw.0.3.0F"
+  cpus 1
+  memory "16 GB"
   errorStrategy "retry"
   publishDir "${params.output_folder}/nohuman/"
   
@@ -173,6 +174,8 @@ process remove_human {
   hg_index/\$bwa_index_prefix \
   ${fastq1} ${fastq2} \
   | tee -a ${fastq1}.nohuman.log && \
+  echo Checking if alignment is empty  | tee -a ${fastq1}.nohuman.log && \
+  [[ -s alignment.sam ]] && \
   echo Extracting Unaligned Pairs | tee -a ${fastq1}.nohuman.log && \
   samtools fastq alignment.sam \
   --threads ${task.cpus} -f 12 \
@@ -181,3 +184,6 @@ process remove_human {
   echo Done | tee -a ${fastq1}.nohuman.log
   """
 }
+
+//   gunzip -c ${hg_index_tgz} | tar -x -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
+//  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
