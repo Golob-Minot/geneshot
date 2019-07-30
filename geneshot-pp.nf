@@ -202,7 +202,7 @@ process remove_human {
   echo Extracting Unaligned Pairs | tee -a ${R1_n}.nohuman.log && \
   samtools fastq alignment.sam \
   --threads ${task.cpus} -f 12 \
-  -1 ${R1_n}.noadapt.nohuman.fq.gz -2 ${R2_n}.noadapt.nohuman.fq.gz \
+  -1 ${R1_n}.noadapt.nohuman.fq.gz -2 ${R2_n}.noadapt.nohuman.R2.fq.gz \
   | tee -a ${R1_n}.nohuman.log && \
   echo Done | tee -a ${R1_n}.nohuman.log
   """
