@@ -35,7 +35,6 @@ profiles{
                 memory = 128.GB
             }
         }
-        executor.awscli = '/home/ec2-user/miniconda/bin/aws'
         docker {
             enabled = true
             temp = 'auto'
@@ -63,7 +62,6 @@ profiles{
                 memory = 128.GB
             }
         }
-        executor.awscli = '/home/ec2-user/miniconda/bin/aws'
         aws {
             region = 'us-west-2'
             batch {
