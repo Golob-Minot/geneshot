@@ -32,14 +32,18 @@ def helpMessage() {
     nextflow run geneshot-pp.nf <ARGUMENTS>
     
     Required Arguments:
-      --manifest         CSV file listing samples to preprocess (see below)
-      --output_folder    Folder to place outputs (default invocation dir)
+      --manifest            CSV file listing samples to preprocess (see below)
 
     Options:
-      --index            Index reads are provided (default: false)
-      --hg_index_url     URL for human genome index, defaults to current HG
-      --hg_index         Cached copy of the bwa indexed human genome, TGZ format.
-      -w                 Working directory. Defaults to `./work`
+      --output_folder       Folder to place outputs (default invocation dir)
+      --index               Index reads are provided (default: false)
+      --hg_index_url        URL for human genome index, defaults to current HG
+      --hg_index            Cached copy of the bwa indexed human genome, TGZ format
+      --adapter_F           Forward sequencing adapter sequence (to be removed)
+      --adapter_$           Reverse sequencing adapter sequence (to be removed)
+                              (Adapter sequences default to nextera adapters)
+      --min_hg_align_score  Minimum alignment score for human genome (default 30)
+      -w                    Working directory. Defaults to `./work`
 
     Batchfile:
       The manifest is a CSV with a header indicating which samples correspond to which files.
@@ -192,3 +196,23 @@ process remove_human {
 
 //   gunzip -c ${hg_index_tgz} | tar -x -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
 //  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
+
+nohuman_ch.reduce('specimen, R1, R2\n'){ csvStr, row ->
+            return  csvStr += "${row[0]}, ${row[1]}, ${row[2]}\n";
+        }.set{manifestStr}
+
+process outputManifest {
+    container "ubuntu:16.04"
+
+    publishDir "${params.output_folder}/"
+
+    input:
+        val manifestStr from manifestStr
+    
+    output:
+        file 'manifest.nohuman.csv' into opManifest
+
+    """
+        echo "${manifestStr}" > manifest.nohuman.csv
+    """
+}
