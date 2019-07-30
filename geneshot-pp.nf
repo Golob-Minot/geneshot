@@ -21,7 +21,7 @@ params.hg_index_url = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GC
 params.hg_index = false
 params.min_hg_align_score = 30
 
-params.output_folder = './'
+params.output_folder = '.'
 
 // Function which prints help message text
 def helpMessage() {
@@ -65,8 +65,17 @@ if (params.help){
 if (params.index) {
     Channel.from(file(params.manifest))
         .splitCsv(header: true, sep: ",")
-        .map { sample ->
-        [sample.specimen, file(sample.R1), file(sample.R2), file(sample.I1), file(sample.I2)]}
+        .map { sample -> [
+          sample.specimen,
+          // base names below, lacking .fq.gz
+          file(sample.R1).name.replaceAll(/.fastq.gz$/, "").replaceAll(/.fq.gz$/, ""), 
+          file(sample.R2).name.replaceAll(/.fastq.gz$/, "").replaceAll(/.fq.gz$/, ""),
+          // Actual files
+          file(sample.R1),
+          file(sample.R2),
+          file(sample.I1),
+          file(sample.I2),
+        ]}
         .set{ input_ch }
     // Step 1: barcodecop
     process barcodecop {
@@ -75,10 +84,10 @@ if (params.index) {
       errorStrategy "retry"
 
       input:
-        set specimen, file(R1), file(R2), file(I1), file(I2) from input_ch
+        set specimen, R1_n, R2_n, file(R1), file(R2), file(I1), file(I2) from input_ch
       
       output:
-        set specimen, file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz") into demupltiplexed_ch
+        set specimen,  R1_n, R2_n, file("${R1_n}.bcc.fq.gz"), file("${R2_n}.bcc.fq.gz") into demupltiplexed_ch
       """
       set -e
 
@@ -86,20 +95,25 @@ if (params.index) {
       ${I1} ${I2} \
       --match-filter \
       -f ${R1} \
-      -o ${R1}.bcc.fq.gz &&
+      -o ${R1_n}.bcc.fq.gz &&
       barcodecop \
       ${I1} ${I2} \
       --match-filter \
       -f ${R2} \
-      -o ${R2}.bcc.fq.gz
+      -o ${R2_n}.bcc.fq.gz
       """
     }
 }
 else {
     Channel.from(file(params.manifest))
         .splitCsv(header: true, sep: ",")
-        .map { sample ->
-        [sample.specimen, file(sample.R1), file(sample.R2)]}
+        .map { sample -> [
+          sample.specimen,
+          file(sample.R1).name.replaceAll(/.fastq.gz$/, "").replaceAll(/.fq.gz$/, ""), 
+          file(sample.R2).name.replaceAll(/.fastq.gz$/, "").replaceAll(/.fq.gz$/, ""),
+          file(sample.R1),
+          file(sample.R2)
+          ]}
         .set{ demupltiplexed_ch }
 }
 
@@ -112,10 +126,10 @@ process cutadapt {
   //publishDir "${params.output_folder}/noadapt/"
 
   input:
-  set sample_name, file(fastq1), file(fastq2) from demupltiplexed_ch
+  set sample_name, R1_n, R2_n, file(fastq1), file(fastq2) from demupltiplexed_ch
   
   output:
-  set sample_name, file("${fastq1}.noadapt.R1.fq.gz"), file("${fastq2}.noadapt.R2.fq.gz"), file("${fastq1}.cutadapt.log") into noadapt_ch
+  set sample_name, R1_n, R2_n, file("${R1_n}.noadapt.fq.gz"), file("${R2_n}.noadapt.fq.gz"), file("${R1_n}.cutadapt.log") into noadapt_ch
 
   """
   set -e 
@@ -123,8 +137,8 @@ process cutadapt {
   cutadapt \
   -j ${task.cpus} \
    -a ${params.adapter_F} -A ${params.adapter_R} \
-  -o ${fastq1}.noadapt.R1.fq.gz -p ${fastq2}.noadapt.R2.fq.gz \
-  ${fastq1} ${fastq2} > ${fastq1}.cutadapt.log
+  -o ${R1_n}.noadapt.fq.gz -p ${R2_n}.noadapt.fq.gz \
+  ${fastq1} ${fastq2} > ${R1_n}.cutadapt.log
   """
 }
 
@@ -159,10 +173,10 @@ process remove_human {
 
   input:
     file hg_index_tgz from hg_index_tgz
-    set sample_name, file(fastq1), file(fastq2), file(cutadapt_log) from noadapt_ch
+    set sample_name, R1_n, R2_n, file(fastq1), file(fastq2), file(cutadapt_log) from noadapt_ch
   
   output:
-    set sample_name, file("${fastq1}.nohuman.R1.fq.gz"), file("${fastq2}.nohuman.R2.fq.gz"), file("${fastq1}.nohuman.log") into nohuman_ch
+    set sample_name, R1_n, R2_n, file("${R1_n}.noadapt.nohuman.fq.gz"), file("${R2_n}.noadapt.nohuman.R2.fq.gz"), file("${R1_n}.noadapt.nohuman.log") into nohuman_ch
 
   afterScript "rm -rf hg_index/*"
 
@@ -170,27 +184,27 @@ process remove_human {
   set - e
 
   bwa_index_prefix=\$(tar -ztvf ${hg_index_tgz} | head -1 | sed \'s/.* //\' | sed \'s/.amb//\') && \
-  echo BWA index file prefix is \${bwa_index_prefix} | tee -a ${fastq1}.nohuman.log && \
-  echo Extracting BWA index | tee -a ${fastq1}.nohuman.log && \
+  echo BWA index file prefix is \${bwa_index_prefix} | tee -a ${R1_n}.nohuman.log && \
+  echo Extracting BWA index | tee -a ${R1_n}.nohuman.log && \
   mkdir -p hg_index/ && \
-  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
-  echo Files in index directory: | tee -a ${fastq1}.nohuman.log && \
-  ls -l -h hg_index | tee -a ${fastq1}.nohuman.log && \
-  echo Running BWA | tee -a ${fastq1}.nohuman.log && \
+  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${R1_n}.nohuman.log && \
+  echo Files in index directory: | tee -a ${R1_n}.nohuman.log && \
+  ls -l -h hg_index | tee -a ${R1_n}.nohuman.log && \
+  echo Running BWA | tee -a ${R1_n}.nohuman.log && \
   bwa mem -t ${task.cpus} \
   -T ${params.min_hg_align_score} \
   -o alignment.sam \
   hg_index/\$bwa_index_prefix \
   ${fastq1} ${fastq2} \
-  | tee -a ${fastq1}.nohuman.log && \
-  echo Checking if alignment is empty  | tee -a ${fastq1}.nohuman.log && \
+  | tee -a ${R1_n}.nohuman.log && \
+  echo Checking if alignment is empty  | tee -a ${R1_n}.nohuman.log && \
   [[ -s alignment.sam ]] && \
-  echo Extracting Unaligned Pairs | tee -a ${fastq1}.nohuman.log && \
+  echo Extracting Unaligned Pairs | tee -a ${R1_n}.nohuman.log && \
   samtools fastq alignment.sam \
   --threads ${task.cpus} -f 12 \
-  -1 ${fastq1}.nohuman.R1.fq.gz -2 ${fastq2}.nohuman.R2.fq.gz \
-  | tee -a ${fastq1}.nohuman.log && \
-  echo Done | tee -a ${fastq1}.nohuman.log
+  -1 ${R1_n}.noadapt.nohuman.fq.gz -2 ${R2_n}.noadapt.nohuman.fq.gz \
+  | tee -a ${R1_n}.nohuman.log && \
+  echo Done | tee -a ${R1_n}.nohuman.log
   """
 }
 
@@ -198,7 +212,7 @@ process remove_human {
 //  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
 
 nohuman_ch.reduce('specimen, R1, R2\n'){ csvStr, row ->
-            return  csvStr += "${row[0]}, ${params.output_folder}/nohuman/${row[1].name}, ${params.output_folder}/nohuman/${row[3].name}\n";
+            return  csvStr += "${row[0]}, ${params.output_folder}/nohuman/${row[3].name}, ${params.output_folder}/nohuman/${row[4].name}\n";
         }.set{manifestStr}
 
 process outputManifest {
