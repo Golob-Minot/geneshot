@@ -102,7 +102,7 @@ else {
 
 // Step 2
 process cutadapt {
-  container "golob/cutadapt:1.18__bcw.0.3.0_al38"
+  container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
   label 'io_limited'
   errorStrategy "retry"
 
@@ -128,7 +128,7 @@ process cutadapt {
 // Step 3A.
 if (!params.hg_index) {
   process download_hg_index {
-    container "golob/bwa:0.7.17__bcw.0.3.0C"
+    container "golob/bwa:0.7.17__bcw.0.3.0I"
     errorStrategy "retry"
     label 'io_limited'
 
@@ -146,7 +146,7 @@ if (!params.hg_index) {
 
 // Step 3B.
 process remove_human {
-  container "golob/bwa:0.7.17__bcw.0.3.0H"
+  container "golob/bwa:0.7.17__bcw.0.3.0I"
   //container "quay.io/fhcrc-microbiome/bwa:v0.7.17--4"
   errorStrategy "retry"
   publishDir "${params.output_folder}/nohuman/"
