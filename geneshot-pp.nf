@@ -201,7 +201,7 @@ nohuman_ch.reduce('specimen, R1, R2\n'){ csvStr, row ->
         }.set{manifestStr}
 
 process outputManifest {
-    container "ubuntu:16.04"
+    container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
 
     publishDir "${params.output_folder}/"
 
