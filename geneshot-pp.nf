@@ -152,7 +152,7 @@ process remove_human {
   container "golob/bwa:0.7.17__bcw.0.3.0I"
   //container "quay.io/fhcrc-microbiome/bwa:v0.7.17--4"
   errorStrategy "retry"
-  publishDir path: "${params.output_folder}/nohuman/" mode: copy
+  publishDir path: "${params.output_folder}/nohuman/" mode: 'copy'
 
   label 'mem_veryhigh'
 
@@ -204,7 +204,7 @@ nohuman_ch.reduce('specimen, R1, R2\n'){ csvStr, row ->
 process outputManifest {
     container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
 
-    publishDir path: "${params.output_folder}/" mode: copy
+    publishDir path: "${params.output_folder}/" mode: 'copy'
 
     input:
         val manifestStr from manifestStr
