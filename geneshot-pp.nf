@@ -23,7 +23,6 @@ params.min_hg_align_score = 30
 
 params.output_folder = '.'
 
-
 // Function which prints help message text
 def helpMessage() {
     log.info"""
@@ -40,7 +39,7 @@ def helpMessage() {
       --hg_index_url        URL for human genome index, defaults to current HG
       --hg_index            Cached copy of the bwa indexed human genome, TGZ format
       --adapter_F           Forward sequencing adapter sequence (to be removed)
-      --adapter_$           Reverse sequencing adapter sequence (to be removed)
+      --adapter_R           Reverse sequencing adapter sequence (to be removed)
                               (Adapter sequences default to nextera adapters)
       --min_hg_align_score  Minimum alignment score for human genome (default 30)
       -w                    Working directory. Defaults to `./work`
