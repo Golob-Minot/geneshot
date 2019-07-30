@@ -176,7 +176,7 @@ process remove_human {
     set sample_name, R1_n, R2_n, file(fastq1), file(fastq2), file(cutadapt_log) from noadapt_ch
   
   output:
-    set sample_name, R1_n, R2_n, file("${R1_n}.noadapt.nohuman.fq.gz"), file("${R2_n}.noadapt.nohuman.R2.fq.gz"), file("${R1_n}.noadapt.nohuman.log") into nohuman_ch
+    set sample_name, R1_n, R2_n, file("${R1_n}.noadapt.nohuman.fq.gz"), file("${R2_n}.noadapt.nohuman.R2.fq.gz"), file("${R1_n}.nohuman.log") into nohuman_ch
 
   afterScript "rm -rf hg_index/*"
 
