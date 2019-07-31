@@ -97,9 +97,9 @@ process metaspadesAssembly {
 // Annotation with prokka
 
 process prokkaAnnotate {
-    container 'golob/prokka:1.1.13__bcw.0.3.0'
+    container 'golob/prokka:1.1.13__bcw.0.3.0B'
     label 'mem_veryhigh'
-    //errorStrategy "retry"
+    errorStrategy "retry"
     publishDir "${params.output_folder}", mode: 'copy'
 
     input:
@@ -113,7 +113,6 @@ process prokkaAnnotate {
             file("prokka/${specimen}.faa.gz"), \
             file("prokka/${specimen}.ffn.gz"), \
             file("prokka/${specimen}.fsa.gz"), \
-            file("prokka/${specimen}.gbf.gz"), \
             file("prokka/${specimen}.gff.gz"), \
             file("prokka/${specimen}.log.gz"), \
             file("prokka/${specimen}.sqn.gz"), \
@@ -138,7 +137,6 @@ process prokkaAnnotate {
     gzip prokka/${specimen}.ffn &&
     gzip prokka/${specimen}.fna &&
     gzip prokka/${specimen}.fsa &&
-    gzip prokka/${specimen}.gbf &&
     gzip prokka/${specimen}.gff &&
     gzip prokka/${specimen}.log &&
     gzip prokka/${specimen}.sqn &&
@@ -146,27 +144,26 @@ process prokkaAnnotate {
     gzip prokka/${specimen}.txt
     """
 }
-/*
+
 // retrieve the eggnogmapper db
 process eggnogMapperDownloadDB {
     container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1A'
-    label 'io_limited'
-    errorStrategy "retry"
+    label = 'io_limited'
+    //errorStrategy "retry"
     afterScript "rm -rf dl_dir/*"
 
     output:
-        file("eggnogDB.tgz")
-    
+        file("eggnogDB.tgz") into eggnogdb_tgz
     
     """
     set -e
     
     mkdir -p dl_dir/ &&
     download_eggnog_data.py none -y --data_dir dl_dir/ &&
-    tar czvf eggnogDB.tgz --directory dl_dir/ .
+    tar -I pigz -cvf eggnogDB.tgz --directory dl_dir/ .
     """
 }
-/*
+
 process eggnogMap {
     container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1A'
     label 'mem_veryhigh'
@@ -174,6 +171,7 @@ process eggnogMap {
 
     input:
         set val(specimen), file(faa) from specimen_prokka_faa_ch
+        file(eggnogdb_tgz)
 
     output:
         set val(specimen), file(" ${specimen}.egm.emapper.annotations.gz") into eggnogmap_ch
@@ -182,7 +180,7 @@ process eggnogMap {
     set -e 
 
     mkdir -p db/emdb/ &&
-    tar -I pigz -C db/emdb/ -xf ${db_tgz} ./eggnog.db ./eggnog_proteins.dmnd 
+    tar -I pigz -C db/emdb/ -xf ${eggnogdb_tgz} ./eggnog.db ./eggnog_proteins.dmnd 
     emapper.py \
     -i ${faa} \
     -m diamond \
