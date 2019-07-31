@@ -100,7 +100,7 @@ process prokkaAnnotate {
     container = 'golob/metaspades:v3.11.1--8A__bcw__0.3.0'
     label 'mem_veryhigh'
     //errorStrategy "retry"
-    publishDir "${params.output_folder}/prokka/", mode: 'copy'
+    publishDir "${params.output_folder}", mode: 'copy'
 
 
     input:
@@ -109,7 +109,6 @@ process prokkaAnnotate {
     output:
         set \
         val(specimen), \
-        file("${specimen}.prokka.log"), \
         file("prokka/${specimen}.tbl.gz"), \
         file("prokka/${specimen}.err.gz"), \
         file("prokka/${specimen}.faa.gz"), \
@@ -130,7 +129,7 @@ process prokkaAnnotate {
     --prefix ${specimen} \
     --cpus ${task.cpus} \
     --mincontiglen ${params.mincontiglen} \
-    ${scaffolds} | tee -a ${specimen}.prokka.log &&
+    ${scaffolds} &&
     gzip prokka/${specimen}.tbl &&
     gzip prokka/${specimen}.err &&
     gzip prokka/${specimen}.faa &&
