@@ -236,8 +236,8 @@ process combineReads {
 }
 
 // Output the final reads and manifest
-sample_qc_ch.reduce('specimen, R1, R2\n'){ csvStr, row ->
-            return  csvStr += "${row[0]}, ${params.output_folder}/qc/${row[1].name}, ${params.output_folder}/qc/${row[2].name}\n";
+sample_qc_ch.reduce('specimen,R1,R2\n'){ csvStr, row ->
+            return  csvStr += "${row[0]},${params.output_folder}/qc/${row[1].name},${params.output_folder}/qc/${row[2].name}\n";
         }.set{manifestStr}
 
 process outputManifest {
