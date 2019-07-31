@@ -97,39 +97,41 @@ process metaspadesAssembly {
 // Annotation with prokka
 
 process prokkaAnnotate {
-    container = 'golob/metaspades:v3.11.1--8A__bcw__0.3.0'
+    container 'golob/prokka:1.1.13__bcw.0.3.0'
     label 'mem_veryhigh'
     //errorStrategy "retry"
     publishDir "${params.output_folder}", mode: 'copy'
-
 
     input:
         set val(specimen), file(contigs), file(scaffolds), file(spades_log) from assembly_ch
     
     output:
         set \
-        val(specimen), \
-        file("prokka/${specimen}.tbl.gz"), \
-        file("prokka/${specimen}.err.gz"), \
-        file("prokka/${specimen}.faa.gz"), \
-        file("prokka/${specimen}.ffn.gz"), \
-        file("prokka/${specimen}.fsa.gz"), \
-        file("prokka/${specimen}.gbf.gz"), \
-        file("prokka/${specimen}.gff.gz"), \
-        file("prokka/${specimen}.log.gz"), \
-        file("prokka/${specimen}.sqn.gz"), \
-        file("prokka/${specimen}.tsv.gz"), \
-        file("prokka/${specimen}.txt.gz") into prokka_ch
+            val(specimen), \
+            file("prokka/${specimen}.tbl.gz"), \
+            file("prokka/${specimen}.err.gz"), \
+            file("prokka/${specimen}.faa.gz"), \
+            file("prokka/${specimen}.ffn.gz"), \
+            file("prokka/${specimen}.fsa.gz"), \
+            file("prokka/${specimen}.gbf.gz"), \
+            file("prokka/${specimen}.gff.gz"), \
+            file("prokka/${specimen}.log.gz"), \
+            file("prokka/${specimen}.sqn.gz"), \
+            file("prokka/${specimen}.tsv.gz"), \
+            file("prokka/${specimen}.txt.gz") into prokka_ch
+
+        set val(specimen), file("prokka/${specimen}.faa.gz") into specimen_prokka_faa_ch
     
     """
     set -e 
 
     prokka \
-    --outdir ./prokka \
+    --outdir prokka/ \
     --prefix ${specimen} \
     --cpus ${task.cpus} \
     --mincontiglen ${params.mincontiglen} \
     ${scaffolds} &&
+    ls -l -h prokka/ &&
     gzip prokka/${specimen}.tbl &&
     gzip prokka/${specimen}.err &&
     gzip prokka/${specimen}.faa &&
@@ -143,6 +145,55 @@ process prokkaAnnotate {
     gzip prokka/${specimen}.tsv &&
     gzip prokka/${specimen}.txt
     """
+}
+/*
+// retrieve the eggnogmapper db
+process eggnogMapperDownloadDB {
+    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1A'
+    label 'io_limited'
+    errorStrategy "retry"
+    afterScript "rm -rf dl_dir/*"
+
+    output:
+        file("eggnogDB.tgz")
+    
+    
+    """
+    set -e
+    
+    mkdir -p dl_dir/ &&
+    download_eggnog_data.py none -y --data_dir dl_dir/ &&
+    tar czvf eggnogDB.tgz --directory dl_dir/ .
+    """
+}
+/*
+process eggnogMap {
+    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1A'
+    label 'mem_veryhigh'
+    //errorStrategy "retry"
+
+    input:
+        set val(specimen), file(faa) from specimen_prokka_faa_ch
+
+    output:
+        set val(specimen), file(" ${specimen}.egm.emapper.annotations.gz") into eggnogmap_ch
+
+    """
+    set -e 
+
+    mkdir -p db/emdb/ &&
+    tar -I pigz -C db/emdb/ -xf ${db_tgz} ./eggnog.db ./eggnog_proteins.dmnd 
+    emapper.py \
+    -i ${faa} \
+    -m diamond \
+    --dmnd_db db/emdb/eggnog_proteins.dmnd \
+    --data_dir db/emdb/ \
+    --cpu ${task.cpus} \
+    -o ${specimen}.egm &&
+    pigz ${specimen}.egm.emapper.annotations
+    """
+        
+
 }
 
 /*
