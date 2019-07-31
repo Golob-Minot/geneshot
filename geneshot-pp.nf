@@ -162,11 +162,11 @@ if (!params.hg_index) {
 
 
 // Step 3B.
-process remove_human {
+process removeHuman {
   container "golob/bwa:0.7.17__bcw.0.3.0I"
   //container "quay.io/fhcrc-microbiome/bwa:v0.7.17--4"
   errorStrategy "retry"
-  publishDir path: "${params.output_folder}/nohuman/", mode: 'copy'
+
 
   label 'mem_veryhigh'
 
@@ -176,7 +176,7 @@ process remove_human {
     set sample_name, R1_n, R2_n, file(fastq1), file(fastq2), file(cutadapt_log) from noadapt_ch
   
   output:
-    set sample_name, R1_n, R2_n, file("${R1_n}.noadapt.nohuman.fq.gz"), file("${R2_n}.noadapt.nohuman.R2.fq.gz"), file("${R1_n}.nohuman.log") into nohuman_ch
+    set sample_name, file("${R1_n}.noadapt.nohuman.fq.gz"), file("${R2_n}.noadapt.nohuman.R2.fq.gz"), file("${R1_n}.nohuman.log") into nohuman_ch
 
   afterScript "rm -rf hg_index/*"
 
@@ -208,11 +208,36 @@ process remove_human {
   """
 }
 
-//   gunzip -c ${hg_index_tgz} | tar -x -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
-//  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${fastq1}.nohuman.log && \
+// Combine reads, grouping by specimen
+nohuman_ch.groupTuple()
+  .set{ sample_no_human_group_ch }
 
-nohuman_ch.reduce('specimen, R1, R2\n'){ csvStr, row ->
-            return  csvStr += "${row[0]}, ${params.output_folder}/nohuman/${row[3].name}, ${params.output_folder}/nohuman/${row[4].name}\n";
+process combineReads {
+    container = 'golob/fastatools:0.6.2__bcw.0.3.0'
+    label = 'io_limited'
+
+    publishDir path: "${params.output_folder}/qc/", mode: 'copy'
+
+    input:
+      set val(sample), file(R1s), file(R2s), file(logs) from sample_no_human_group_ch
+    
+    output:
+      set val(sample), file("${sample}.R1.fastq.gz"), file("${sample}.R2.fastq.gz") into sample_qc_ch
+
+    """
+    combine_fastq_pairs.py \
+    -1 ${R1s} \
+    -2 ${R2s} \
+    --normalize-ids \
+    -o1 "${sample}.R1.fastq.gz" \
+    -o2 "${sample}.R2.fastq.gz"
+    """
+
+}
+
+// Output the final reads and manifest
+sample_qc_ch.reduce('specimen, R1, R2\n'){ csvStr, row ->
+            return  csvStr += "${row[0]}, ${params.output_folder}/qc/${row[1].name}, ${params.output_folder}/qc/${row[2].name}\n";
         }.set{manifestStr}
 
 process outputManifest {
@@ -224,9 +249,10 @@ process outputManifest {
         val manifestStr from manifestStr
     
     output:
-        file 'manifest.nohuman.csv' into opManifest
+        file 'manifest.qc.csv' into opManifest
 
     """
-        echo "${manifestStr}" > manifest.nohuman.csv
+        echo "${manifestStr}" > manifest.qc.csv
     """
 }
+// */
