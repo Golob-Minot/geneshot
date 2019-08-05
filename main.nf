@@ -279,6 +279,14 @@ process countReadsSummary {
 set -e
 
 echo name,n_reads > TEMP
+
+for fp in ${readcount_csv_list}; do
+
+    echo "Checking to make sure that \$fp exists"
+    [[ -s \$fp ]]
+
+done
+
 cat ${readcount_csv_list} >> TEMP && mv TEMP ${output_prefix}.readcounts.csv
   """
 
