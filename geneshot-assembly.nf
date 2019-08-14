@@ -72,7 +72,7 @@ process metaspadesAssembly {
     label 'mem_veryhigh'
     //errorStrategy "retry"
 
-    publishDir "${params.output_folder}/${specimen}/assembly/", mode: 'copy'
+    publishDir "${params.output_folder}/assembly/${specimen}/assembly/", mode: 'copy'
 
     input:
         set specimen, file(R1), file(R2) from input_ch
@@ -101,7 +101,7 @@ process prokkaAnnotate {
     container 'golob/prokka:1.1.14__bcw.0.3.1'
     label 'mem_veryhigh'
     errorStrategy "retry"
-    publishDir "${params.output_folder}/${specimen}/prokka/", mode: 'copy'
+    publishDir "${params.output_folder}/assembly/${specimen}/", mode: 'copy'
 
     input:
         set val(specimen), file(contigs), file(scaffolds), file(spades_log) from assembly_ch
