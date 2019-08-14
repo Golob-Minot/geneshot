@@ -127,7 +127,8 @@ input_w_index_valid_ch
 process barcodecop {
   container "golob/barcodecop:0.4.1__bcw_0.3.0"
   label 'io_limited'
-  errorStrategy "retry"
+  errorStrategy 'retry'
+  maxRetries 10
 
   input:
     set specimen, file(R1), file(R2), file(I1), file(I2) from to_bcc_ch
@@ -177,7 +178,8 @@ input_no_index_valid_ch
 process cutadapt {
   container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
   label 'io_limited'
-  errorStrategy "retry"
+  errorStrategy 'retry'
+  maxRetries 10
 
   //publishDir "${params.output_folder}/noadapt/"
 
@@ -220,7 +222,8 @@ if (!params.hg_index) {
 // Step 3B.
 process removeHuman {
   container "golob/bwa:0.7.17__bcw.0.3.0I"
-  //errorStrategy "retry"
+  errorStrategy 'retry'
+  maxRetries 10
   label 'mem_veryhigh'
 
 
@@ -268,8 +271,10 @@ nohuman_ch.groupTuple()
   .set{ sample_no_human_group_ch }
 
 process combineReads {
-    container = 'golob/fastatools:0.6.2__bcw.0.3.0'
+    container = 'golob/fastatools:0.7.0__bcw.0.3.0'
     label = 'io_limited'
+    errorStrategy 'retry'
+    maxRetries 10
 
     publishDir path: "${params.output_folder}/qc/", mode: 'copy'
 
