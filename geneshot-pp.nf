@@ -35,7 +35,6 @@ def helpMessage() {
 
     Options:
       --output_folder       Folder to place outputs (default invocation dir)
-      --index               Index reads are provided (default: false)
       --hg_index_url        URL for human genome index, defaults to current HG
       --hg_index            Cached copy of the bwa indexed human genome, TGZ format
       --adapter_F           Forward sequencing adapter sequence (to be removed)
@@ -55,67 +54,124 @@ def helpMessage() {
 }
 
 // Show help message if the user specifies the --help flag at runtime
-if (params.help){
+if (params.help || params.manifest == null){
     // Invoke the function above which prints the help message
     helpMessage()
     // Exit out and do not run anything else
     exit 0
 }
 
-if (params.index) {
-    Channel.from(file(params.manifest))
-        .splitCsv(header: true, sep: ",")
-        .map { sample -> [
-          sample.specimen,
-          // base names below, lacking .fq.gz
-          file(sample.R1).name.replaceAll(/.fastq.gz$/, "").replaceAll(/.fq.gz$/, ""), 
-          file(sample.R2).name.replaceAll(/.fastq.gz$/, "").replaceAll(/.fq.gz$/, ""),
-          // Actual files
-          file(sample.R1),
-          file(sample.R2),
-          file(sample.I1),
-          file(sample.I2),
-        ]}
-        .set{ input_ch }
-    // Step 1: barcodecop
-    process barcodecop {
-      container "golob/barcodecop:0.4.1__bcw_0.3.0"
-      label 'io_limited'
-      errorStrategy "retry"
+// Implicit else we have a manifest. Time to do some validation:
+// Split into index provided or not. Further validate critical elements are present
+// e.g. A specimen, R1 and R2
 
-      input:
-        set specimen, R1_n, R2_n, file(R1), file(R2), file(I1), file(I2) from input_ch
-      
-      output:
-        set specimen,  R1_n, R2_n, file("${R1_n}.bcc.fq.gz"), file("${R2_n}.bcc.fq.gz") into demupltiplexed_ch
-      """
-      set -e
+input_w_index_ch = Channel.create()
+input_no_index_ch = Channel.create()
+input_invalid_ch = Channel.create()
 
-      barcodecop \
-      ${I1} ${I2} \
-      --match-filter \
-      -f ${R1} \
-      -o ${R1_n}.bcc.fq.gz &&
-      barcodecop \
-      ${I1} ${I2} \
-      --match-filter \
-      -f ${R2} \
-      -o ${R2_n}.bcc.fq.gz
-      """
+Channel.from(file(params.manifest))
+    .splitCsv(header: true, sep: ",")
+    .choice(
+        input_invalid_ch,
+        input_no_index_ch,
+        input_w_index_ch,
+    ) {
+        r -> if (
+            (r.specimen == null) ||
+            (r.R1 == null) ||
+            (r.R2 == null) ||
+            (r.specimen == "") ||
+            (r.R1 == "") ||
+            (r.R2 == "")
+        ) return 0;
+        else if (
+            (r.I1 != null) && 
+            (r.I2 != null) && 
+            (r.I1 != "") &&
+            (r.I2 != "")
+            ) return 2;
+        else return 1;
     }
+// Continuing validation, be sure the files exist and are not empty.
+// If any file in a row is empty, make a note of it and proceed with the remainder
+
+input_w_index_invalid_ch = Channel.create()
+input_w_index_valid_ch = Channel.create()
+input_w_index_ch.choice(
+    input_w_index_invalid_ch,
+    input_w_index_valid_ch
+) {
+    r -> (file(r.R1).isEmpty() || file(r.R2).isEmpty() || file(r.I1).isEmpty() || file(r.I2).isEmpty()) ? 0 : 1
 }
-else {
-    Channel.from(file(params.manifest))
-        .splitCsv(header: true, sep: ",")
-        .map { sample -> [
-          sample.specimen,
-          file(sample.R1).name.replaceAll(/.fastq.gz$/, "").replaceAll(/.fq.gz$/, ""), 
-          file(sample.R2).name.replaceAll(/.fastq.gz$/, "").replaceAll(/.fq.gz$/, ""),
-          file(sample.R1),
-          file(sample.R2)
-          ]}
-        .set{ demupltiplexed_ch }
+
+input_no_index_invalid_ch = Channel.create()
+input_no_index_valid_ch = Channel.create()
+input_no_index_ch.choice(
+    input_no_index_invalid_ch,
+    input_no_index_valid_ch
+) {
+    r -> (file(r.R1).isEmpty() || file(r.R2).isEmpty()) ? 0 : 1
 }
+
+// For those with an index, make a channel for barcodecop
+input_w_index_valid_ch
+    .map{ sample -> [
+        sample.specimen,
+        file(sample.R1),
+        file(sample.R2),
+        file(sample.I1),
+        file(sample.I2),
+    ]}
+    .set{ to_bcc_ch }
+// ... and run barcodecop to validate the demultiplex
+process barcodecop {
+  container "golob/barcodecop:0.4.1__bcw_0.3.0"
+  label 'io_limited'
+  errorStrategy "retry"
+
+  input:
+    set specimen, file(R1), file(R2), file(I1), file(I2) from to_bcc_ch
+  
+  output:
+    set specimen, file("${R1.getSimpleName()}_R1.bcc.fq.gz"), file("${R2.getSimpleName()}_R2.bcc.fq.gz") into post_bcc_ch
+  """
+  set -e
+
+  barcodecop \
+  ${I1} ${I2} \
+  --match-filter \
+  -f ${R1} \
+  -o ${R1.getSimpleName()}_R1.bcc.fq.gz &&
+  barcodecop \
+  ${I1} ${I2} \
+  --match-filter \
+  -f ${R2} \
+  -o ${R2.getSimpleName()}_R2.bcc.fq.gz
+  """
+}
+
+// See if any read sets fail at this step
+bcc_to_cutadapt_ch = Channel.create()
+bcc_empty_ch = Channel.create()
+post_bcc_ch
+    .choice(
+        bcc_to_cutadapt_ch,
+        bcc_empty_ch
+    ) {
+        r -> (file(r[1]).isEmpty() || file(r[2]).isEmpty()) ? 1 : 0
+    }
+
+// Mix together the reads with no index with the reads with verified demultiplex
+
+input_no_index_valid_ch
+    .map { sample -> [
+        sample.specimen,
+        // Actual files
+        file(sample.R1),
+        file(sample.R2),
+    ]}
+    .mix(bcc_to_cutadapt_ch)
+    .set{ demupltiplexed_ch}
 
 // Step 2
 process cutadapt {
@@ -126,10 +182,10 @@ process cutadapt {
   //publishDir "${params.output_folder}/noadapt/"
 
   input:
-  set sample_name, R1_n, R2_n, file(fastq1), file(fastq2) from demupltiplexed_ch
+  set sample_name, file(R1), file(R2) from demupltiplexed_ch
   
   output:
-  set sample_name, R1_n, R2_n, file("${R1_n}.noadapt.fq.gz"), file("${R2_n}.noadapt.fq.gz"), file("${R1_n}.cutadapt.log") into noadapt_ch
+  set sample_name, file("${R1.getSimpleName()}_R1.noadapt.fq.gz"), file("${R2.getSimpleName()}_R2.noadapt.fq.gz"), file("${R1.getSimpleName()}.cutadapt.log") into noadapt_ch
 
   """
   set -e 
@@ -137,8 +193,8 @@ process cutadapt {
   cutadapt \
   -j ${task.cpus} \
    -a ${params.adapter_F} -A ${params.adapter_R} \
-  -o ${R1_n}.noadapt.fq.gz -p ${R2_n}.noadapt.fq.gz \
-  ${fastq1} ${fastq2} > ${R1_n}.cutadapt.log
+  -o ${R1.getSimpleName()}_R1.noadapt.fq.gz -p ${R2.getSimpleName()}_R2.noadapt.fq.gz \
+  ${R1} ${R1} > ${R1.getSimpleName()}.cutadapt.log
   """
 }
 
@@ -164,19 +220,16 @@ if (!params.hg_index) {
 // Step 3B.
 process removeHuman {
   container "golob/bwa:0.7.17__bcw.0.3.0I"
-  //container "quay.io/fhcrc-microbiome/bwa:v0.7.17--4"
   errorStrategy "retry"
-
-
   label 'mem_veryhigh'
 
 
   input:
     file hg_index_tgz from hg_index_tgz
-    set sample_name, R1_n, R2_n, file(fastq1), file(fastq2), file(cutadapt_log) from noadapt_ch
+    set sample_name, file(R1), file(R2), file(cutadapt_log) from noadapt_ch
   
   output:
-    set sample_name, file("${R1_n}.noadapt.nohuman.fq.gz"), file("${R2_n}.noadapt.nohuman.R2.fq.gz"), file("${R1_n}.nohuman.log") into nohuman_ch
+    set sample_name, file("${R1.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R2.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R1.getSimpleName()}.nohuman.log") into nohuman_ch
 
   afterScript "rm -rf hg_index/*"
 
@@ -184,27 +237,27 @@ process removeHuman {
   set - e
 
   bwa_index_prefix=\$(tar -ztvf ${hg_index_tgz} | head -1 | sed \'s/.* //\' | sed \'s/.amb//\') && \
-  echo BWA index file prefix is \${bwa_index_prefix} | tee -a ${R1_n}.nohuman.log && \
-  echo Extracting BWA index | tee -a ${R1_n}.nohuman.log && \
+  echo BWA index file prefix is \${bwa_index_prefix} | tee -a ${R1.getSimpleName()}.nohuman.log && \
+  echo Extracting BWA index | tee -a ${R1.getSimpleName()}.nohuman.log && \
   mkdir -p hg_index/ && \
-  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${R1_n}.nohuman.log && \
-  echo Files in index directory: | tee -a ${R1_n}.nohuman.log && \
-  ls -l -h hg_index | tee -a ${R1_n}.nohuman.log && \
-  echo Running BWA | tee -a ${R1_n}.nohuman.log && \
+  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${R1.getSimpleName()}.nohuman.log && \
+  echo Files in index directory: | tee -a ${R1.getSimpleName()}.nohuman.log && \
+  ls -l -h hg_index | tee -a ${R1.getSimpleName()}.nohuman.log && \
+  echo Running BWA | tee -a ${R1.getSimpleName()}.nohuman.log && \
   bwa mem -t ${task.cpus} \
   -T ${params.min_hg_align_score} \
   -o alignment.sam \
   hg_index/\$bwa_index_prefix \
-  ${fastq1} ${fastq2} \
-  | tee -a ${R1_n}.nohuman.log && \
-  echo Checking if alignment is empty  | tee -a ${R1_n}.nohuman.log && \
+  ${R1} ${R2} \
+  | tee -a ${R1.getSimpleName()}.nohuman.log && \
+  echo Checking if alignment is empty  | tee -a ${R1.getSimpleName()}.nohuman.log && \
   [[ -s alignment.sam ]] && \
-  echo Extracting Unaligned Pairs | tee -a ${R1_n}.nohuman.log && \
+  echo Extracting Unaligned Pairs | tee -a ${R1.getSimpleName()}.nohuman.log && \
   samtools fastq alignment.sam \
   --threads ${task.cpus} -f 12 \
-  -1 ${R1_n}.noadapt.nohuman.fq.gz -2 ${R2_n}.noadapt.nohuman.R2.fq.gz \
-  | tee -a ${R1_n}.nohuman.log && \
-  echo Done | tee -a ${R1_n}.nohuman.log
+  -1 ${R1.getSimpleName()}.noadapt.nohuman.fq.gz -2 ${R2.getSimpleName()}.noadapt.nohuman.fq.gz \
+  | tee -a ${R1.getSimpleName()}.nohuman.log && \
+  echo Done | tee -a ${R1.getSimpleName()}.nohuman.log
   """
 }
 
