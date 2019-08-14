@@ -68,11 +68,11 @@ Channel.from(file(params.manifest))
 
 // Assembly with metaspades
 process metaspadesAssembly {
-    container 'golob/spades:3.12.0__bcw.0.3.0A'
+    container 'golob/spades:3.13.1__bcw.0.3.1'
     label 'mem_veryhigh'
-    errorStrategy "retry"
+    //errorStrategy "retry"
 
-    publishDir "${params.output_folder}/assembly/", mode: 'copy'
+    publishDir "${params.output_folder}/${specimen}/assembly/", mode: 'copy'
 
     input:
         set specimen, file(R1), file(R2) from input_ch
@@ -82,14 +82,15 @@ process metaspadesAssembly {
     
     """
     set -e 
-
+    echo 
     metaspades.py \
     --meta \
     --phred-offset ${params.phred_offset} \
     -1 ${R1} -2 ${R2} \
     -o . \
-    -t ${task.cpus} | tee -a ${specimen}.metaspades.log  &&
-    mv contigs.fasta ${specimen}.contigs.fasta &&
+    -t ${task.cpus} -m ${task.memory.toMega() / 1024} | 
+    tee -a ${specimen}.metaspades.log
+    mv contigs.fasta ${specimen}.contigs.fasta
     mv scaffolds.fasta ${specimen}.scaffolds.fasta
     """
 }
@@ -97,10 +98,10 @@ process metaspadesAssembly {
 // Annotation with prokka
 
 process prokkaAnnotate {
-    container 'golob/prokka:1.1.13__bcw.0.3.0B'
+    container 'golob/prokka:1.1.14__bcw.0.3.1'
     label 'mem_veryhigh'
     errorStrategy "retry"
-    publishDir "${params.output_folder}", mode: 'copy'
+    publishDir "${params.output_folder}/${specimen}/prokka/", mode: 'copy'
 
     input:
         set val(specimen), file(contigs), file(scaffolds), file(spades_log) from assembly_ch
@@ -144,7 +145,7 @@ process prokkaAnnotate {
     gzip prokka/${specimen}.txt
     """
 }
-
+/*
 // retrieve the eggnogmapper db
 process eggnogMapperDownloadDB {
     container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1A'
