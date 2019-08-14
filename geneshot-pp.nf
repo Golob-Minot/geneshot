@@ -220,7 +220,7 @@ if (!params.hg_index) {
 // Step 3B.
 process removeHuman {
   container "golob/bwa:0.7.17__bcw.0.3.0I"
-  errorStrategy "retry"
+  //errorStrategy "retry"
   label 'mem_veryhigh'
 
 
@@ -236,27 +236,29 @@ process removeHuman {
   """
   set - e
 
-  bwa_index_prefix=\$(tar -ztvf ${hg_index_tgz} | head -1 | sed \'s/.* //\' | sed \'s/.amb//\') && \
-  echo BWA index file prefix is \${bwa_index_prefix} | tee -a ${R1.getSimpleName()}.nohuman.log && \
-  echo Extracting BWA index | tee -a ${R1.getSimpleName()}.nohuman.log && \
-  mkdir -p hg_index/ && \
-  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${R1.getSimpleName()}.nohuman.log && \
-  echo Files in index directory: | tee -a ${R1.getSimpleName()}.nohuman.log && \
-  ls -l -h hg_index | tee -a ${R1.getSimpleName()}.nohuman.log && \
-  echo Running BWA | tee -a ${R1.getSimpleName()}.nohuman.log && \
+
+  bwa_index_fn=\$(tar -ztvf ${hg_index_tgz} | head -1 | sed \'s/.* //\')
+  bwa_index_prefix=\${bwa_index_fn%.*}
+  echo BWA index prefix is \${bwa_index_prefix} | tee -a ${R1.getSimpleName()}.nohuman.log
+  echo Extracting BWA index | tee -a ${R1.getSimpleName()}.nohuman.log
+  mkdir -p hg_index/ 
+  tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${R1.getSimpleName()}.nohuman.log
+  echo Files in index directory: | tee -a ${R1.getSimpleName()}.nohuman.log
+  ls -l -h hg_index | tee -a ${R1.getSimpleName()}.nohuman.log
+  echo Running BWA | tee -a ${R1.getSimpleName()}.nohuman.log
   bwa mem -t ${task.cpus} \
   -T ${params.min_hg_align_score} \
   -o alignment.sam \
   hg_index/\$bwa_index_prefix \
   ${R1} ${R2} \
-  | tee -a ${R1.getSimpleName()}.nohuman.log && \
-  echo Checking if alignment is empty  | tee -a ${R1.getSimpleName()}.nohuman.log && \
-  [[ -s alignment.sam ]] && \
-  echo Extracting Unaligned Pairs | tee -a ${R1.getSimpleName()}.nohuman.log && \
+  | tee -a ${R1.getSimpleName()}.nohuman.log
+  echo Checking if alignment is empty  | tee -a ${R1.getSimpleName()}.nohuman.log
+  [[ -s alignment.sam ]]
+  echo Extracting Unaligned Pairs | tee -a ${R1.getSimpleName()}.nohuman.log
   samtools fastq alignment.sam \
   --threads ${task.cpus} -f 12 \
   -1 ${R1.getSimpleName()}.noadapt.nohuman.fq.gz -2 ${R2.getSimpleName()}.noadapt.nohuman.fq.gz \
-  | tee -a ${R1.getSimpleName()}.nohuman.log && \
+  | tee -a ${R1.getSimpleName()}.nohuman.log
   echo Done | tee -a ${R1.getSimpleName()}.nohuman.log
   """
 }
