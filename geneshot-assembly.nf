@@ -18,8 +18,8 @@ params.help = false
 // spades
 params.phred_offset = 33
 
-// prokka
-params.mincontiglen = 200
+//
+params.centre = 'geneshot'
 
 // Function which prints help message text
 def helpMessage() {
@@ -35,7 +35,7 @@ def helpMessage() {
       --output_folder       Folder to place outputs (default invocation dir)
       -w                    Working directory. Defaults to `./work`
       --phred_offset        for spades. Default 33.
-      --mincontiglen        minimum contig len for prokka (default = 200)
+      --centre              Centre for use in prokka. default = 'geneshot'
 
 
     Batchfile:
@@ -129,7 +129,9 @@ process prokkaAnnotate {
     --outdir prokka/ \
     --prefix ${specimen} \
     --cpus ${task.cpus} \
-    --mincontiglen ${params.mincontiglen} \
+    --metagenome \
+    --compliant \
+    --centre ${params.centre} \
     ${scaffolds} &&
     ls -l -h prokka/ &&
     gzip prokka/${specimen}.tbl &&
@@ -145,13 +147,78 @@ process prokkaAnnotate {
     gzip prokka/${specimen}.txt
     """
 }
+
+/*
+process eggnogMapperDownloadDB__Diamond {
+    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1B'
+    //label = 'multithread'
+    label = 'io_limited'
+    errorStrategy "ignore"
+    afterScript "rm -rf /tmp/enmdb/"
+
+    /*
+    output:
+        file("eggnog.db.gz") into eggnog_db_f
+        file("eggnog_proteins.dmnd.gz") into eggnog_proteins_dmnd_f  
+    """
+    set -e
+    
+    mkdir -p /tmp/enmdb/ &&
+    download_eggnog_data.py none -y --data_dir /tmp/enmdb/ &&
+    pigz -p ${task.cpus} -c /tmp/db/emdb/eggnog.db > eggnog.db.gz
+    pigz -p ${task.cpus} -c /tmp/db/emdb/eggnog_proteins.dmnd > eggnog_proteins.dmnd.gz
+    """
+
+    output:
+        file("eggnog.db") into eggnog_db_f
+        file("eggnog_proteins.dmnd") into eggnog_proteins_dmnd_f  
+
+    """
+    set -e
+    
+    mkdir -p /tmp/enmdb/ &&
+    download_eggnog_data.py none -y --data_dir /tmp/enmdb/ &&
+    ls -l -h /tmp/db/emdb && 
+    tree /tmp/db/ &&
+    mv /tmp/db/emdb/eggnog.db eggnog.db &&
+    mv /tmp/db/emdb/eggnog_proteins.dmnd eggnog_proteins.dmnd
+    """
+}
+
+process eggnogMap {
+    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1B'
+    label 'mem_veryhigh'
+    errorStrategy "retry"
+
+    input:
+        set val(specimen), file(faa) from specimen_prokka_faa_ch
+        file(eggnog_db_f)
+        file(eggnog_proteins_dmnd_f)
+
+    output:
+        set val(specimen), file(" ${specimen}.egm.emapper.annotations.gz") into eggnogmap_ch
+
+    """
+    set -e 
+
+    emapper.py \
+    -i ${faa} \
+    -m diamond \
+    --dmnd_db eggnog_proteins.dmnd \
+    --data_dir ./ \
+    --cpu ${task.cpus} \
+    -o ${specimen}.egm &&
+    pigz -p ${task.cpus} ${specimen}.egm.emapper.annotations
+    """
+}
+
 /*
 // retrieve the eggnogmapper db
 process eggnogMapperDownloadDB {
-    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1A'
-    label = 'io_limited'
+    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1B'
+    label = 'multithread'
     //errorStrategy "retry"
-    afterScript "rm -rf dl_dir/*"
+    afterScript "rm -rf /tmp/enmdb/"
 
     output:
         file("eggnogDB.tgz") into eggnogdb_tgz
@@ -159,14 +226,15 @@ process eggnogMapperDownloadDB {
     """
     set -e
     
-    mkdir -p dl_dir/ &&
-    download_eggnog_data.py none -y --data_dir dl_dir/ &&
-    tar -I pigz -cvf eggnogDB.tgz --directory dl_dir/ .
+    mkdir -p /tmp/enmdb/ &&
+    download_eggnog_data.py none -y --data_dir /tmp/enmdb/ &&
+    tar -czvf /tmp/eggnogDB.tgz --directory /tmp/enmdb/ . &&
+    ln -s /tmp/eggnogDB.tgz eggnogDB.tgz
     """
 }
 
 process eggnogMap {
-    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1A'
+    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1B'
     label 'mem_veryhigh'
     //errorStrategy "retry"
 
@@ -195,6 +263,6 @@ process eggnogMap {
 
 }
 
-/*
+
 
 // */
