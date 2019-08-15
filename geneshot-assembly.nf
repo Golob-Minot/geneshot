@@ -190,7 +190,6 @@ process eggnogMap {
     emapper.py \
     -i ${faa} \
     -m diamond \
-    -d bact \
     --dmnd_db eggnog_proteins.dmnd \
     --data_dir ./ \
     --cpu ${task.cpus} \
