@@ -148,121 +148,56 @@ process prokkaAnnotate {
     """
 }
 
-/*
+
 process eggnogMapperDownloadDB__Diamond {
-    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1B'
-    //label = 'multithread'
+    container 'golob/eggnog-mapper:2xx__bcw.0.3.1A'
     label = 'io_limited'
-    errorStrategy "ignore"
-    afterScript "rm -rf /tmp/enmdb/"
+    errorStrategy "finish"
 
-    /*
-    output:
-        file("eggnog.db.gz") into eggnog_db_f
-        file("eggnog_proteins.dmnd.gz") into eggnog_proteins_dmnd_f  
-    """
-    set -e
-    
-    mkdir -p /tmp/enmdb/ &&
-    download_eggnog_data.py none -y --data_dir /tmp/enmdb/ &&
-    pigz -p ${task.cpus} -c /tmp/db/emdb/eggnog.db > eggnog.db.gz
-    pigz -p ${task.cpus} -c /tmp/db/emdb/eggnog_proteins.dmnd > eggnog_proteins.dmnd.gz
-    """
 
     output:
-        file("eggnog.db") into eggnog_db_f
-        file("eggnog_proteins.dmnd") into eggnog_proteins_dmnd_f  
-
+        file "eggnog.db" into eggnog_db_f
+        file "eggnog_proteins.dmnd" into eggnog_proteins_dmnd_f  
     """
     set -e
-    
-    mkdir -p /tmp/enmdb/ &&
-    download_eggnog_data.py none -y --data_dir /tmp/enmdb/ &&
-    ls -l -h /tmp/db/emdb && 
-    tree /tmp/db/ &&
-    mv /tmp/db/emdb/eggnog.db eggnog.db &&
-    mv /tmp/db/emdb/eggnog_proteins.dmnd eggnog_proteins.dmnd
+    echo "Downloading eggnog.db"
+    wget http://eggnogdb.embl.de/download/emapperdb-5.0.0/eggnog.db.gz
+    echo "Decompressing eggnog.db"
+    pigz -d eggnog.db.gz
+    echo "Downloading eggnog_proteins.dmnd"
+    wget http://eggnogdb.embl.de/download/emapperdb-5.0.0/eggnog_proteins.dmnd.gz
+    echo "Decompressing eggnog_proteins.dmnd"
+    pigz -d eggnog_proteins.dmnd.gz
     """
 }
 
 process eggnogMap {
-    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1B'
+    container 'golob/eggnog-mapper:2xx__bcw.0.3.1A'
     label 'mem_veryhigh'
-    errorStrategy "retry"
+    //errorStrategy "retry"
 
     input:
         set val(specimen), file(faa) from specimen_prokka_faa_ch
-        file(eggnog_db_f)
-        file(eggnog_proteins_dmnd_f)
+        file eggnog_db_f
+        file eggnog_proteins_dmnd_f
 
     output:
-        set val(specimen), file(" ${specimen}.egm.emapper.annotations.gz") into eggnogmap_ch
+        set val(specimen), file("${specimen}.egm.emapper.annotations.gz") into eggnogmap_ch
 
     """
-    set -e 
+    set -e
 
     emapper.py \
     -i ${faa} \
     -m diamond \
+    -d bact \
     --dmnd_db eggnog_proteins.dmnd \
     --data_dir ./ \
     --cpu ${task.cpus} \
-    -o ${specimen}.egm &&
+    -o ${specimen}.egm
     pigz -p ${task.cpus} ${specimen}.egm.emapper.annotations
     """
 }
-
-/*
-// retrieve the eggnogmapper db
-process eggnogMapperDownloadDB {
-    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1B'
-    label = 'multithread'
-    //errorStrategy "retry"
-    afterScript "rm -rf /tmp/enmdb/"
-
-    output:
-        file("eggnogDB.tgz") into eggnogdb_tgz
-    
-    """
-    set -e
-    
-    mkdir -p /tmp/enmdb/ &&
-    download_eggnog_data.py none -y --data_dir /tmp/enmdb/ &&
-    tar -czvf /tmp/eggnogDB.tgz --directory /tmp/enmdb/ . &&
-    ln -s /tmp/eggnogDB.tgz eggnogDB.tgz
-    """
-}
-
-process eggnogMap {
-    container 'golob/eggnog-mapper:1.0.3__bcw.0.3.1B'
-    label 'mem_veryhigh'
-    //errorStrategy "retry"
-
-    input:
-        set val(specimen), file(faa) from specimen_prokka_faa_ch
-        file(eggnogdb_tgz)
-
-    output:
-        set val(specimen), file(" ${specimen}.egm.emapper.annotations.gz") into eggnogmap_ch
-
-    """
-    set -e 
-
-    mkdir -p db/emdb/ &&
-    tar -I pigz -C db/emdb/ -xf ${eggnogdb_tgz} ./eggnog.db ./eggnog_proteins.dmnd 
-    emapper.py \
-    -i ${faa} \
-    -m diamond \
-    --dmnd_db db/emdb/eggnog_proteins.dmnd \
-    --data_dir db/emdb/ \
-    --cpu ${task.cpus} \
-    -o ${specimen}.egm &&
-    pigz ${specimen}.egm.emapper.annotations
-    """
-        
-
-}
-
 
 
 // */
