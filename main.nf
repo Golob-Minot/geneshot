@@ -255,8 +255,8 @@ echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
 
 // Make a single file which summarizes the number of reads across all samples
 // This is only run after all of the samples are done processing through the
-// 'total_counts' channel, which is transformed by the .collect() command into
-// a single list containing all of the data from all samples.
+// 'total_counts' channel, which is transformed by the .toSortedList() command
+// into a single list containing all of the data from all samples.
 process countReadsSummary {
   container "ubuntu:16.04"
   cpus 1
@@ -267,7 +267,7 @@ process countReadsSummary {
 
   input:
   // Because the input channel has been collected into a single list, this process will only be run once
-  file readcount_csv_list from total_counts.collect()
+  file readcount_csv_list from total_counts.toSortedList()
   val output_prefix from params.output_prefix
   
   output:
@@ -542,8 +542,8 @@ process summarizeExperiment {
     publishDir "${params.output_folder}"
 
     input:
-    file metaphlan_tsv_list from metaphlan_for_summary.collect()
-    file famli_json_list from famli_json_for_summary.collect()
+    file metaphlan_tsv_list from metaphlan_for_summary.toSortedList()
+    file famli_json_list from famli_json_for_summary.toSortedList()
     file ref_hdf5 from file(params.ref_hdf5)
     file batchfile from file(params.batchfile)
     file readcounts_csv
