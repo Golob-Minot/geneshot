@@ -575,6 +575,15 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 
+# Make sure that all input files are present
+for fp_list in [
+    "${metaphlan_tsv_list}".split(" "),
+    "${famli_json_list}".split(" "),
+    ["${ref_hdf5}", "${batchfile}", "${readcounts_csv}"]
+]:
+    for fp in fp_list:
+        assert os.path.exists(fp), "Expected to find %s" % fp
+
 # Rename the reference HDF5 to use as the output HDF5
 assert os.path.exists("${ref_hdf5}")
 if "${ref_hdf5}" != "${output_prefix}.hdf5":
@@ -590,11 +599,12 @@ metadata = pd.read_csv("${batchfile}", sep=",")
 logging.info("Writing metadata to HDF")
 metadata.to_hdf(store, "metadata")
 
-# Get all of the files with a given ending
-def get_file_list(suffix, folder="."):
-    for fp in os.listdir(folder):
-        if fp.endswith(suffix):
-            yield fp.replace(suffix, ""), fp
+# Parse the list of files passed in as a space-delimited string
+def parse_file_list(file_list_str, suffix):
+    for fp in file_list_str.split(" "):
+        assert os.path.exists(fp), "Could not find file %s" % fp
+        # Yield the file path, with and without the suffix removed
+        yield fp.replace(suffix, ""), fp
 
 # Read in the KEGG KO labels
 kegg_ko = pd.read_hdf(store, "/groups/KEGG_KO")
@@ -621,7 +631,7 @@ def read_famli_json(sample_name, fp):
 
 allele_abund = pd.concat([
     read_famli_json(sample_name, fp)
-    for sample_name, fp in get_file_list(".json.gz")
+    for sample_name, fp in parse_file_list("${famli_json_list}", ".json.gz")
 ])
 
 # Write out the FAMLI results
@@ -669,7 +679,7 @@ def read_metaphlan(sample_name, fp):
 
 metaphlan_abund = pd.concat([
     read_metaphlan(sample_name, fp)
-    for sample_name, fp in get_file_list(".metaphlan.tsv")
+    for sample_name, fp in parse_file_list("${metaphlan_tsv_list}", ".metaphlan.tsv")
 ])
 
 # Write out the MetaPhlAn2 results
@@ -744,11 +754,9 @@ assert readcounts["aligned_reads"].isnull().sum() == 0, (readcounts.loc[readcoun
 readcounts.to_hdf(store, "readcounts", format="table")
 readcounts.to_csv("${output_prefix}.readcounts.csv", sep=",", index=None)
 
-    
 for key in store.keys():
     if key.startswith("/groups/") and key != "/groups/KEGG_KO" and key != "/groups/NCBI_TAXID":
         summarize_alleles_by_group(key)
-
 
 """
 
