@@ -195,7 +195,12 @@ process concatenate {
 
   """
 set -e
-ls -lahtr
+
+for fp in ${fastq_list}; do
+    echo "Checking for \$fp"
+    [[ -s \$fp ]]
+done
+
 cat ${fastq_list} > TEMP && mv TEMP ${sample_name}.fastq.gz
   """
 
