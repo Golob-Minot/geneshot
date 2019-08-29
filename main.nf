@@ -214,7 +214,7 @@ process correctHeaders {
   errorStrategy "retry"
   
   input:
-  set sample_name, file(fastq) from correct_headers_ch.groupTuple()
+  set sample_name, file(fastq) from correct_headers_ch
   
   output:
   set sample_name, file("${sample_name}.unique.headers.fastq.gz") into count_reads, metaphlan_ch, diamond_ch, humann_ch
