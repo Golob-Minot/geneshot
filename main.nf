@@ -542,8 +542,8 @@ process famli {
 // Summarize all of the results from the experiment
 process summarizeExperiment {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
-    cpus 16
-    memory "120 GB"
+    cpus 32
+    memory "240 GB"
     publishDir "${params.output_folder}"
 
     input:
@@ -771,8 +771,8 @@ for key in store.keys():
 if (params.humann) {
   process addHUMAnN2toHDF {
       container "quay.io/fhcrc-microbiome/python-pandas:latest"
-      cpus 16
-      memory "32 GB"
+      cpus 32
+      memory "240 GB"
       publishDir "${params.output_folder}"
 
       input:
