@@ -829,7 +829,7 @@ for fp, key, dtype_dict in [
     print("Reading in %s" % fp)
     df = pd.read_csv(fp, sep=",", dtype=dtype_dict, usecols=list(dtype_dict.keys()))
     print(df.head())
-    df.to_hdf(store, key, complevel=5)
+    df.to_hdf(store, key, complevel=5, format="table")
 
 store.close()
 """
