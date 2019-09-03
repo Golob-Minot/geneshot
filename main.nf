@@ -395,8 +395,8 @@ mv output/*_pathcoverage.tsv ${sample_name}_pathcoverage.tsv
   // Summarize all of the HUMAnN2 results
   process HUMAnN2summary {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
-    cpus 4
-    memory "8 GB"
+    cpus 16
+    memory "120 GB"
     publishDir "${params.output_folder}"
 
     input:
