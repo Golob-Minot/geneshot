@@ -810,12 +810,24 @@ rootLogger.addHandler(consoleHandler)
 store = pd.HDFStore("${output_hdf}", mode="a")
 
 for fp, key, dtype_dict in [
-    ("${humann_genefamilies_csv}", "/abund/humann_genefamilies", dict([("gene_family", str), ("RPK", float), ("sample", str)])),
-    ("${humann_pathabundance_csv}", "/abund/humann_pathabundance", dict([("pathway", str), ("abund", float), ("sample", str)])),
-    ("${humann_pathcoverage_csv}", "/abund/humann_pathcoverage", dict([("pathway", str), ("cov", float), ("sample", str)]))
+    (
+      "${humann_genefamilies_csv}", 
+      "/abund/humann_genefamilies", 
+      dict([("gene_family", str), ("RPK", float), ("sample", str)]),
+    ),
+    (
+      "${humann_pathabundance_csv}", 
+      "/abund/humann_pathabundance", 
+      dict([("pathway", str), ("abund", float), ("sample", str)]),
+    ),
+    (
+      "${humann_pathcoverage_csv}", 
+      "/abund/humann_pathcoverage", 
+      dict([("pathway", str), ("cov", float), ("sample", str)],
+    ))
 ]:
     print("Reading in %s" % fp)
-    df = pd.read_csv(fp, sep=",", dtype=dtype_dict)
+    df = pd.read_csv(fp, sep=",", dtype=dtype_dict, usecols=list(dtype_dict.keys()))
     print(df.head())
     df.to_hdf(store, key, complevel=5)
 
