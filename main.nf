@@ -809,12 +809,12 @@ rootLogger.addHandler(consoleHandler)
 # Open a connection to the output HDF5
 store = pd.HDFStore("${output_hdf}", mode="a")
 
-for fp, key in [
-    ("${humann_genefamilies_csv}", "/abund/humann_genefamilies"),
-    ("${humann_pathabundance_csv}", "/abund/humann_pathabundance"),
-    ("${humann_pathcoverage_csv}", "/abund/humann_pathcoverage")
+for fp, key, dtype_dict in [
+    ("${humann_genefamilies_csv}", "/abund/humann_genefamilies", dict([("gene_family", str), ("RPK", float), ("sample", str)])),
+    ("${humann_pathabundance_csv}", "/abund/humann_pathabundance", dict([("pathway", str), ("abund", float), ("sample", str)])),
+    ("${humann_pathcoverage_csv}", "/abund/humann_pathcoverage", dict([("pathway", str), ("cov", float), ("sample", str)]))
 ]:
-    df = pd.read_csv(fp, sep=",")
+    df = pd.read_csv(fp, sep=",", dtype=dtype_dict)
     df.to_hdf(store, key, complevel=5)
 
 store.close()
