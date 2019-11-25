@@ -13,7 +13,17 @@ The analysis pipeline can be run with a single command:
 ```
 # Reference database
 REF_DMND="s3://fh-ctr-public-reference-data/tool_specific_data/cagalog/2019-06-26-CAGalog/2019-06-26-CAGalog.dmnd"
-REF_HDF="s3://fh-ctr-public-reference-data/tool_specific_data/cagalog/2019-06-26-CAGalog/2019-06-26-CAGalog.hdf5"
+REF_HDF5="s3://fh-ctr-public-reference-data/tool_specific_data/cagalog/2019-06-26-CAGalog/2019-06-26-CAGalog.hdf5"
+
+# Manifest CSV
+BATCHFILE=manifest.csv         # FILL THIS IN
+
+# Output file paths
+OUTPUT_FOLDER=output_folder/   # FILL THIS IN
+PROJECT=project                # FILL THIS IN
+
+# Temp file paths
+WORK_DIR=work/                 # FILL THIS IN
 
 nextflow \
     -C ~/nextflow.config \
