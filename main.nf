@@ -76,10 +76,6 @@ if ( params.from_ncbi_sra ){
   process downloadSraFastq {
       // Docker container used to execude the command below
       container "quay.io/fhcrc-microbiome/get_sra:v0.4"
-      // Number of CPUs allotted for this process
-      cpus 4
-      // Amount of memory allotted for this process
-      memory "8 GB"
       // If the process fails, automatically restart it
       errorStrategy "retry"
 
@@ -140,8 +136,6 @@ else {
 
     process interleave {
       container "ubuntu:16.04"
-      cpus 4
-      memory "8 GB"
       errorStrategy "retry"
 
       input:
@@ -181,8 +175,6 @@ else {
 // Concatenate reads by sample name
 process concatenate {
   container "ubuntu:16.04"
-  cpus 4
-  memory "8 GB"
   errorStrategy "retry"
   
   input:
@@ -209,8 +201,6 @@ cat ${fastq_list} > TEMP && mv TEMP ${sample_name}.fastq.gz
 // Make sure that every read has a unique name
 process correctHeaders {
   container "ubuntu:16.04"
-  cpus 4
-  memory "8 GB"
   errorStrategy "retry"
   
   input:
@@ -235,8 +225,6 @@ ${sample_name}.unique.headers.fastq.gz
 // Count the number of input reads
 process countReads {
   container "ubuntu:16.04"
-  cpus 1
-  memory "4 GB"
   errorStrategy "retry"
   
   input:
@@ -264,8 +252,6 @@ echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
 // into a single list containing all of the data from all samples.
 process countReadsSummary {
   container "ubuntu:16.04"
-  cpus 1
-  memory "4 GB"
   // The output from this process will be copied to the --output_folder specified by the user
   publishDir "${params.output_folder}"
   errorStrategy "retry"
@@ -300,8 +286,6 @@ cat ${readcount_csv_list} >> TEMP && mv TEMP ${output_prefix}.readcounts.csv
 // Process to quantify the microbial species present using the metaphlan2 tool
 process metaphlan2 {
     container "quay.io/fhcrc-microbiome/metaphlan@sha256:51b416458088e83d0bd8d840a5a74fb75066b2435d189c5e9036277d2409d7ea"
-    cpus 16
-    memory "32 GB"
 
     input:
     set val(sample_name), file(input_fastq) from metaphlan_ch
@@ -323,8 +307,6 @@ if (params.humann) {
   // Download the HUMAnN2 reference database
   process HUMAnN2_DB {
     container "quay.io/fhcrc-microbiome/humann2:v0.11.2--1"
-    cpus 16
-    memory "120 GB"
 
     output:
     file "HUMANn2_DB.tar" into humann_db
@@ -356,8 +338,6 @@ tar cvf HUMANn2_DB.tar HUMANn2_DB
   // Run HUMAnN2
   process HUMAnN2 {
     container "quay.io/fhcrc-microbiome/humann2:v0.11.2--1"
-    cpus 16
-    memory "120 GB"
 
     // The .join() call below combines the FASTQ and metaphlan output which share the same sample name
     input:
@@ -395,8 +375,6 @@ mv output/*_pathcoverage.tsv ${sample_name}_pathcoverage.tsv
   // Summarize all of the HUMAnN2 results
   process HUMAnN2summary {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
-    cpus 16
-    memory "120 GB"
     publishDir "${params.output_folder}"
 
     input:
@@ -468,8 +446,6 @@ logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.pathcoverage.csv"))
 // Align each sample against the reference database of genes using DIAMOND
 process diamond {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
-    cpus 32
-    memory "240 GB"
     errorStrategy "retry"
     
     input:
@@ -512,8 +488,6 @@ process diamond {
 // Filter the alignments with the FAMLI algorithm
 process famli {
     container "quay.io/fhcrc-microbiome/famli@sha256:241a7db60cb735abd59f4829e8ddda0451622b6eb2321f176fd9d76297d8c9e7"
-    cpus 16
-    memory "120 GB"
     errorStrategy "retry"
     
     input:
@@ -542,8 +516,6 @@ process famli {
 // Summarize all of the results from the experiment
 process summarizeExperiment {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
-    cpus 32
-    memory "240 GB"
     publishDir "${params.output_folder}"
 
     input:
@@ -771,8 +743,6 @@ for key in store.keys():
 if (params.humann) {
   process addHUMAnN2toHDF {
       container "quay.io/fhcrc-microbiome/python-pandas:latest"
-      cpus 32
-      memory "240 GB"
       publishDir "${params.output_folder}"
 
       input:
