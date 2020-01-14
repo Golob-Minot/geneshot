@@ -1,5 +1,6 @@
 # Nextflow temp files and logs
 .nextflow*
+work/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
