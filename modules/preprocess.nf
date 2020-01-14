@@ -185,7 +185,7 @@ ${I1} ${I2} \
 process cutadapt {
     container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
     label 'io_limited'
-    // errorStrategy 'retry'
+    errorStrategy 'retry'
     maxRetries 10
 
     input:
