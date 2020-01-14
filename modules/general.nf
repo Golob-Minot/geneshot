@@ -6,7 +6,7 @@ process combineReads {
     maxRetries 10
 
     // If the user sets --preprocess_output, write out the combined reads to that folder
-    publishDir path: "${params.preprocess_output_folder}", enabled: params.preprocess_output_folder != false
+    publishDir path: "${params.output_folder}qc/", enabled: params.savereads
 
     input:
     tuple val(sample), file("R1.*.fastq.gz"), file("R2.*.fastq.gz")
@@ -32,6 +32,7 @@ combine_fastq_pairs.py \
 process outputManifest {
     container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
 
+    publishDir path: "${params.output_folder}qc/", enabled: params.savereads
 
     input:
         val manifestStr
@@ -57,7 +58,7 @@ workflow writeManifest {
         manifestStr = reads_ch.reduce(
             'specimen,R1,R2\n'
         ){ csvStr, row ->
-            return  csvStr += "${row[0]},${params.preprocess_output_folder}${row[1].name},${params.preprocess_output_folder}${row[2].name}\n";
+            return  csvStr += "${row[0]},${params.output_folder}qc/${row[1].name},${params.output_folder}qc/${row[2].name}\n";
         }
 
         // Write the manifest CSV to a file
