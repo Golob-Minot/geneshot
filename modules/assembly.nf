@@ -37,7 +37,7 @@ mv scaffolds.fasta ${specimen}.scaffolds.fasta
 process prokkaAnnotate {
     container 'golob/prokka:1.1.14__bcw.0.3.1'
     label 'mem_veryhigh'
-    // errorStrategy "retry"
+    errorStrategy "retry"
     publishDir "${params.output_folder}/prokka/${specimen}/", mode: 'copy'
 
     input:
@@ -73,4 +73,59 @@ prokka \
     
 gzip prokka/${specimen}*
 """
+}
+
+process combineCDS {
+    container "ubuntu:16.04"
+    label 'io_limited'
+    errorStrategy 'retry'
+    maxRetries 10
+    
+    input:
+    file "assembly.*.fasta.gz"
+    
+    output:
+    file "all_CDS.fasta.gz"
+
+    """
+#!/bin/bash
+set -e
+cat *fasta.gz > all_CDS.fasta.gz
+gzip -t all_CDS.fasta.gz
+    """
+}
+
+
+process clusterCDS {
+    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    label 'mem_veryhigh'
+    errorStrategy 'retry'
+    
+    input:
+    file all_cds
+    
+    output:
+    set min_identity, file("mmseqs.${params.min_identity}.tsv.gz"), file("mmseqs.${params.min_identity}.rep.fasta.gz")
+    
+
+    afterScript "rm -r *"
+
+    """
+#!/bin/bash
+set -e
+# Make the MMSeqs2 database
+mmseqs createdb ${all_cds} db
+# Cluster the protein sequences
+mmseqs linclust db mmseqs.${params.min_identity}.cluster ./ \
+    --min-seq-id ${params.min_identity / 100} \
+    --max-seqs 100000 \
+    -c ${params.min_coverage / 100}
+# Make TSV output for clustering
+mmseqs createtsv db db mmseqs.${params.min_identity}.cluster mmseqs.${params.min_identity}.tsv
+# Get the representative sequences
+mmseqs result2repseq db mmseqs.${params.min_identity}.cluster mmseqs.${params.min_identity}.rep
+mmseqs result2flat db db mmseqs.${params.min_identity}.rep mmseqs.${params.min_identity}.rep.fasta --use-fasta-header
+gzip mmseqs.${params.min_identity}.tsv
+gzip mmseqs.${params.min_identity}.rep.fasta
+    """
 }
