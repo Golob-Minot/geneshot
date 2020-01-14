@@ -15,7 +15,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
     -c nextflow.config \
     -profile testing \
     --manifest data/mock.manifest.csv \
-    --preprocess_output output/preprocess_output \
+    --preprocess_output output/preprocess_output/ \
     --output output/ \
     --hg_index data/hg_chr_21_bwa_index.tar.gz \
     -w work/ \
