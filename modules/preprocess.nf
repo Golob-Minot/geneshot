@@ -147,6 +147,10 @@ workflow preprocess_wf {
     // Remove the human reads
     removeHuman(hg_index_tgz, cutadapt.out)
 
+    // Set the outputs of the workflow
+    emit:
+        removeHuman.out
+
 }
 
 
@@ -215,6 +219,8 @@ process download_hg_index {
     file 'hg_index.tar.gz'
     
 """
+set -e
+
 wget ${params.hg_index_url} -O hg_index.tar.gz
 """
 }
@@ -233,7 +239,7 @@ process removeHuman {
         tuple sample_name, file(R1), file(R2), file(cutadapt_log)
 
     output:
-        tuple sample_name, file("${R1.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R2.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R1.getSimpleName()}.nohuman.log")
+        tuple sample_name, file("${R1.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R2.getSimpleName()}.noadapt.nohuman.fq.gz")
 
     afterScript "rm -rf hg_index/*"
 
