@@ -32,7 +32,6 @@ combine_fastq_pairs.py \
 process outputManifest {
     container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
 
-    publishDir path: "${params.preprocess_output_folder}"
 
     input:
         val manifestStr
@@ -64,4 +63,54 @@ workflow writeManifest {
         // Write the manifest CSV to a file
         outputManifest(manifestStr)
         
+}
+
+// Count the number of input reads for a single sample
+process countReads {
+    container "golob/fastatools:0.7.0__bcw.0.3.0"
+    cpus 1
+    memory "4 GB"
+    errorStrategy "retry"
+
+    input:
+    tuple sample_name, file(fastq)
+
+    output:
+    file "${sample_name}.countReads.csv"
+
+"""
+set -e
+
+[[ -s ${fastq} ]]
+
+n=\$(gunzip -c "${fastq}" | awk 'NR % 4 == 1' | wc -l)
+echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
+"""
+}
+
+
+// Make a single file which summarizes the number of reads across all samples
+// This is only run after all of the samples are done processing through the
+// 'total_counts' channel, which is transformed by the .collect() command into
+// a single list containing all of the data from all samples.
+process countReadsSummary {
+    container "golob/fastatools:0.7.0__bcw.0.3.0"
+    // The output from this process will be copied to the --output_folder specified by the user
+    publishDir "${params.output_folder}/qc/", mode: 'copy'
+    errorStrategy "retry"
+
+    input:
+    // Because the input channel has been collected into a single list, this process will only be run once
+    file readcount_csv_list
+
+    output:
+    file "readcounts.csv"
+
+
+"""
+set -e
+
+echo name,n_reads > readcounts.csv
+cat ${readcount_csv_list} >> readcounts.csv
+"""
 }
