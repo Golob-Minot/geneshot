@@ -41,13 +41,13 @@ process prokkaAnnotate {
     publishDir "${params.output_folder}/prokka/${specimen}/", mode: 'copy'
 
     input:
-        tuple val(specimen) , file(contigs), file(scaffolds), file(spades_log)
+        tuple val(specimen), file(contigs), file(scaffolds), file(spades_log)
     
     output:
+        tuple val(specimen), file("prokka/${specimen}.faa.gz")
+        tuple val(specimen), file("prokka/${specimen}.gff.gz")
         tuple \
             val(specimen), \
-            file("prokka/${specimen}.tbl.gz"), \
-            file("prokka/${specimen}.err.gz"), \
             file("prokka/${specimen}.faa.gz"), \
             file("prokka/${specimen}.ffn.gz"), \
             file("prokka/${specimen}.fsa.gz"), \
@@ -56,8 +56,6 @@ process prokkaAnnotate {
             file("prokka/${specimen}.sqn.gz"), \
             file("prokka/${specimen}.tsv.gz"), \
             file("prokka/${specimen}.txt.gz")
-
-        tuple val(specimen), file("prokka/${specimen}.faa.gz")
     
 """
 set -e 
@@ -105,11 +103,9 @@ process clusterCDS {
     file all_cds
     
     output:
-    set min_identity, file("mmseqs.${params.min_identity}.tsv.gz"), file("mmseqs.${params.min_identity}.rep.fasta.gz")
+    file "mmseqs.${params.min_identity}.rep.fasta.gz"
+    file "mmseqs.${params.min_identity}.tsv.gz"
     
-
-    afterScript "rm -r *"
-
     """
 #!/bin/bash
 set -e

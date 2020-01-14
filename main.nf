@@ -41,6 +41,8 @@ params.min_hg_align_score = 30
 // Assembly options
 params.phred_offset = 33 // spades
 params.centre = 'geneshot' // prokka
+params.min_identity = 90 // mmseqs2
+params.min_coverage = 50 // mmseqs2
 
 
 // Function which prints help message text
@@ -68,6 +70,8 @@ def helpMessage() {
     For Assembly:
       --phred_offset        for spades. Default 33.
       --centre              Centre for use in prokka. default = 'geneshot'
+      --min_identity        Amino acid identity cutoff used to combine similar genes (mmseqs2)
+      --min_coverage        Length cutoff used to combine similar genes (mmseqs2)
       
 
     Batchfile:
@@ -111,9 +115,11 @@ include './modules/general' params(
 include './modules/assembly' params(
     output_folder: output_folder,
     phred_offset: params.phred_offset,
-    centre: params.centre
+    centre: params.centre,
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
 )
-// include './modules/alignment'
+include './modules/alignment'
 
 
 workflow {
@@ -181,6 +187,25 @@ workflow {
     // Annotate those contigs with Prokka
     prokkaAnnotate(
         metaspadesAssembly.out
+    )
+
+    // Combine the gene sequences across all samples
+    combineCDS(
+        prokkaAnnotate.out[
+            0
+        ].map {
+            it -> it[1]
+        }.collect()
+    )
+
+    // Combine genes by amino acid identity
+    clusterCDS(
+        combineCDS.out
+    )
+
+    // Make a DIAMOND indexed database from those gene sequences
+    makeDiamondDB(
+        clusterCDS.out[0]
     )
 
 }

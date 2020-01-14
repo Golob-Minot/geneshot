@@ -1,6 +1,30 @@
 // Processes used for alignment of reads against gene databases
 
 // Align each sample against the reference database of genes using DIAMOND
+process makeDiamondDB {
+    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    label 'mem_veryhigh'
+    errorStrategy 'retry'
+    
+    input:
+    file fasta
+
+    output:
+    file "${fasta}.dmnd"
+
+    """
+    set -e
+    diamond \
+      makedb \
+      --in ${fasta} \
+      --db ${fasta}.dmnd \
+      --threads ${task.cpus}
+    """
+
+}
+
+
+// Align each sample against the reference database of genes using DIAMOND
 process diamond {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
