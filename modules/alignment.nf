@@ -28,39 +28,33 @@ process makeDiamondDB {
 process diamond {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
-    errorStrategy 'retry'
+    // errorStrategy 'retry'
     
     input:
-    set val(sample_name), file(input_fastq)
+    tuple val(sample_name), file(R1), file(R2)
     file refdb
-    val min_id from 90
-    val query_cover from 50
-    val cpu from 32
-    val top from 1
-    val min_score from 20
-    val blocks from 15
-    val query_gencode from 11
-
+    
     output:
-    set sample_name, file("${sample_name}.aln.gz")
-
-    afterScript "rm *"
+    tuple sample_name, file("${sample_name}.aln.gz")
 
     """
     set -e
+
+    cat ${R1} ${R2} > query.fastq.gz
+
     diamond \
       blastx \
-      --query ${input_fastq} \
+      --query query.fastq.gz \
       --out ${sample_name}.aln.gz \
-      --threads ${cpu} \
+      --threads ${task.cpus} \
       --db ${refdb} \
       --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen \
-      --min-score ${min_score} \
-      --query-cover ${query_cover} \
-      --id ${min_id} \
-      --top ${top} \
-      --block-size ${blocks} \
-      --query-gencode ${query_gencode} \
+      --min-score ${params.dmnd_min_score} \
+      --query-cover ${params.dmnd_min_coverage} \
+      --id ${params.dmnd_min_identity} \
+      --top ${params.dmnd_top_pct} \
+      --block-size ${task.memory.toMega() / (1024 * 6)} \
+      --query-gencode ${params.gencode} \
       --compress 1 \
       --unal 0
     """
@@ -75,14 +69,10 @@ process famli {
     errorStrategy 'retry'
     
     input:
-    set sample_name, file(input_aln)
-    val cpu from 16
-    val batchsize from 50000000
-
+    tuple sample_name, file(input_aln)
+    
     output:
-    file "${sample_name}.json.gz"
-
-    afterScript "rm *"
+    tuple sample_name, "${sample_name}.json.gz"
 
     """
     set -e
@@ -90,8 +80,8 @@ process famli {
       filter \
       --input ${input_aln} \
       --output ${sample_name}.json \
-      --threads ${cpu} \
-      --batchsize ${batchsize}
+      --threads ${task.cpus} \
+      --batchsize 5000000
     gzip ${sample_name}.json
     """
 

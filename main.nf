@@ -43,6 +43,11 @@ params.phred_offset = 33 // spades
 params.centre = 'geneshot' // prokka
 params.min_identity = 90 // mmseqs2
 params.min_coverage = 50 // mmseqs2
+params.dmnd_min_identity = 80 // DIAMOND
+params.dmnd_min_coverage = 50 // DIAMOND
+params.dmnd_top_pct = 1 // DIAMOND
+params.dmnd_min_score = 20 // DIAMOND
+params.gencode = 11 //DIAMOND
 
 
 // Function which prints help message text
@@ -70,8 +75,13 @@ def helpMessage() {
     For Assembly:
       --phred_offset        for spades. Default 33.
       --centre              Centre for use in prokka. default = 'geneshot'
-      --min_identity        Amino acid identity cutoff used to combine similar genes (mmseqs2)
-      --min_coverage        Length cutoff used to combine similar genes (mmseqs2)
+      --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90) (mmseqs2)
+      --min_coverage        Length cutoff used to combine similar genes (default: 50) (mmseqs2)
+      --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
+      --dmnd_min_coverage   Query coverage cutoff used to align short reads (default: 50) (DIAMOND)
+      --dmnd_top_pct        Keep top X% of alignments for each short read (default: 1) (DIAMOND)
+      --dmnd_min_score      Minimum score for short read alignment (default: 20) (DIAMOND)
+      --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
       
 
     Batchfile:
@@ -119,7 +129,13 @@ include './modules/assembly' params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
-include './modules/alignment'
+include './modules/alignment' params(
+    dmnd_min_identity: params.dmnd_min_identity,
+    dmnd_min_coverage: params.dmnd_min_coverage,
+    dmnd_top_pct: params.dmnd_top_pct,
+    dmnd_min_score: params.dmnd_min_score,
+    gencode: params.gencode
+)
 
 
 workflow {
@@ -206,6 +222,17 @@ workflow {
     // Make a DIAMOND indexed database from those gene sequences
     makeDiamondDB(
         clusterCDS.out[0]
+    )
+
+    // Align all specimens against the DIAMOND database
+    diamond(
+        combineReads.out,
+        makeDiamondDB.out
+    )
+
+    // Filter to the most likely single alignment per query
+    famli(
+        diamond.out
     )
 
 }
