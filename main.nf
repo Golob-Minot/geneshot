@@ -78,6 +78,7 @@ def helpMessage() {
       --adapter_R           Reverse sequencing adapter sequence (to be removed)
                               (Adapter sequences default to nextera adapters)
       --min_hg_align_score  Minimum alignment score for human genome (default 30)
+
     For Assembly:
       --phred_offset        for spades. Default 33.
       --centre              Centre for use in prokka. default = 'geneshot'
@@ -214,44 +215,20 @@ workflow {
     // # DE NOVO ASSEMBLY AND ANNOTATION #
     // ###################################
 
-    // Assemble samples with metaSPAdes
-    metaspadesAssembly(
+    // Run the assembly and annotation workflow (in modules/assembly.nf)
+    assembly_wf(
         combineReads.out
     )
 
-    // Annotate those contigs with Prokka
-    prokkaAnnotate(
-        metaspadesAssembly.out
+    // ############################
+    // # ALIGNMENT-BASED ANALYSIS #
+    // ############################
+
+    // Run the alignment-based analysis steps (in modules/alignment.nf)
+    alignment_wf(
+        assembly_wf.out.gene_fasta,
+        combineReads.out
     )
 
-    // Combine the gene sequences across all samples
-    combineCDS(
-        prokkaAnnotate.out[
-            0
-        ].map {
-            it -> it[1]
-        }.collect()
-    )
-
-    // Combine genes by amino acid identity
-    clusterCDS(
-        combineCDS.out
-    )
-
-    // Make a DIAMOND indexed database from those gene sequences
-    makeDiamondDB(
-        clusterCDS.out[0]
-    )
-
-    // Align all specimens against the DIAMOND database
-    diamond(
-        combineReads.out,
-        makeDiamondDB.out
-    )
-
-    // Filter to the most likely single alignment per query
-    famli(
-        diamond.out
-    )
 
 }

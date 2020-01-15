@@ -19,6 +19,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
     --output output \
     --hg_index data/hg_chr_21_bwa_index.tar.gz \
     -w work/ \
+    --noannot \
     -resume
 
 NXF_VER=19.10.0 nextflow run main.nf \
@@ -29,4 +30,5 @@ NXF_VER=19.10.0 nextflow run main.nf \
     --output output/ \
     --hg_index data/hg_chr_21_bwa_index.tar.gz \
     -w work/ \
+    --noannot \
     -resume

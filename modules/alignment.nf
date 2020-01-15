@@ -1,5 +1,30 @@
 // Processes used for alignment of reads against gene databases
 
+workflow alignment_wf {
+    get:
+        gene_fasta
+        reads_ch
+
+    main:
+
+    // Make a DIAMOND indexed database from those gene sequences
+    makeDiamondDB(
+        gene_fasta
+    )
+
+    // Align all specimens against the DIAMOND database
+    diamond(
+        reads_ch,
+        makeDiamondDB.out
+    )
+
+    // Filter to the most likely single alignment per query
+    famli(
+        diamond.out
+    )
+
+}
+
 // Align each sample against the reference database of genes using DIAMOND
 process makeDiamondDB {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"

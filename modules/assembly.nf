@@ -1,5 +1,61 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 
+workflow assembly_wf {
+    get:
+        combined_reads_ch
+
+    main:
+
+    // Assemble samples with metaSPAdes
+    metaspadesAssembly(
+        combined_reads_ch
+    )
+
+    // Annotate those contigs with Prokka
+    prokkaAnnotate(
+        metaspadesAssembly.out
+    )
+
+    // Combine the gene sequences across all samples
+    combineCDS(
+        prokkaAnnotate.out[
+            0
+        ].map {
+            it -> it[1]
+        }.collect()
+    )
+
+    // Combine genes by amino acid identity
+    clusterCDS(
+        combineCDS.out
+    )
+
+    // Annotate the clustered genes with eggNOG
+    if ( params.eggnog_db && params.eggnog_dmnd ){
+        if ( !path(params.eggnog_db).isEmpty() && !path(params.eggnog_dmnd).isEmpty() ) {
+            eggnog_annotation(
+                clusterCDS.out[0],
+                path(params.eggnog_db),
+                path(params.eggnog_dmnd)
+            )
+        }
+    }
+
+    // Annotate the clustered genes with DIAMOND for taxonomic ID
+    if ( params.taxonomic_dmnd ) {
+        if ( ! path(params.taxonomic_dmnd).isEmpty() ){
+            taxonomic_annotation(
+                clusterCDS.out[0],
+                path(params.taxonomic_dmnd)
+            )
+        }
+    }
+
+    emit:
+        gene_fasta = clusterCDS.out[0]
+
+}
+
 // Assembly with metaspades
 process metaspadesAssembly {
     container 'golob/spades:3.13.1__bcw.0.3.1'
@@ -125,3 +181,76 @@ gzip mmseqs.${params.min_identity}.tsv
 gzip mmseqs.${params.min_identity}.rep.fasta
     """
 }
+
+
+process taxonomic_annotation {
+    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    label 'mem_veryhigh'
+
+    input:
+    file query
+    file diamond_tax_db
+    
+    output:
+    file "${query}.tax.aln.gz"
+
+    
+"""
+set -e
+
+diamond \
+    blastp \
+    --db ${diamond_tax_db} \
+    --query ${query} \
+    --out ${query}.tax.aln.gz \
+    --outfmt 102 \
+    --id ${params.min_identity} \
+    --top ${100 - params.min_identity} \
+    --block-size ${task.memory.toMega() / (1024 * 6)} \
+    --threads ${task.cpus} \
+    --compress 1
+
+rm ${diamond_tax_db}
+"""
+
+}
+
+
+process eggnog_annotation {
+    container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
+    label 'mem_veryhigh'
+    
+    input:
+    path query
+    path eggnog_db
+    path eggnog_dmnd
+
+    output:
+    path "${query}.emapper.annotations.gz"
+
+    
+    """
+set -e
+
+mkdir data
+mkdir TEMP
+mkdir SCRATCH
+
+mv ${eggnog_db} data/eggnog.db
+mv ${eggnog_dmnd} data/eggnog_proteins.dmnd
+
+emapper.py \
+    -i ${query} \
+    --output ${query} \
+    -m "diamond" \
+    --cpu ${task.cpus} \
+    --data_dir data/ \
+    --scratch_dir SCRATCH/ \
+    --temp_dir TEMP/ \
+
+gzip ${query}.emapper.annotations
+    
+    """
+
+}
+
