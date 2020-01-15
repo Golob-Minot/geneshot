@@ -49,6 +49,12 @@ params.dmnd_top_pct = 1 // DIAMOND
 params.dmnd_min_score = 20 // DIAMOND
 params.gencode = 11 //DIAMOND
 
+// Annotation options
+params.noannot = false
+params.taxonomic_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd"
+params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db"
+params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
+
 
 // Function which prints help message text
 def helpMessage() {
@@ -82,6 +88,16 @@ def helpMessage() {
       --dmnd_top_pct        Keep top X% of alignments for each short read (default: 1) (DIAMOND)
       --dmnd_min_score      Minimum score for short read alignment (default: 20) (DIAMOND)
       --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
+
+    For Annotation:
+      --noannot             If specified, disable annotation for taxonomy or function.
+                            Individual annotations can also be disabled by, e.g., setting --eggnog_db false
+      --taxonomic_dmnd      Database used for taxonomic annotation 
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
+      --eggnog_dmnd         One of two databases used for functional annotation with eggNOG 
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
+      --eggnog_db           One of two databases used for functional annotation with eggNOG 
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
       
 
     Batchfile:
@@ -127,7 +143,10 @@ include './modules/assembly' params(
     phred_offset: params.phred_offset,
     centre: params.centre,
     min_identity: params.min_identity,
-    min_coverage: params.min_coverage
+    min_coverage: params.min_coverage,
+    eggnog_db: params.eggnog_db,
+    eggnog_dmnd: params.eggnog_dmnd,
+    taxonomic_dmnd: params.taxonomic_dmnd,
 )
 include './modules/alignment' params(
     dmnd_min_identity: params.dmnd_min_identity,
