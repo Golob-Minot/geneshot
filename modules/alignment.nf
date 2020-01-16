@@ -33,6 +33,12 @@ workflow alignment_wf {
         assembleAbundances.out
     )
 
+    // Calculate the relative abundance of each CAG in these samples
+    calcCAGabund(
+        assembleAbundances.out,
+        makeCAGs.out
+    )
+
 }
 
 // Align each sample against the reference database of genes using DIAMOND
@@ -200,11 +206,18 @@ df = pd.DataFrame(
 
 # Add all of the data to the DataFrame
 for sample_name, sample_abund in all_abund.items():
+    # Format as a Pandas Series
+    sample_abund = pd.Series(
+        sample_abund
+    )
+
+    # Divide by the sum to get the proportional abundance
+    sample_abund = sample_abund / sample_abund.sum()
+
+    # Add the values to the table
     df.values[
         :, sample_names.index(sample_name)
-    ] = pd.Series(
-        sample_abund
-    ).reindex(
+    ] = sample_abund.reindex(
         index=all_gene_names
     ).fillna(
         0
@@ -338,10 +351,81 @@ cags_df = pd.DataFrame(
     columns=["CAG", "gene"]
 )
 
+# Make sure that we have every gene assigned to a CAG
+assert cags_df.shape[0] == df.shape[0], (cags_df.shape[0], df.shape[0])
+
+logging.info("Largest CAGs:")
+print(cags_df["CAG"].value_counts().head())
+
 fp_out = "CAGs.csv.gz"
 
 logging.info("Writing out CAGs to %s" % fp_out)
-cags_df.to_csv(fp_out, compression="gzip")
+cags_df.to_csv(fp_out, compression="gzip", index=None)
+
+logging.info("Done")
+    """
+}
+
+// Summarize the abundance of every CAG across each sample
+process calcCAGabund {
+    container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+    label "mem_veryhigh"
+    errorStrategy 'retry'
+
+    input:
+    path gene_feather
+    path cag_csv_gz
+
+    output:
+    file "CAGs.abund.feather"
+
+    """
+#!/usr/bin/env python3
+
+import feather
+import pandas as pd
+import logging
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [calculateCAGabundance] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+# Read in the table of CAGs
+cags_df = pd.read_csv(
+    "${cag_csv_gz}",
+    compression="gzip"
+)
+
+# Read in the table of gene abundances
+abund_df = pd.read_feather(
+    "${gene_feather}"
+).set_index(
+    "index"
+)
+
+# Annotate each gene with the CAG it was assigned to
+abund_df["CAG"] = cags_df.set_index("gene")["CAG"]
+
+# Make sure that every gene was assigned to a CAG
+assert abund_df["CAG"].isnull().sum() == 0
+
+# Now sum up the gene relative abundance by CAGs
+# and write out to a feather file
+abund_df.groupby(
+    "CAG"
+).sum(
+).reset_index(
+).to_feather(
+    "CAGs.abund.feather"
+)
 
 logging.info("Done")
     """
