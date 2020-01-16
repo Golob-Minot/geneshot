@@ -39,6 +39,11 @@ workflow alignment_wf {
         makeCAGs.out
     )
 
+    emit:
+        cag_csv = makeCAGs.out
+        gene_abund_feather = assembleAbundances.out
+        cag_abund_feather = calcCAGabund.out
+
 }
 
 // Align each sample against the reference database of genes using DIAMOND
