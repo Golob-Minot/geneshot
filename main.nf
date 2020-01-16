@@ -148,6 +148,8 @@ include './modules/general' params(
     savereads: params.savereads,
     output_folder: output_folder
 )
+
+// Import the workflows used for assembly and annotation
 include './modules/assembly' params(
     output_folder: output_folder,
     phred_offset: params.phred_offset,
@@ -159,6 +161,8 @@ include './modules/assembly' params(
     eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
 )
+
+// Import the workflows used for alignment-based analysis
 include './modules/alignment' params(
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
