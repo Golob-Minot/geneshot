@@ -55,6 +55,10 @@ params.taxonomic_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/ge
 params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db"
 params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
 
+// CAG options
+params.distance_threshold = 0.5
+params.distance_metric = "cosine"
+params.linkage_type = "average"
 
 // Function which prints help message text
 def helpMessage() {
@@ -99,6 +103,11 @@ def helpMessage() {
                             (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG 
                             (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
+
+    For CAGs:
+      --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
+      --distance_threshold  Distance threshold used to group genes by co-abundance (default: 0.5)
+      --linkage_type        Linkage type used to group genes by co-abundance (default: average)
       
 
     Batchfile:
@@ -155,7 +164,10 @@ include './modules/alignment' params(
     dmnd_min_coverage: params.dmnd_min_coverage,
     dmnd_top_pct: params.dmnd_top_pct,
     dmnd_min_score: params.dmnd_min_score,
-    gencode: params.gencode
+    gencode: params.gencode,
+    distance_metric: params.distance_metric,
+    distance_threshold: params.distance_threshold,
+    linkage_type: params.linkage_type,
 )
 
 
