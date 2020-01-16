@@ -25,7 +25,7 @@ workflow alignment_wf {
 
     // Make a single table with the abundance of every gene across every sample
     assembleAbundances(
-        famli.out.collect()
+        famli.out.toSortedList()
     )
 
     // Group genes into Co-Abundant Gene Groups (CAGs)
@@ -43,6 +43,7 @@ workflow alignment_wf {
         cag_csv = makeCAGs.out
         gene_abund_feather = assembleAbundances.out
         cag_abund_feather = calcCAGabund.out
+        famli_json_list = famli.out.toSortedList()
 
 }
 
