@@ -170,6 +170,9 @@ include './modules/alignment' params(
     linkage_type: params.linkage_type,
 )
 
+include './modules/statistics' params(
+    formula: params.formula
+)
 
 workflow {
     main:
@@ -243,5 +246,17 @@ workflow {
         combineReads.out
     )
 
+    // ########################
+    // # STATISTICAL ANALYSIS #
+    // ########################
+
+    // Calculate the association of individual CAGs with user-provided features
+    if ( params.formula ) {
+        corncob_wf(
+            alignment_wf.out.famli_json_list,
+            alignment_wf.out.cag_csv,
+            file(params.manifest)
+        )
+    }
 
 }

@@ -18,6 +18,8 @@ NXF_VER=19.10.0 nextflow run main.nf \
     --preprocess_output output/preprocess_output \
     --output output \
     --hg_index data/hg_chr_21_bwa_index.tar.gz \
+    --formula "label1 + label2" \
+    --distance_threshold 0.1 \
     -w work/ \
     --noannot \
     -resume
