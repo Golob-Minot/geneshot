@@ -1,10 +1,8 @@
 // Input to this workflow is a manifest CSV 
 
 // Function to read in a CSV and return a Channel
-def read_manifest(fp){
-    Channel.fromPath(
-        fp
-    ).splitCsv(
+def read_manifest(manifest_file){
+    manifest_file.splitCsv(
         header: true, 
         sep: ","
     )
@@ -48,14 +46,15 @@ def filter_valid_index(manifest_ch){
 
 workflow preprocess_wf {
 
+    get:
+    manifest_file
+
     main:
 
     // Start by checking the manifest for rows which are invalid in any way
     
     // Raise an error if there are any rows which are missing any values for specimen, R1, or R2
-    read_manifest(
-        params.manifest
-    ).filter { r ->
+    read_manifest(manifest_file).filter { r ->
         (r.specimen == null) ||
         (r.R1 == null) ||
         (r.R2 == null) ||
@@ -67,9 +66,7 @@ workflow preprocess_wf {
 
     // Raise an error if there are any rows which point to empty or missing R1 / R2 files
     filter_no_index(
-        read_manifest(
-            params.manifest
-        )
+        read_manifest(manifest_file)
     ).filter {
         r -> (file(r.R1).isEmpty() || file(r.R2).isEmpty())
     }.count(
@@ -77,9 +74,7 @@ workflow preprocess_wf {
 
     // Raise an error if there are any rows which point to empty or missing files for R1, R2, I1, or I2
     filter_valid_index(
-        read_manifest(
-            params.manifest
-        )
+        read_manifest(manifest_file)
     ).filter {
         r -> (file(r.R1).isEmpty() || file(r.R2).isEmpty() || file(r.I1).isEmpty() || file(r.I2).isEmpty())
     }.count(
@@ -87,9 +82,7 @@ workflow preprocess_wf {
 
     // Get rows which have valid R1 and R2, but no values provided for I1 or I2
     input_no_index_valid_ch = filter_no_index(
-        read_manifest(
-            params.manifest
-        )
+        read_manifest(manifest_file)
     ).filter {
         r -> (!file(r.R1).isEmpty() && !file(r.R2).isEmpty())
     }
@@ -97,9 +90,7 @@ workflow preprocess_wf {
     // Get rows which have valid R1, R2, I1, and I2
     // and make a channel for barcodecop
     to_bcc_ch = filter_valid_index(
-        read_manifest(
-            params.manifest
-        )
+        read_manifest(manifest_file)
     ).filter {
         r -> (!file(r.R1).isEmpty() && !file(r.R2).isEmpty() && !file(r.I1).isEmpty() && !file(r.I2).isEmpty())
     }.map{ sample -> [

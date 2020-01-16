@@ -60,6 +60,9 @@ params.distance_threshold = 0.5
 params.distance_metric = "cosine"
 params.linkage_type = "average"
 
+// Statistical analysis options
+params.formula = false
+
 // Function which prints help message text
 def helpMessage() {
     log.info"""
@@ -181,11 +184,27 @@ include './modules/statistics' params(
 workflow {
     main:
 
+    // Phase 0: Validation of input data
+
+    // If the user specifies a `--formula`, the first step in the process
+    // will be to ensure that the formula is written correctly, and is
+    // compatible with the data provided in the manifest
+    if ( params.formula ) {
+        validation_wf(
+            file(params.manifest)
+        )
+        manifest_file = validation_wf.out
+    } else {
+        manifest_file = Channel.from(file(params.manifest))
+    }
+
     // Phase I: Preprocessing
     if (!params.nopreprocess) {
 
         // Run the entire preprocessing workflow
-        preprocess_wf()
+        preprocess_wf(
+            manifest_file
+        )
 
         // Combine the reads by specimen name
         combineReads(preprocess_wf.out.groupTuple())
@@ -195,7 +214,7 @@ workflow {
         // read the manifest and combine by specimen
         combineReads(
             read_manifest(
-                file(params.manifest)
+                manifest_file
             ).filter { r ->
                 (r.specimen != null) &&
                 (r.R1 != null) &&

@@ -1,5 +1,32 @@
 // // Processes to perform statistical analysis
 
+// Workflow to test out the provided formula and manifest CSV in a dry run
+// This is intended to catch the case early on where the provided formula
+// is not formatted correctly, or does not match the manifest (sample sheet)
+workflow validation_wf {
+    get: manifest_csv
+    main: 
+
+    mockData(
+        manifest_csv
+    )
+
+    runCorncob(
+        mockData.out,
+        manifest_csv
+    )
+
+    validateFormula(
+        runCorncob.out,
+        manifest_csv
+    )
+
+    emit:
+    validateFormula.out
+
+}
+
+// Workflow to run corncob on the actual data
 workflow corncob_wf {
     get:
     famli_json_list
@@ -22,6 +49,88 @@ workflow corncob_wf {
     runCorncob.out
 }
 
+process mockData {
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    label 'io_limited'
+
+    input:
+    path manifest_csv
+
+    output:
+    path "random.counts.csv.gz"
+
+"""
+#!/usr/bin/env python3
+
+import numpy as np
+import pandas as pd
+
+# Get the user-provided manifest
+manifest = pd.read_csv("${manifest_csv}")
+
+# Make sure that 'specimen' is in the header
+assert 'specimen' in manifest.columns.values, "Must provide a column named 'specimen'"
+
+# Get the list of specimen names
+specimen_names = list(set(manifest['specimen'].tolist()))
+
+# Make a new DataFrame with random numbers
+df = pd.DataFrame(
+    np.random.randint(
+        1000, high=2000, size=[len(specimen_names), 5], dtype=int
+    ),
+    index=specimen_names,
+    columns=[
+        "CAG-%d" % i
+        for i in range(5)
+    ]
+)
+
+# Add a total column
+df["total"] = df.sum(axis=1)
+
+# Write out to a file
+df.reset_index(
+).rename(
+    columns=dict([("index", "specimen")])
+).to_csv(
+    "random.counts.csv.gz",
+    index=None,
+    compression="gzip"
+)
+
+"""
+
+}
+
+process validateFormula {
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    label 'io_limited'
+
+    input:
+    path corncob_output_csv
+    path manifest_csv
+
+    output:
+    path "${manifest_csv}"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Open up the corncob results for the simulated random data
+df = pd.read_csv("${corncob_output_csv}")
+
+# Make sure that we have results for every CAG
+assert set(df["CAG"].tolist()) == set(["CAG-%d" % i for i in range(5)])
+
+# Make sure that every CAG has each expected row
+for _, cag_df in df.groupby("CAG"):
+    assert set(cag_df["type"].tolist()) == set(["p_value", "std_error", "estimate"])
+"""
+
+}
 
 // Extract a CAG-level counts table from the FAMLI JSON outputs
 // Corncob takes the absolute number of reads from each sample into account
@@ -218,7 +327,7 @@ corn_tib <- do.call(rbind, mclapply(
             ) %>%
             select(-`t value`) %>%
             gather(key = type, ...=estimate:p_value) %>%
-            mutate("cag" = names(counts)[i])
+            mutate("CAG" = names(counts)[i])
         )
       } else {
           return(
@@ -226,7 +335,7 @@ corn_tib <- do.call(rbind, mclapply(
                   "parameter" = "all",
                   "type" = "failed", 
                   "value" = NA, 
-                  "cag" = names(counts)[i]
+                  "CAG" = names(counts)[i]
               )
           )
       }   
