@@ -30,25 +30,43 @@ workflow assembly_wf {
         combineCDS.out
     )
 
+    // Determine whether or not to run the eggNOG annotation based
+    // on --noannot and --eggnog_db / --eggnog_dmnd
+    run_eggnog = false
+    if ( params.noannot == false ) {
+        if ( params.eggnog_db && params.eggnog_dmnd ) {
+            if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
+                run_eggnog = true
+            }
+        }
+    }
+
     // Annotate the clustered genes with eggNOG
-    if ( params.eggnog_db && params.eggnog_dmnd ){
-        if ( !path(params.eggnog_db).isEmpty() && !path(params.eggnog_dmnd).isEmpty() ) {
-            eggnog_annotation(
-                clusterCDS.out[0],
-                path(params.eggnog_db),
-                path(params.eggnog_dmnd)
-            )
+    if ( run_eggnog ){
+        eggnog_annotation(
+            clusterCDS.out[0],
+            file(params.eggnog_db),
+            file(params.eggnog_dmnd)
+        )
+    }
+
+    // Determine whether or not to run the taxnomic annotation based
+    // on --noannot and --taxonomic_dmnd
+    run_tax = false
+    if ( params.noannot == false ) {
+        if ( params.taxonomic_dmnd ) {
+            if ( !file(params.taxonomic_dmnd).isEmpty() ){
+                run_tax = true
+            }
         }
     }
 
     // Annotate the clustered genes with DIAMOND for taxonomic ID
-    if ( params.taxonomic_dmnd ) {
-        if ( ! path(params.taxonomic_dmnd).isEmpty() ){
-            taxonomic_annotation(
-                clusterCDS.out[0],
-                path(params.taxonomic_dmnd)
-            )
-        }
+    if ( run_tax ) {
+        taxonomic_annotation(
+            clusterCDS.out[0],
+            path(params.taxonomic_dmnd)
+        )
     }
 
     emit:

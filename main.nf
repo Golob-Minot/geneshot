@@ -145,6 +145,7 @@ include './modules/assembly' params(
     centre: params.centre,
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,
+    noannot: params.noannot,
     eggnog_db: params.eggnog_db,
     eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
