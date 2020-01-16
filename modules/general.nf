@@ -6,7 +6,7 @@ process combineReads {
     maxRetries 10
 
     // If the user sets --preprocess_output, write out the combined reads to that folder
-    publishDir path: "${params.output_folder}qc/", enabled: params.savereads
+    publishDir path: "${params.output_folder}qc/", enabled: params.savereads, mode: "copy"
 
     input:
     tuple val(sample), file("R1.*.fastq.gz"), file("R2.*.fastq.gz")
@@ -32,7 +32,7 @@ combine_fastq_pairs.py \
 process outputManifest {
     container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
 
-    publishDir path: "${params.output_folder}qc/", enabled: params.savereads
+    publishDir path: "${params.output_folder}qc/", enabled: params.savereads, mode: "copy"
 
     input:
         val manifestStr
