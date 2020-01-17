@@ -283,4 +283,7 @@ workflow {
         )
     }
 
+    publish:
+        corncob_wf.out to: "${output_folder}/stats/", enabled: params.formula
+
 }
