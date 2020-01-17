@@ -109,7 +109,7 @@ gzip -c scaffolds.fasta > ${specimen}.scaffolds.fasta.gz
 process prodigalAnnotate {
     container 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
     label 'io_limited'
-    // errorStrategy "retry"
+    errorStrategy "retry"
     publishDir "${params.output_folder}/prodigal/${specimen}/", mode: "copy"
 
     input:
