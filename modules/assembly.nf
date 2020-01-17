@@ -168,8 +168,8 @@ process clusterCDS {
     file all_cds
     
     output:
-    file "mmseqs.${params.min_identity}.rep.fasta.gz"
-    file "mmseqs.${params.min_identity}.tsv.gz"
+    file "genes.fasta.gz"
+    file "genes.alleles.tsv.gz"
     
     """
 #!/bin/bash
@@ -177,17 +177,17 @@ set -e
 # Make the MMSeqs2 database
 mmseqs createdb ${all_cds} db
 # Cluster the protein sequences
-mmseqs linclust db mmseqs.${params.min_identity}.cluster ./ \
+mmseqs linclust db cluster_db ./ \
     --min-seq-id ${params.min_identity / 100} \
     --max-seqs 100000 \
     -c ${params.min_coverage / 100}
 # Make TSV output for clustering
-mmseqs createtsv db db mmseqs.${params.min_identity}.cluster mmseqs.${params.min_identity}.tsv
+mmseqs createtsv db db cluster_db genes.alleles.tsv
 # Get the representative sequences
-mmseqs result2repseq db mmseqs.${params.min_identity}.cluster mmseqs.${params.min_identity}.rep
-mmseqs result2flat db db mmseqs.${params.min_identity}.rep mmseqs.${params.min_identity}.rep.fasta --use-fasta-header
-gzip mmseqs.${params.min_identity}.tsv
-gzip mmseqs.${params.min_identity}.rep.fasta
+mmseqs result2repseq db cluster_db genes
+mmseqs result2flat db db genes genes.fasta --use-fasta-header
+gzip genes.alleles.tsv
+gzip genes.fasta
     """
 }
 
