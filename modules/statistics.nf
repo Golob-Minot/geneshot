@@ -255,7 +255,7 @@ logging.info("Done")
 process runCorncob {
     container "quay.io/fhcrc-microbiome/corncob"
     label "mem_veryhigh"
-    // errorStrategy "retry"
+    errorStrategy "retry"
     publishDir "${params.output_folder}/stats/", mode: "copy"
     
     input:
