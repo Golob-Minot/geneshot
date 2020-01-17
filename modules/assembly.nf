@@ -110,7 +110,7 @@ process prodigalAnnotate {
     container 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
     label 'io_limited'
     errorStrategy "retry"
-    publishDir "${params.output_folder}/prodigal/${specimen}/", mode: "copy"
+    publishDir "${params.output_folder}/assembly/${specimen}/", mode: "copy"
 
     input:
         tuple val(specimen), file(contigs), file(scaffolds), file(spades_log)
@@ -202,7 +202,7 @@ process taxonomic_annotation {
     file diamond_tax_db
     
     output:
-    file "${query}.tax.aln.gz"
+    file "genes.tax.aln.gz"
 
     
 """
@@ -212,7 +212,7 @@ diamond \
     blastp \
     --db ${diamond_tax_db} \
     --query ${query} \
-    --out ${query}.tax.aln.gz \
+    --out genes.tax.aln.gz \
     --outfmt 102 \
     --id ${params.min_identity} \
     --top ${100 - params.min_identity} \
@@ -237,7 +237,7 @@ process eggnog_annotation {
     path eggnog_dmnd
 
     output:
-    path "${query}.emapper.annotations.gz"
+    path "genes.emapper.annotations.gz"
 
     
     """
@@ -252,14 +252,14 @@ mv ${eggnog_dmnd} data/eggnog_proteins.dmnd
 
 emapper.py \
     -i ${query} \
-    --output ${query} \
+    --output genes \
     -m "diamond" \
     --cpu ${task.cpus} \
     --data_dir data/ \
     --scratch_dir SCRATCH/ \
     --temp_dir TEMP/ \
 
-gzip ${query}.emapper.annotations
+gzip genes.emapper.annotations
     
     """
 

@@ -179,6 +179,7 @@ include './modules/alignment' params(
 )
 
 include './modules/statistics' params(
+    output_folder: output_folder,
     formula: params.formula
 )
 

@@ -58,14 +58,14 @@ process makeDiamondDB {
     file fasta
 
     output:
-    file "${fasta}.dmnd"
+    file "genes.dmnd"
 
     """
     set -e
     diamond \
       makedb \
       --in ${fasta} \
-      --db ${fasta}.dmnd \
+      --db genes.dmnd \
       --threads ${task.cpus}
     """
 
