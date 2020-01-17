@@ -91,11 +91,6 @@ def helpMessage() {
       --centre              Centre for use in prokka. default = 'geneshot'
       --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90) (mmseqs2)
       --min_coverage        Length cutoff used to combine similar genes (default: 50) (mmseqs2)
-      --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
-      --dmnd_min_coverage   Query coverage cutoff used to align short reads (default: 50) (DIAMOND)
-      --dmnd_top_pct        Keep top X% of alignments for each short read (default: 1) (DIAMOND)
-      --dmnd_min_score      Minimum score for short read alignment (default: 20) (DIAMOND)
-      --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
 
     For Annotation:
       --noannot             If specified, disable annotation for taxonomy or function.
@@ -106,6 +101,13 @@ def helpMessage() {
                             (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG 
                             (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
+    
+    For Alignment:
+      --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
+      --dmnd_min_coverage   Query coverage cutoff used to align short reads (default: 50) (DIAMOND)
+      --dmnd_top_pct        Keep top X% of alignments for each short read (default: 1) (DIAMOND)
+      --dmnd_min_score      Minimum score for short read alignment (default: 20) (DIAMOND)
+      --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
 
     For CAGs:
       --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
