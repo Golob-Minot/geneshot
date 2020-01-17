@@ -40,7 +40,6 @@ params.min_hg_align_score = 30
 
 // Assembly options
 params.phred_offset = 33 // spades
-params.centre = 'geneshot' // prokka
 params.min_identity = 90 // mmseqs2
 params.min_coverage = 50 // mmseqs2
 params.dmnd_min_identity = 80 // DIAMOND
@@ -89,7 +88,6 @@ def helpMessage() {
 
     For Assembly:
       --phred_offset        for spades. Default 33.
-      --centre              Centre for use in prokka. default = 'geneshot'
       --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90) (mmseqs2)
       --min_coverage        Length cutoff used to combine similar genes (default: 50) (mmseqs2)
 
@@ -159,7 +157,6 @@ include './modules/general' params(
 include './modules/assembly' params(
     output_folder: output_folder,
     phred_offset: params.phred_offset,
-    centre: params.centre,
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,
     noannot: params.noannot,
