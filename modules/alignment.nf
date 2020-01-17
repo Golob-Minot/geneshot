@@ -52,6 +52,7 @@ process makeDiamondDB {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
     errorStrategy 'retry'
+    publishDir "${params.output_folder}/ref/", mode: "copy"
     
     input:
     file fasta
@@ -140,12 +141,13 @@ process assembleAbundances {
     container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
     label "mem_veryhigh"
     errorStrategy 'retry'
+    publishDir "${params.output_folder}/abund/", mode: "copy"
 
     input:
     file sample_jsons
 
     output:
-    file "gene_abund.feather"
+    file "gene.abund.feather"
 
 
     """
@@ -234,7 +236,7 @@ for sample_name, sample_abund in all_abund.items():
 # Write out to a feather file
 logging.info("Writing to disk")
 df.reset_index(inplace=True)
-df.to_feather("gene_abund.feather")
+df.to_feather("gene.abund.feather")
 
 logging.info("Done")
 
@@ -247,6 +249,7 @@ process makeCAGs {
     container "quay.io/fhcrc-microbiome/find-cags@sha256:30ec0e8b25ef142b68eebcfa84a7a2eeb44ebb25481a60db923fed288abec4a9"
     label "mem_veryhigh"
     errorStrategy 'retry'
+    publishDir "${params.output_folder}/ref/", mode: "copy"
 
     input:
     path gene_feather
@@ -377,13 +380,14 @@ process calcCAGabund {
     container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
     label "mem_veryhigh"
     errorStrategy 'retry'
+    publishDir "${params.output_folder}/abund/", mode: "copy"
 
     input:
     path gene_feather
     path cag_csv_gz
 
     output:
-    file "CAGs.abund.feather"
+    file "CAG.abund.feather"
 
     """
 #!/usr/bin/env python3
@@ -430,7 +434,7 @@ abund_df.groupby(
 ).sum(
 ).reset_index(
 ).to_feather(
-    "CAGs.abund.feather"
+    "CAG.abund.feather"
 )
 
 logging.info("Done")

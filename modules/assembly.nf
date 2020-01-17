@@ -162,6 +162,7 @@ process clusterCDS {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label 'mem_veryhigh'
     errorStrategy 'retry'
+    publishDir "${params.output_folder}/ref/", mode: "copy"
     
     input:
     file all_cds
@@ -194,6 +195,7 @@ gzip mmseqs.${params.min_identity}.rep.fasta
 process taxonomic_annotation {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
+    publishDir "${params.output_folder}/annot/", mode: "copy"
 
     input:
     file query
@@ -227,6 +229,7 @@ rm ${diamond_tax_db}
 process eggnog_annotation {
     container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
     label 'mem_veryhigh'
+    publishDir "${params.output_folder}/annot/", mode: "copy"
     
     input:
     path query

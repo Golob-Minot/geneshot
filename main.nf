@@ -167,6 +167,7 @@ include './modules/assembly' params(
 
 // Import the workflows used for alignment-based analysis
 include './modules/alignment' params(
+    output_folder: output_folder,
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
     dmnd_top_pct: params.dmnd_top_pct,

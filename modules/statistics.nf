@@ -138,6 +138,7 @@ for _, cag_df in df.groupby("CAG"):
 process extractCounts {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label 'mem_veryhigh'
+    publishDir "${params.output_folder}/abund/", mode: "copy"
     
     input:
     file famli_json_list
@@ -255,6 +256,7 @@ process runCorncob {
     container "quay.io/fhcrc-microbiome/corncob"
     label "mem_veryhigh"
     // errorStrategy "retry"
+    publishDir "${params.output_folder}/stats/", mode: "copy"
     
     input:
     file readcounts_csv_gz
