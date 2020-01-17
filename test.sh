@@ -23,6 +23,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
     --distance_threshold 0.1 \
     -w work/ \
     --noannot \
+    --savereads \
     -resume
 
 # Test with preprocessing and no formula
