@@ -78,6 +78,7 @@ def helpMessage() {
       --nopreprocess        If specified, omit the preprocessing steps (removing adapters and human sequences)
       --savereads           If specified, save the preprocessed reads to the output folder (inside qc/)
       -w                    Working directory. Defaults to `./work`
+
     For preprocessing:
       --hg_index_url        URL for human genome index, defaults to current HG
       --hg_index            Cached copy of the bwa indexed human genome, TGZ format
