@@ -16,13 +16,14 @@ workflow assembly_wf {
         metaspadesAssembly.out
     )
 
+    // Calculate summary metrics for every assembled gene
+    geneAssemblyMetrics(
+        prodigalAnnotate.out[0].collect()
+    )
+
     // Combine the gene sequences across all samples
     combineCDS(
-        prodigalAnnotate.out[
-            0
-        ].map {
-            it -> it[1]
-        }.collect()
+        prodigalAnnotate.out[0].collect()
     )
 
     // Combine genes by amino acid identity
@@ -99,8 +100,9 @@ metaspades.py \
     -t ${task.cpus} -m ${task.memory.toMega() / 1024} | 
     tee -a ${specimen}.metaspades.log
 
-gzip -c contigs.fasta > ${specimen}.contigs.fasta.gz
-gzip -c scaffolds.fasta > ${specimen}.scaffolds.fasta.gz
+# Add the specimen name to the contig name
+gzip -c contigs.fasta | sed 's/>/>${specimen}_/' > ${specimen}.contigs.fasta.gz
+gzip -c scaffolds.fasta | sed 's/>/>${specimen}_/' > ${specimen}.scaffolds.fasta.gz
 """
 }
 
@@ -116,8 +118,8 @@ process prodigalAnnotate {
         tuple val(specimen), file(contigs), file(scaffolds), file(spades_log)
     
     output:
-        tuple val(specimen), file("${specimen}.faa.gz")
-        tuple val(specimen), file("${specimen}.gff.gz")
+        file "${specimen}.faa.gz"
+        file "${specimen}.gff.gz"
     
 """
 set -e 
@@ -136,6 +138,102 @@ gzip ${specimen}.faa
 
 """
 }
+
+
+// Summarize the depth of sequencing and GC content for every assembled gene
+process geneAssemblyMetrics {
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    label 'io_limited'
+    errorStrategy 'retry'
+    publishDir "${params.output_folder}/assembly/", mode: "copy"
+    
+    input:
+    file faa_list
+    
+    output:
+    file "gene.assembly.metrics.csv.gz"
+
+"""
+#!/usr/bin/env python3
+import gzip
+import pandas as pd
+
+# Parse the list of FASTA files to read in
+faa_list = "${faa_list}".split(" ")
+
+# Function to parse a FASTA file with information encoded by Prodigal and metaSPAdes in the header
+def parse_prodigal_faa(fp):
+
+    # Keep track of all of the information for each assembled gene
+    dat = []
+
+    # Open a connection to the file
+    with gzip.open(fp, "rt") as f:
+
+        # Iterate over every line
+        for line in f:
+
+            # Skip the non-header lines
+            if line.startswith(">") is False:
+                continue
+
+            # Add the information for this header
+            dat.append(parse_header(line))
+
+    return dat
+
+# Function to parse a single header
+def parse_header(line):
+
+    # Keep track of the gene name
+    # The next two fields after the gene name are the start and the stop positions
+    gene_name, start, stop, strand, details = line.split(" # ")
+
+    # The first field in the gene name is the specimen
+    specimen, gene_name = gene_name.split("_NODE_", 1)
+
+    # There is more good information to get from the gene name
+    contig_num, _, length, _, depth, gene_num = gene_name.split("_")
+
+    # The final piece we want to get is the GC content, from the `details`
+    gc = None
+    for f in details.split(";"):
+        if f.startswith("gc_cont="):
+            gc = f[len("gc_cont="):]
+    assert gc is not None
+
+    return dict([
+        ("gene_name", gene_name),
+        ("start", int(start)),
+        ("stop", int(stop)),
+        ("strand", strand),
+        ("details", details),
+        ("specimen", specimen),
+        ("contig_num", contig_num),
+        ("contig_length", float(length)),
+        ("contig_depth", float(depth)),
+        ("gene_num", gene_num),
+        ("gc", float(gc))
+    ])
+
+# Read in all of the files
+df = pd.DataFrame([
+    gene_details
+    for fp in faa_list
+    for gene_details in parse_prodigal_faa(fp)
+])
+
+# Write out to a file
+df.to_csv(
+    "gene.assembly.metrics.csv.gz",
+    index = None,
+    compression = "gzip"
+)
+
+
+"""
+}
+
 
 process combineCDS {
     container "ubuntu:16.04"
