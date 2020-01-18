@@ -31,6 +31,18 @@ workflow assembly_wf {
         combineCDS.out
     )
 
+    emit:
+        gene_fasta = clusterCDS.out[0]
+
+}
+
+// Break out the annotation into a separate workflow
+workflow annotation_wf {
+    get:
+    gene_fasta
+
+    main:
+
     // Determine whether or not to run the eggNOG annotation based
     // on --noannot and --eggnog_db / --eggnog_dmnd
     run_eggnog = false
@@ -45,7 +57,7 @@ workflow assembly_wf {
     // Annotate the clustered genes with eggNOG
     if ( run_eggnog ){
         eggnog_annotation(
-            clusterCDS.out[0],
+            gene_fasta,
             file(params.eggnog_db),
             file(params.eggnog_dmnd)
         )
@@ -65,15 +77,13 @@ workflow assembly_wf {
     // Annotate the clustered genes with DIAMOND for taxonomic ID
     if ( run_tax ) {
         taxonomic_annotation(
-            clusterCDS.out[0],
+            gene_fasta,
             path(params.taxonomic_dmnd)
         )
     }
 
-    emit:
-        gene_fasta = clusterCDS.out[0]
-
 }
+
 
 // Assembly with metaspades
 process metaspadesAssembly {

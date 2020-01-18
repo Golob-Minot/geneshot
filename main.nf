@@ -39,6 +39,7 @@ params.hg_index = false
 params.min_hg_align_score = 30
 
 // Assembly options
+params.gene_fasta = false
 params.phred_offset = 33 // spades
 params.min_identity = 90 // mmseqs2
 params.min_coverage = 50 // mmseqs2
@@ -87,6 +88,8 @@ def helpMessage() {
       --min_hg_align_score  Minimum alignment score for human genome (default 30)
 
     For Assembly:
+      --gene_fasta          (optional) Compressed FASTA with pre-generated catalog of microbial genes.
+                            If provided, then the entire de novo assembly process will be skipped entirely.
       --phred_offset        for spades. Default 33.
       --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90) (mmseqs2)
       --min_coverage        Length cutoff used to combine similar genes (default: 50) (mmseqs2)
@@ -256,9 +259,25 @@ workflow {
     // # DE NOVO ASSEMBLY AND ANNOTATION #
     // ###################################
 
-    // Run the assembly and annotation workflow (in modules/assembly.nf)
-    assembly_wf(
-        combineReads.out
+    // A gene catalog was provided, so skip de novo assembly
+    if ( params.gene_fasta ) {
+
+        // Point to the file provided
+        gene_fasta = file(gene_fasta)
+
+    } else {
+
+        // Run the assembly and annotation workflow (in modules/assembly.nf)
+        assembly_wf(
+            combineReads.out
+        )
+
+        gene_fasta = assembly_wf.out.gene_fasta
+    }
+
+    // Run the annotation steps on the gene catalog
+    annotation_wf(
+        gene_fasta
     )
 
     // ############################
@@ -267,7 +286,7 @@ workflow {
 
     // Run the alignment-based analysis steps (in modules/alignment.nf)
     alignment_wf(
-        assembly_wf.out.gene_fasta,
+        gene_fasta,
         combineReads.out
     )
 
