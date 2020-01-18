@@ -64,3 +64,16 @@ NXF_VER=19.10.0 nextflow run main.nf \
     -w work/ \
     --noannot \
     -resume
+
+# Test with the gene catalog made in a previous round
+NXF_VER=19.10.0 nextflow run main.nf \
+    -c nextflow.config \
+    -profile testing \
+    --gene_fasta output1/ref/genes.fasta.gz \
+    --nopreprocess \
+    --manifest data/mock.manifest.csv \
+    --output output5 \
+    --hg_index data/hg_chr_21_bwa_index.tar.gz \
+    -w work/ \
+    --noannot \
+    -resume
