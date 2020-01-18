@@ -88,7 +88,11 @@ process diamond {
     """
     set -e
 
-    cat ${R1} ${R2} > query.fastq.gz
+    cat ${R1} ${R2} | \
+    gunzip -c | \
+    awk "{if(NR % 4 == 1){print \\"@\\" NR }else{if(NR % 4 == 3){print \\"+\\"}else{print}}}" | \
+    gzip -c \
+     > query.fastq.gz
 
     diamond \
       blastx \
