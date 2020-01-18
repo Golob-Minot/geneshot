@@ -111,8 +111,8 @@ metaspades.py \
     tee -a ${specimen}.metaspades.log
 
 # Add the specimen name to the contig name
-gzip -c contigs.fasta | sed 's/>/>${specimen}_/' > ${specimen}.contigs.fasta.gz
-gzip -c scaffolds.fasta | sed 's/>/>${specimen}_/' > ${specimen}.scaffolds.fasta.gz
+cat contigs.fasta | sed 's/>/>${specimen}_/' | gzip -c > ${specimen}.contigs.fasta.gz
+cat scaffolds.fasta | sed 's/>/>${specimen}_/' | gzip -c > ${specimen}.scaffolds.fasta.gz
 """
 }
 
