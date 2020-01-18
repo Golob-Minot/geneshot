@@ -301,9 +301,12 @@ workflow {
             alignment_wf.out.cag_csv,
             file(params.manifest)
         )
+        corncob_results = corncob_wf.out
+    } else {
+        corncob_results = Channel.empty()
     }
 
     publish:
-        corncob_wf.out to: "${output_folder}/stats/", enabled: params.formula
+        corncob_results to: "${output_folder}/stats/", enabled: params.formula
 
 }
