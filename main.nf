@@ -59,7 +59,6 @@ params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/genesho
 params.distance_threshold = 0.5
 params.distance_metric = "cosine"
 params.linkage_type = "average"
-params.min_samples_per_gene = 2
 
 // Statistical analysis options
 params.formula = false
@@ -116,10 +115,6 @@ def helpMessage() {
       --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
       --distance_threshold  Distance threshold used to group genes by co-abundance (default: 0.5)
       --linkage_type        Linkage type used to group genes by co-abundance (default: average)
-      --min_samples_per_gene
-                            In order for a gene to be included in the group of genes which will be
-                            combined to make CAGs, it must be observed (by alignment of a single read)
-                            in at least N samples (default: 2)
       
 
     Batchfile:
@@ -184,7 +179,6 @@ include './modules/alignment' params(
     distance_metric: params.distance_metric,
     distance_threshold: params.distance_threshold,
     linkage_type: params.linkage_type,
-    min_samples_per_gene: params.min_samples_per_gene
 )
 
 include './modules/statistics' params(

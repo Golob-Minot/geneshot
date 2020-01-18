@@ -306,15 +306,6 @@ df = feather.read_dataframe(
     np.float16
 )
 
-min_samples_per_gene = int("${params.min_samples_per_gene}")
-logging.info("Minimum number of samples per gene: %d" % min_samples_per_gene)
-
-total_n = df.shape[0]
-df = df.loc[
-    (df > 0).sum(axis=1) >= min_samples_per_gene
-]
-logging.info("Genes found in >= %d samples: %d / %d" % (min_samples_per_gene, df.shape[0], total_n))
-
 max_dist = float("${params.distance_threshold}")
 logging.info("Maximum cosine distance: %s" % max_dist)
 
