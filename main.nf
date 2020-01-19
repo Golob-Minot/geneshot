@@ -263,7 +263,7 @@ workflow {
     if ( params.gene_fasta ) {
 
         // Point to the file provided
-        gene_fasta = file(gene_fasta)
+        gene_fasta = file(params.gene_fasta)
 
     } else {
 
