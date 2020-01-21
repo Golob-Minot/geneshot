@@ -2,7 +2,7 @@
 process combineReads {
     container = 'golob/fastatools:0.7.0__bcw.0.3.0'
     label = 'io_limited'
-    // errorStrategy 'retry'
+    errorStrategy 'retry'
     maxRetries 10
 
     // If the user sets --preprocess_output, write out the combined reads to that folder
@@ -113,5 +113,26 @@ set -e
 
 echo name,n_reads > readcounts.csv
 cat ${readcount_csv_list} >> readcounts.csv
+"""
+}
+
+
+// Process which will concatenate a set of files
+process concatenateFiles {
+    container "ubuntu:18.04"
+    label "io_limited"
+    errorStrategy "retry"
+    
+    input:
+    file file_list
+
+    output:
+    file "${file_list[0].name}"
+
+"""
+# Break on any errors
+set -e
+
+cat ${file_list} > TEMP && mv TEMP ${file_list[0].name}
 """
 }
