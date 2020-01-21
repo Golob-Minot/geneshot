@@ -15,5 +15,6 @@ NXF_VER=19.10.0 nextflow run download_sra.nf \
     -profile testing \
     --accession SRR10668195,SRR10668196,SRR10668197 \
     --output output_download_1 \
+    --metadata \
     -w work/ \
     -resume
