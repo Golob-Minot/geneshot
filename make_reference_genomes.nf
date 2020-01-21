@@ -7,6 +7,7 @@ nextflow.preview.dsl=2
 
 // Set default values for parameters
 params.manifest = false
+params.dbname = "reference_genomes"
 params.output = false
 params.help = false
 
@@ -33,6 +34,7 @@ def helpMessage() {
     Required Arguments:
       --manifest            Manifest TSV from the NCBI Genomes portal
       --output              Folder to write output files
+      --dbname              Prefix for the output files (default: reference_genomes)
 
     Output Files:
 
@@ -73,8 +75,8 @@ process downloadGenome {
     tuple val(org_name), val(assembly_name), val(ftp_prefix)
 
     output:
-    file "${assembly_name.replaceAll(/"/, "")}.fasta.gz"
-    file "${assembly_name.replaceAll(/"/, "")}.fasta.gz.csv.gz"
+    file "*.fasta.gz"
+    file "*.fasta.gz.csv.gz"
 
     """
 # Break on any errors
@@ -86,8 +88,11 @@ ftp_suffix="\$(echo \$ftp_prefix | sed 's/.*\\///')"
 genome_suffix=_genomic.fna.gz
 url=\$ftp_prefix/\$ftp_suffix\$genome_suffix
 
+# Get the name of the genome
+genome_name=\$( echo "${org_name}_${assembly_name}" | sed 's/[^A-Za-z0-9.]/_/g' )
+
 # Set the name of the downloaded file
-genome_fp="${assembly_name.replaceAll(/"/, "")}.fasta.gz"
+genome_fp="\$genome_name.fasta.gz"
 
 echo Fetching \$url
 wget \$url -O \$genome_fp || \
@@ -107,7 +112,6 @@ mv TEMP \$genome_fp
 # headers from this FASTA, and the second containing a name
 # for this organism which includes both the #Organism Name
 # as well as the Assembly
-genome_name=\$( echo ${org_name}_${assembly_name} | sed 's/[^A-Za-z0-9.]/_/g' )
 
 gunzip -c \$genome_fp | grep '>' | tr -d '>' | while read header; do
     echo \$header,\$genome_name
@@ -123,11 +127,15 @@ workflow {
     //  - Assembly
     //  - GenBank FTP
 
+    // Skip any rows that are lacking the GenBank FTP column
+
     Channel.from(
         file(params.manifest)
     ).splitCsv(
         header: true
-    ).map {
+    ).filter {
+        r -> r["GenBank FTP"].length() > 0
+    }.map {
         r -> [r["#Organism Name"], r["Assembly"], r["GenBank FTP"]]
     }.set {
         genome_ch
@@ -140,17 +148,21 @@ workflow {
 
     // Concatenate the genomes in two steps
     concatGenomes_1(
-        downloadGenome.out[0].toSortedList().flatten().collate(100)
+        downloadGenome.out[0].toSortedList().flatten().collate(100),
+        "concat_genomes_1.fasta.gz"
     )
     concatGenomes_2(
-        concatGenomes_1.out.collect()
+        concatGenomes_1.out.collect(),
+        "${params.dbname}.fasta.gz"
     )
     // Concatenate the CSV header key in two steps
     concatCSV_1(
-        downloadGenome.out[1].toSortedList().flatten().collate(100)
+        downloadGenome.out[1].toSortedList().flatten().collate(100),
+        "concat_genomes_1.csv.gz"
     )
     concatCSV_2(
-        concatCSV_1.out.collect()
+        concatCSV_1.out.collect(),
+        "${params.dbname}.csv.gz"
     )
 
     publish:

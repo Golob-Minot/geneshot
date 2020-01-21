@@ -124,15 +124,16 @@ process concatenateFiles {
     errorStrategy "retry"
     
     input:
-    file file_list
+    file "__INPUT*"
+    val output_name
 
     output:
-    file "${file_list[0].name}"
+    file "${output_name}"
 
 """
 # Break on any errors
 set -e
 
-cat ${file_list} > TEMP && mv TEMP ${file_list[0].name}
+cat __INPUT* > ${output_name}
 """
 }
