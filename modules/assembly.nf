@@ -1,5 +1,7 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 
+include makeDiamondDB from "./alignment"
+
 workflow assembly_wf {
     get:
         combined_reads_ch
@@ -79,6 +81,31 @@ workflow annotation_wf {
         taxonomic_annotation(
             gene_fasta,
             path(params.taxonomic_dmnd)
+        )
+    }
+
+    // Determine whether or not to run the genome alignment based
+    // on --noannot, --ref_genome_fasta, and --ref_genome_csv
+    run_genome_alignment = false
+    if ( params.noannot == false ) {
+        if ( params.ref_genome_fasta && params.ref_genome_csv ) {
+            if ( !file(params.ref_genome_fasta).isEmpty() && !file(params.ref_genome_csv).isEmpty() ){
+                run_genome_alignment = true
+            }
+        }
+    }
+
+    // Annotate the clustered genes by alignment against whole reference genomes
+    if ( run_genome_alignment ) {
+
+        // Make a DIAMOND database for the provided genes
+        makeDiamondDB(
+            gene_fasta
+        )
+
+        alignGenomes(
+            makeDiamondDB.out,
+            file(params.ref_genome_fasta)
         )
     }
 
@@ -373,3 +400,48 @@ gzip genes.emapper.annotations
 
 }
 
+process alignGenomes {
+    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    label "mem_veryhigh"
+    // errorStrategy "retry"
+    
+    input:
+    file genes_dmnd
+    file fasta_gz
+
+    output:
+    file "reference_genomes.aln.gz"
+
+    """
+set -e
+
+# Make sure all files are present
+echo "Making sure ${genes_dmnd} is present"
+[[ -s ${genes_dmnd} ]]
+echo "Making sure ${fasta_gz} is present"
+[[ -s ${fasta_gz} ]]
+
+echo "Processing \$fasta_name (\$fasta)"
+
+diamond \
+    blastx \
+    --query ${fasta_gz} \
+    --out reference_genomes.aln.gz \
+    --threads ${task.cpus} \
+    --db ${genes_dmnd} \
+    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen \
+    --range-cover ${params.min_coverage} \
+    --subject-cover ${params.min_coverage} \
+    --range-culling \
+    --id ${params.min_identity} \
+    --top 1 \
+    --block-size ${task.memory.toMega() / (1024 * 6)} \
+    --query-gencode ${query_gencode} \
+    -F 15 \
+    --unal 0 \
+    --compress 1
+
+echo "Done"
+    """
+
+}

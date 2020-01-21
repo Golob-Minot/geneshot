@@ -77,3 +77,38 @@ NXF_VER=19.10.0 nextflow run main.nf \
     -w work/ \
     --noannot \
     -resume
+
+
+# Test with the gene catalog made in a previous round and whole genome alignment
+NXF_VER=19.10.0 nextflow run main.nf \
+    -c nextflow.config \
+    -profile testing \
+    --gene_fasta output1/ref/genes.fasta.gz \
+    --nopreprocess \
+    --manifest data/mock.manifest.csv \
+    --output output6 \
+    --hg_index data/hg_chr_21_bwa_index.tar.gz \
+    -w work/ \
+    --eggnog_db false \
+    --eggnog_dmnd false \
+    --taxonomic_dmnd false \
+    --ref_genome_fasta data/reference_genomes.fasta.gz \
+    --ref_genome_csv data/reference_genomes.csv.gz \
+    -resume
+
+# Test with de novo assembly and whole genome alignment
+NXF_VER=19.10.0 nextflow run main.nf \
+    -c nextflow.config \
+    -profile testing \
+    --nopreprocess \
+    --manifest data/mock.manifest.csv \
+    --output output7 \
+    --hg_index data/hg_chr_21_bwa_index.tar.gz \
+    --distance_threshold 0.1 \
+    -w work/ \
+    --eggnog_db false \
+    --eggnog_dmnd false \
+    --taxonomic_dmnd false \
+    --ref_genome_fasta data/reference_genomes.fasta.gz \
+    --ref_genome_csv data/reference_genomes.csv.gz \
+    -resume

@@ -41,8 +41,8 @@ params.min_hg_align_score = 30
 // Assembly options
 params.gene_fasta = false
 params.phred_offset = 33 // spades
-params.min_identity = 90 // mmseqs2
-params.min_coverage = 50 // mmseqs2
+params.min_identity = 90 // mmseqs2 and reference genome alignment
+params.min_coverage = 50 // mmseqs2 and reference genome alignment
 params.dmnd_min_identity = 80 // DIAMOND
 params.dmnd_min_coverage = 50 // DIAMOND
 params.dmnd_top_pct = 1 // DIAMOND
@@ -54,6 +54,8 @@ params.noannot = false
 params.taxonomic_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd"
 params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db"
 params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
+params.ref_genome_fasta = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.fasta.gz"
+params.ref_genome_csv = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.csv.gz"
 
 // CAG options
 params.distance_threshold = 0.5
@@ -91,8 +93,10 @@ def helpMessage() {
       --gene_fasta          (optional) Compressed FASTA with pre-generated catalog of microbial genes.
                             If provided, then the entire de novo assembly process will be skipped entirely.
       --phred_offset        for spades. Default 33.
-      --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90) (mmseqs2)
+      --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90)
+                            This value is also used to align the gene catalog against whole microbial genomes.
       --min_coverage        Length cutoff used to combine similar genes (default: 50) (mmseqs2)
+                            This value is also used to align the gene catalog against whole microbial genomes.
 
     For Annotation:
       --noannot             If specified, disable annotation for taxonomy or function.
@@ -103,6 +107,10 @@ def helpMessage() {
                             (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG 
                             (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
+      --ref_genome_fasta    FASTA of microbial genomes to perform whole-genome alignment of the gene catalog against.
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.fasta.gz)
+      --ref_genome_csv      CSV needed to perform whole-genome alignment of the gene catalog against a set of microbial genomes.
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.csv.gz)
     
     For Alignment:
       --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
@@ -166,6 +174,9 @@ include './modules/assembly' params(
     eggnog_db: params.eggnog_db,
     eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
+    ref_genome_fasta: params.ref_genome_fasta,
+    ref_genome_csv: params.ref_genome_csv,
+    gencode: params.gencode,
 )
 
 // Import the workflows used for alignment-based analysis
