@@ -154,8 +154,14 @@ def fetch_sra_metadata(sra_id):
         db="sra",
         id=int(sra_id)
     )
-    record = ET.fromstring("".join(handle.readlines()))
+    record = "".join(handle.readlines())
     handle.close()
+    try:
+        record = ET.fromstring(record)
+    except:
+        print("Wasn't able to parse XML from:")
+        print(record)
+        raise
 
     # Keep track of the data as a simple dict
     dat = {}
