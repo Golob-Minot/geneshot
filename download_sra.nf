@@ -111,9 +111,15 @@ handle = retry_func(
     id=int(bioproject_id), 
     linkname="bioproject_sra"
 )
-# Parse the XML
-elink_results = ET.fromstring("".join(handle.readlines()))
+# Read the string that was returned
+raw_xml = "".join(handle.readlines())
 handle.close()
+# Parse the XML from that string
+elink_results = ET.fromstring(raw_xml)
+
+# Make sure that there are some links in this set of results
+assert elink_results.find("LinkSet") is not None, raw_xml
+assert elink_results.find("LinkSet").find("LinkSetDb") is not None, raw_xml
 
 # Parse all of the SRA records from this BioProject
 sra_id_list = [
