@@ -421,7 +421,7 @@ echo "Making sure ${genes_dmnd} is present"
 echo "Making sure ${fasta_gz} is present"
 [[ -s ${fasta_gz} ]]
 
-echo "Processing \$fasta_name (\$fasta)"
+echo "Processing ${fasta_gz} and ${genes_dmnd}"
 
 diamond \
     blastx \
@@ -436,7 +436,7 @@ diamond \
     --id ${params.min_identity} \
     --top 1 \
     --block-size ${task.memory.toMega() / (1024 * 6)} \
-    --query-gencode ${query_gencode} \
+    --query-gencode ${params.gencode} \
     -F 15 \
     --unal 0 \
     --compress 1
