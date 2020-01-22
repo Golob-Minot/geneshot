@@ -12,7 +12,7 @@ def helpMessage() {
     log.info"""
     Usage:
 
-    nextflow run jgolob/geneshot/download_sra <ARGUMENTS>
+    nextflow run jgolob/geneshot/download_sra.nf <ARGUMENTS>
 
     NOTE:   This script expected paired-end FASTQ data, and will probably not work
             with any other type

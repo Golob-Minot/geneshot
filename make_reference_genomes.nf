@@ -22,7 +22,7 @@ def helpMessage() {
     log.info"""
     Usage:
 
-    nextflow run jgolob/geneshot/make_reference_genomes <ARGUMENTS>
+    nextflow run jgolob/geneshot/make_reference_genomes.nf <ARGUMENTS>
 
     Input File:   
     
