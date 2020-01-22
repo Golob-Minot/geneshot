@@ -50,7 +50,8 @@ if (!params.output.endsWith("/")){
 }
 
 // Get the accession for each Run in this BioProject
-process getRunAccessions {
+// Then, get the metadata for each SRA accession, including the name used to download the FASTQ
+process getMetadata {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_limited"
     errorStrategy 'retry'
@@ -59,141 +60,161 @@ process getRunAccessions {
     val accession from params.accession
 
     output:
+    file "${accession}.metadata.csv" into metadata_csv
     file "accession_list.txt" into accession_list
-
 
 """
 #!/usr/bin/env python3
 from Bio import Entrez
 from time import sleep
 import xml.etree.ElementTree as ET
+import pandas as pd
 
 Entrez.email = "scicomp@fredhutch.org"
 
 accession ="${accession}"
-print(accession)
+print("Fetching paired-end data from %s" % accession)
+
+# Make a function to fetch data from the Entrez API
+# while retrying if any errors are encountered
+def retry_func(f, max_retries=10, pause_seconds=0.5, **kwargs):
+    # Try the function `max_retries` times
+    assert isinstance(max_retries, int)
+    assert max_retries > 0
+    for i in range(max_retries):
+        try:
+            return f(**kwargs)
+        except:
+            pass
+        print("Caught an error on the %d th attempt, retrying" % (i + 1))
+        sleep(pause_seconds)
+
 
 # First, get the ID for the BioProject from the accession
-try:
-    handle = Entrez.esearch(db="bioproject", term=accession)
-except:
-    sleep(0.2)
-    handle = Entrez.esearch(db="bioproject", term=accession)
-l = "".join(handle.readlines())
+handle = retry_func(Entrez.esearch, db="bioproject", term=accession)
+
+# Parse the XML
+bioproject_result = ET.fromstring("".join(handle.readlines()))
+
+# Close the handle
 handle.close()
 
-bioproject_id = None
-for i in l.split("<Id>"):
-    if "</Id>" in i:
-        bioproject_id = i.split("</Id>")[0]
-assert bioproject_id is not None
+# Get the ID of the BioProject result
+bioproject_id = bioproject_result.find("IdList").find("Id").text
 
-print("Getting BioSample %s = %s" % (accession, bioproject_id))
+print("Getting BioProject %s = %s" % (accession, bioproject_id))
 
 # Get all of the SRA Runs for this BioProject
-try:
-    handle = Entrez.elink(
-        dbfrom="bioproject", 
-        id=int(bioproject_id), 
-        linkname="bioproject_sra"
-    )
-except:
-    sleep(0.2)
-    handle = Entrez.elink(
-        dbfrom="bioproject", 
-        id=int(bioproject_id), 
-        linkname="bioproject_sra"
-    )
-l = "".join(handle.readlines())
+handle = retry_func(
+    Entrez.elink,
+    dbfrom="bioproject", 
+    id=int(bioproject_id), 
+    linkname="bioproject_sra"
+)
+# Parse the XML
+elink_results = ET.fromstring("".join(handle.readlines()))
 handle.close()
 
-with open("accession_list.txt", "wt") as handle:
-    for i in "".join(l).split("<Id>"):
-        if "</Id>" in i:
-            if bioproject_id in i:
-                continue
-            handle.write(
-                i.split("</Id>")[0] + "\\n"
-            )
-    
-"""
-}
-
-// Get the metadata for each SRA accession, including the name used to download the FASTQ
-process getMetadata {
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-    label "io_limited"
-    errorStrategy 'retry'
-    
-    input:
-    val accession from accession_list.splitText()
-
-    output:
-    file "*.csv" into metadata_csv_ch1
-    file "*.csv" into metadata_csv_ch2
-
-
-"""
-#!/usr/bin/env python3
-from Bio import Entrez
-import xml.etree.ElementTree as ET
-import pandas as pd
-from time import sleep
-Entrez.email = "scicomp@fredhutch.org"
-
-accession = "${accession.replaceAll(/\n/, "")}"
-print(accession)
+# Parse all of the SRA records from this BioProject
+sra_id_list = [
+    child.find("Id").text
+    for child in elink_results.find("LinkSet").find("LinkSetDb")
+    if child.find("Id") is not None
+]
+print("Found %d SRA accessions from this BioProject" % (len(sra_id_list)))
 
 # Function to iteratively parse the XML record
 def parse_record(r, prefix=[]):
+
+    if r.text is not None:
+        if len(r.text.replace("\\n", "")) > 0:
+            yield prefix + [r.tag], r.text.replace("\\n", "")
+
     for k, v in r.attrib.items():
         yield prefix + [k], v
+
     for child in r:
+
+        if child.tag == "TAG":
+            if r.find("VALUE") is not None:
+                yield prefix + [child.text], r.find("VALUE").text
+                continue
+
+        if child.tag == "VALUE":
+            if r.find("TAG") is not None:
+                continue
+
         for i in parse_record(child, prefix + [r.tag]):
             yield i
 
-try:
-    handle = Entrez.efetch(db="sra", id=int(accession))
-except:
-    sleep(1)
-    handle = Entrez.efetch(db="sra", id=int(accession))
+# Function to get metadata from an SRA accession
+def fetch_sra_metadata(sra_id):
+    handle = retry_func(
+        Entrez.efetch,
+        db="sra",
+        id=int(sra_id)
+    )
+    record = ET.fromstring("".join(handle.readlines()))
+    handle.close()
 
-record = ET.fromstring("".join(handle.readlines()))
-handle.close()
+    # Keep track of the data as a simple dict
+    dat = {}
 
-# Keep track of the data as a simple dict
-dat = {}
+    dat["LAYOUT"] = record.find("EXPERIMENT_PACKAGE").find("EXPERIMENT").find("DESIGN").find("LIBRARY_DESCRIPTOR").find("LIBRARY_LAYOUT")[0].tag
 
-# Iterate over every entry in the record
-for prefix, val in parse_record(record):
+    # Iterate over every entry in the record
+    for prefix, val in parse_record(record):
 
-    # Lots of things to skip as not being worth saving
-    if prefix[0] != "EXPERIMENT_PACKAGE_SET":
-        continue
-    if prefix[1] != "EXPERIMENT_PACKAGE":
-        continue
-    if len(val) == 0:
-        continue
-    if prefix[-1] == "namespace":
-        continue
-    if "SRAFiles" in prefix:
-        continue
-    if "CloudFiles" in prefix:
-        continue
-    if "Statistics" in prefix:
-        continue
-    if "Databases" in prefix:
-        continue
+        # Lots of things to skip as not being worth saving
+        if len(prefix) < 2:
+            continue
+        if prefix[0] != "EXPERIMENT_PACKAGE_SET":
+            continue
+        if prefix[1] != "EXPERIMENT_PACKAGE":
+            continue
+        if len(val) == 0:
+            continue
+        if prefix[-1] == "namespace":
+            continue
+        if "SRAFiles" in prefix:
+            continue
+        if "CloudFiles" in prefix:
+            continue
+        if "Statistics" in prefix:
+            continue
+        if "Databases" in prefix:
+            continue
 
-    # This item is worth saving
-    dat["_".join(prefix[2:])] = val
+        # This item is worth saving
+        dat["_".join(prefix[2:])] = val
 
-# Get the accession from this set of data
-assert "RUN_SET_accession" in dat
-accession = dat["RUN_SET_accession"]
 
-# Write out the data as a simple, one-line CSV
-pd.DataFrame([dat]).to_csv(accession + ".csv", index=None)
+    # Make sure that we have the RUN_SET_accession
+    assert "RUN_SET_accession" in dat
+
+    return dat
+
+# Iterate over all of the SRA IDs from this BioProject
+metadata_df = pd.DataFrame([
+    fetch_sra_metadata(sra_id)
+    for sra_id in sra_id_list
+])
+print("Found records for %d SRA accessions" % metadata_df.shape[0])
+
+# Filter down to just the PAIRED records
+metadata_df = metadata_df.query("LAYOUT == 'PAIRED'")
+print("Kept records for %d PAIRED SRA accessions" % metadata_df.shape[0])
+
+# Make sure that we have a column for the SRR* accession
+assert "RUN_SET_accession" in metadata_df.columns.values
+assert metadata_df["RUN_SET_accession"].isnull().sum() == 0
+
+# Save the complete metadata to a file
+metadata_df.to_csv("${accession}.metadata.csv", index=None)
+
+# Also save an accession list
+with open("accession_list.txt", "wt") as fo:
+    fo.write("\\n".join(metadata_df["RUN_SET_accession"].tolist()))
 
 """
 }
@@ -206,10 +227,10 @@ process downloadSRA {
     publishDir "${output_folder}", mode: "copy"
     
     input:
-    val metadata_csv from metadata_csv_ch1
+    val accession from accession_list.splitText().map { r -> r.replaceAll(/\n/, "")}
 
     output:
-    tuple val("${metadata_csv.name.replaceAll(/.csv/, "")}"), file("*fastq.gz") into reads_ch
+    tuple val("${accession}"), file("*fastq.gz") into reads_ch
 
 
     """
@@ -219,7 +240,7 @@ process downloadSRA {
     mkdir cache
     vdb-config --root -s /repository/user/main/public/root=\$PWD/cache || echo Setting up the download cache
 
-    accession=${metadata_csv.name.replaceAll(/.csv/, "")}
+    accession=${accession}
     echo "Downloading \$accession"
 
     fastq-dump \
@@ -248,78 +269,45 @@ manifestStr = reads_ch.reduce(
 
 
 process gatherReadnames {
-    container "ubuntu:18.04"
-
-    input:
-        val manifestStr
-    
-    output:
-        file 'manifest.csv' into manifest_csv
-
-"""
-#!/bin/bash
-
-echo "${manifestStr}" > manifest.csv
-"""
-}
-
-
-process gatherMetadata {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_limited"
     errorStrategy 'retry'
     publishDir "${output_folder}", mode: "copy"
-    
+
     input:
-    file csv_list from metadata_csv_ch2.toSortedList()
-    file "input_manifest.csv" from manifest_csv
-
+        val manifestStr
+        file metadata_csv
+    
     output:
-    file "manifest.csv"
-
+        file "${params.accession}.csv"
 
 """
 #!/usr/bin/env python3
 import pandas as pd
-import os
 
-# Read in the manifest with the location of R1 and R2
-manifest = pd.read_csv(
-    "input_manifest.csv"
-).set_index(
-    "specimen"
+with open("manifest.csv", "wt") as fo:
+    fo.write(\"\"\"${manifestStr}\"\"\")
+
+manifest_df = pd.read_csv("manifest.csv")
+print(manifest_df)
+
+# Read in the metadata
+metadata_df = pd.read_csv("${metadata_csv}")
+print(metadata_df)
+
+# Join the two together
+metadata_df = pd.concat([
+    manifest_df.set_index("specimen"),
+    metadata_df.set_index("RUN_SET_accession")
+], axis=1, sort=True)
+
+# Write out to a file
+metadata_df.reset_index(
+).rename(
+    columns=dict([("index", "specimen")])
+).to_csv(
+    "${params.accession}.csv", 
+    index=None
 )
-
-csv_list = "${csv_list}".split(" ")
-
-# Read in all of the CSV files
-df = {}
-
-# Iterate over every file in the list
-for fp in csv_list:
-
-    # Make sure that the file name ends with ".csv" as expected
-    assert fp.endswith(".csv"), fp
-
-    # Get the accession from the file name
-    accession = fp.replace(".csv", "")
-
-    # Read in the CSV
-    df[accession] = pd.read_csv(fp).iloc[0]
-
-# Make a single DataFrame
-df = pd.DataFrame(
-    df
-).T
-
-# Join together the two tables
-for k in df.columns.values:
-    if k not in manifest.columns.values:
-        print(k)
-        manifest[k] = df[k]
-
-# Write out to the file
-manifest.reset_index().to_csv("manifest.csv", index=None)
 """
-
 }
