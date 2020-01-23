@@ -65,39 +65,47 @@ process getMetadata {
 
 """
 #!/usr/bin/env python3
-from Bio import Entrez
+import requests
 from time import sleep
 import xml.etree.ElementTree as ET
 import pandas as pd
-
-Entrez.email = "scicomp@fredhutch.org"
 
 accession ="${accession}"
 print("Fetching paired-end data from %s" % accession)
 
 # Make a function to fetch data from the Entrez API
 # while retrying if any errors are encountered
-def retry_func(f, max_retries=10, pause_seconds=0.5, **kwargs):
-    # Try the function `max_retries` times
+def request_url(url, max_retries=10, pause_seconds=0.5):
+    # Try the request `max_retries` times, with a `pause_seconds` pause in-between
     assert isinstance(max_retries, int)
     assert max_retries > 0
     for i in range(max_retries):
-        try:
-            return f(**kwargs)
-        except:
-            pass
-        print("Caught an error on the %d th attempt, retrying" % (i + 1))
+        r = requests.get(url)
+        if r.status_code == 200:
+            return r.text
+        print("Caught an error on attempt #%d, retrying" % (i + 1))
         sleep(pause_seconds)
+
+# Format an Entrez query, execute the request, and return the result
+def entrez(mode, **kwargs):
+    assert mode in ["efetch", "esearch", "elink"]
+
+    kwargs_str = "&".join([
+        "%s=%s" % (k, v)
+        for k, v in kwargs.items()
+    ])
+    url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/%s.fcgi?%s"
+    url = url % (mode, kwargs_str)
+
+    # Get the text response
+    response_text = request_url(url)
+
+    # Parse the XML
+    return ET.fromstring(response_text)
 
 
 # First, get the ID for the BioProject from the accession
-handle = retry_func(Entrez.esearch, db="bioproject", term=accession)
-
-# Parse the XML
-bioproject_result = ET.fromstring("".join(handle.readlines()))
-
-# Close the handle
-handle.close()
+bioproject_result = entrez('esearch', db="bioproject", term=accession)
 
 # Get the ID of the BioProject result
 bioproject_id = bioproject_result.find("IdList").find("Id").text
@@ -105,21 +113,16 @@ bioproject_id = bioproject_result.find("IdList").find("Id").text
 print("Getting BioProject %s = %s" % (accession, bioproject_id))
 
 # Get all of the SRA Runs for this BioProject
-handle = retry_func(
-    Entrez.elink,
+elink_results = entrez(
+    'elink',
     dbfrom="bioproject", 
     id=int(bioproject_id), 
     linkname="bioproject_sra"
 )
-# Read the string that was returned
-raw_xml = "".join(handle.readlines())
-handle.close()
-# Parse the XML from that string
-elink_results = ET.fromstring(raw_xml)
 
 # Make sure that there are some links in this set of results
-assert elink_results.find("LinkSet") is not None, raw_xml
-assert elink_results.find("LinkSet").find("LinkSetDb") is not None, raw_xml
+assert elink_results.find("LinkSet") is not None
+assert elink_results.find("LinkSet").find("LinkSetDb") is not None
 
 # Parse all of the SRA records from this BioProject
 sra_id_list = [
@@ -156,19 +159,11 @@ def parse_record(r, prefix=[]):
 # Function to get metadata from an SRA accession
 def fetch_sra_metadata(sra_id):
     print("Fetching metadata for %s" % sra_id)
-    handle = retry_func(
-        Entrez.efetch,
+    record = entrez(
+        'efetch',
         db="sra",
-        id=int(sra_id)
+        id=sra_id
     )
-    record = "".join(handle.readlines())
-    handle.close()
-    try:
-        record = ET.fromstring(record)
-    except:
-        print("Wasn't able to parse XML from:")
-        print(record)
-        raise
 
     # Keep track of the data as a simple dict
     dat = {}
