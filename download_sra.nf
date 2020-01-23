@@ -155,6 +155,7 @@ def parse_record(r, prefix=[]):
 
 # Function to get metadata from an SRA accession
 def fetch_sra_metadata(sra_id):
+    print("Fetching metadata for %s" % sra_id)
     handle = retry_func(
         Entrez.efetch,
         db="sra",
