@@ -14,9 +14,8 @@ def helpMessage() {
 
     nextflow run jgolob/geneshot/download_sra.nf <ARGUMENTS>
 
-    NOTE:   This script expected paired-end FASTQ data, and will probably not work
-            with any other type
-    
+    NOTE:   This script expects paired-end FASTQ data, and will not download any other type
+
     Required Arguments:
       --accession           Accession for NCBI BioProject to download
       --output              Folder to write output files
@@ -24,10 +23,10 @@ def helpMessage() {
     Output Files:
 
     All output files will be written to the --output folder. This includes one or two
-    FASTQ files per Run as well as a manifest.csv file listing all of the files which
-    were downloaded.
+    FASTQ files per Run as well as a `$BIOPROJECT.metadata.csv` file listing all of the files which
+    were downloaded, as well as the metadata describing those samples within NCBI.
 
-    The manifest.csv file will also include the metadata recorded for this set of Runs
+    The `$BIOPROJECT.metadata.csv` file will also include the metadata recorded for this set of Runs
     within the SRA database. The columns for this file may not be formatted nicely,
     but they do match the structure of the data within the SRA API.
 
