@@ -303,6 +303,38 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
 }
 
+process addCorncobResults{
+    container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+    label 'mem_veryhigh'
+    errorStrategy 'retry'
+
+    input:
+        path results_hdf
+        path corncob_csv
+
+    output:
+        path "${results_hdf}"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in the corncob results
+corncob_df = pd.read_csv("${corncob_csv}")
+
+print(
+    "Read in corncob results for %d CAGs" % 
+    corncob_df["CAG"].unique().shape[0]
+)
+
+
+# Open a connection to the HDF5
+with pd.HDFStore("${results_hdf}", "a") as store:
+
+    # Write corncob results to HDF5
+    corncob_df.to_hdf(store, "/stats/cag/corncob")
+
 """
 
 }

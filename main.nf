@@ -345,6 +345,16 @@ workflow {
         finalHDF = addGeneAssembly.out
     }
 
+    // If we performed statistical analysis, add the results to the HDF5
+    if ( params.formula ) {
+        addCorncobResults(
+            finalHDF,
+            corncob_wf.out
+        )
+
+        finalHDF = addCorncobResults.out
+    }
+
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
     repackHDF(
         finalHDF
