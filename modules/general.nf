@@ -137,3 +137,108 @@ set -e
 cat __INPUT* > ${output_name}
 """
 }
+
+process collectAbundances{
+    container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+    label 'mem_veryhigh'
+    // errorStrategy 'retry'
+
+    input:
+        path cag_csv
+        path gene_abund_feather
+        path cag_abund_feather
+        path famli_json_list
+        path readcount_csv
+
+    output:
+        path "results.hdf5"
+
+"""
+#!/usr/bin/env python3
+
+import gzip
+import json
+import pandas as pd
+
+cag_csv = "${cag_csv}"
+gene_abund_feather = "${gene_abund_feather}"
+cag_abund_feather = "${cag_abund_feather}"
+famli_json_list = "${famli_json_list}".split(" ")
+readcount_csv = "${readcount_csv}"
+
+# Function to read in the FAMLI output
+def read_famli_json(fp, suffix=".json.gz"):
+
+    # Get the sample name from the file name
+    assert fp.endswith(suffix)
+    sample_name = fp[:-len(suffix)]
+
+    return pd.DataFrame(
+        json.load(
+            gzip.open(
+                fp, "rt"
+            )
+        )
+    ).assign(
+        specimen=sample_name
+    )
+
+
+# Open a connection to the HDF5
+with pd.HDFStore("results.hdf5", "w") as store:
+
+    # Read in the complete set of FAMLI results
+    famli_df = pd.concat([
+        read_famli_json(fp)
+        for fp in famli_json_list
+    ])
+
+    # Write to HDF5
+    famli_df.to_hdf(store, "/abund/gene/long")
+    
+    # Read in the summary of the number of reads across all samples
+    readcount_df = pd.read_csv(readcount_csv)
+
+    # Write to HDF5
+    readcount_df.to_hdf(store, "/summary/readcount")
+    
+
+    # Read in the table with the CAG-level abundances across all samples
+    cag_abund_df = pd.read_feather(
+        cag_abund_feather
+    )
+    print(
+        "Read in abundances for %d CAGs across %d samples" %
+        (cag_abund_df.shape[0], cag_abund_df.shape[1] - 1)
+    )
+
+
+    # Write to HDF5
+    cag_abund_df.to_hdf(store, "/abund/cag/wide")
+
+    # Read in the table with the gene-level abundances across all samples
+    gene_abund_df = pd.read_feather(
+        gene_abund_feather
+    )
+    print(
+        "Read in abundances for %d genes across %d samples" %
+        (gene_abund_df.shape[0], gene_abund_df.shape[1] - 1)
+    )
+
+    # Write to HDF5
+    gene_abund_df.to_hdf(store, "/abund/gene/wide")
+
+    # Read in the table describing which genes are grouped into which CAGs
+    cag_df = pd.read_csv(cag_csv)
+
+    print(
+        "Read in CAG assignments for %d genes across %d CAGs" % 
+        (cag_df.shape[0], cag_df["CAG"].unique().shape[0])
+    )
+
+    # Write to HDF5
+    cag_df.to_hdf(store, "/annot/gene/cag")
+
+"""
+
+}

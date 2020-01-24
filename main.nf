@@ -317,8 +317,25 @@ workflow {
         corncob_results = Channel.empty()
     }
 
+    // ###################
+    // # GATHER RESULTS #
+    // ###################
+
+    // Start by gathering all of the results which are generated
+    // no matter what options were selected by the user
+    // NOTE: The code used here is imported from ./modules/general.nf
+
+    collectAbundances(
+        alignment_wf.out.cag_csv,
+        alignment_wf.out.gene_abund_feather,
+        alignment_wf.out.cag_abund_feather,
+        alignment_wf.out.famli_json_list,
+        countReadsSummary.out
+    )
+
     publish:
         corncob_results to: "${output_folder}/stats/", enabled: params.formula
         alignment_wf.out.famli_json_list to: "${output_folder}/abund/details/"
+        collectAbundances.out to: "${output_folder}", mode: "copy"
 
 }
