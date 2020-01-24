@@ -228,7 +228,7 @@ def parse_header(line):
     gene_name, start, stop, strand, details = line.split(" # ")
 
     # The first field in the gene name is the specimen
-    specimen, gene_name = gene_name.split("_NODE_", 1)
+    specimen, gene_name = gene_name[1:].split("_NODE_", 1)
 
     # There is more good information to get from the gene name
     contig_num, _, length, _, depth, gene_num = gene_name.split("_")
