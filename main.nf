@@ -319,5 +319,6 @@ workflow {
 
     publish:
         corncob_results to: "${output_folder}/stats/", enabled: params.formula
+        alignment_wf.out.famli_json_list to: "${output_folder}/abund/details/"
 
 }
