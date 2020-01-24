@@ -188,7 +188,7 @@ process geneAssemblyMetrics {
     file faa_list
     
     output:
-    file "gene.assembly.metrics.csv.gz"
+    file "allele.assembly.metrics.csv.gz"
 
 """
 #!/usr/bin/env python3
@@ -262,7 +262,7 @@ df = pd.DataFrame([
 
 # Write out to a file
 df.to_csv(
-    "gene.assembly.metrics.csv.gz",
+    "allele.assembly.metrics.csv.gz",
     index = None,
     compression = "gzip"
 )
