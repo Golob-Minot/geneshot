@@ -52,7 +52,7 @@ if (!params.output.endsWith("/")){
 // Then, get the metadata for each SRA accession, including the name used to download the FASTQ
 process getMetadata {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-    label "io_limited"
+    label "mem_medium"
     errorStrategy 'retry'
     
     input:
@@ -229,7 +229,7 @@ with open("accession_list.txt", "wt") as fo:
 // Make a channel with the files needed for every Run
 process downloadSRA {
     container "quay.io/fhcrc-microbiome/get_sra@sha256:16b7988e435da5d21bb1fbd7c83e97db769f1c95c9d32823fde49c729a64774a"
-    label "io_limited"
+    label "mem_medium"
     errorStrategy 'retry'
     publishDir "${output_folder}", mode: "copy"
     
