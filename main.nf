@@ -333,9 +333,25 @@ workflow {
         countReadsSummary.out
     )
 
+    // If we performed de novo assembly, add the gene assembly information
+    if ( params.gene_fasta ) {
+        finalHDF = collectAbundances.out
+    } else {
+        addGeneAssembly(
+            collectAbundances.out,
+            assembly_wf.out.allele_assembly_csv
+        )
+        finalHDF = addGeneAssembly.out
+    }
+
+    // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
+    repackHDF(
+        finalHDF
+    )
+
     publish:
         corncob_results to: "${output_folder}/stats/", enabled: params.formula
         alignment_wf.out.famli_json_list to: "${output_folder}/abund/details/"
-        collectAbundances.out to: "${output_folder}", mode: "copy"
+        repackHDF.out to: "${output_folder}", mode: "copy"
 
 }

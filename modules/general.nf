@@ -242,3 +242,62 @@ with pd.HDFStore("results.hdf5", "w") as store:
 """
 
 }
+
+process addGeneAssembly{
+    container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+    label 'mem_veryhigh'
+    // errorStrategy 'retry'
+
+    input:
+        path results_hdf
+        path allele_assembly_csv
+
+    output:
+        path "${results_hdf}"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in the summary of allele assembly
+allele_assembly = pd.read_csv("${allele_assembly_csv}")
+
+print(
+    "Read in %d gene assemblies over %d specimens" % 
+    (allele_assembly.shape[0], allele_assembly["specimen"].unique().shape[0])
+)
+
+# Open a connection to the HDF5
+with pd.HDFStore("${results_hdf}", "a") as store:
+
+    # Write to HDF5
+    allele_assembly.to_hdf(store, "/abund/allele/assembly")
+
+"""
+
+}
+
+// Repack an HDF5 file
+process repackHDF {
+
+    container "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
+    label "mem_veryhigh"
+    errorStrategy "retry"
+    
+    input:
+    file output_hdf5
+        
+    output:
+    file "${output_hdf5}"
+
+    """
+#!/bin/bash
+
+set -e
+
+[ -s ${output_hdf5} ]
+
+h5repack -f GZIP=5 ${output_hdf5} TEMP && mv TEMP ${output_hdf5}
+    """
+}

@@ -35,6 +35,7 @@ workflow assembly_wf {
 
     emit:
         gene_fasta = clusterCDS.out[0]
+        allele_assembly_csv = geneAssemblyMetrics.out
 
 }
 
