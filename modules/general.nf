@@ -120,7 +120,7 @@ cat ${readcount_csv_list} >> readcounts.csv
 // Process which will concatenate a set of files
 process concatenateFiles {
     container "ubuntu:18.04"
-    label "io_limited"
+    label "mem_medium"
     errorStrategy "retry"
     
     input:
