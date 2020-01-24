@@ -10,6 +10,7 @@ params.manifest = false
 params.dbname = "reference_genomes"
 params.output = false
 params.help = false
+params.batchsize = 100 // Number of genomes to download by a single worker
 
 // Import a single function for concatenation which will be used multiple times
 include concatenateFiles as concatGenomes_1 from "./modules/general"
@@ -35,6 +36,9 @@ def helpMessage() {
       --manifest            Manifest TSV from the NCBI Genomes portal
       --output              Folder to write output files
       --dbname              Prefix for the output files (default: reference_genomes)
+
+    Optional Arguments:
+      --batchsize           Number of genomes to download by a single worker (default: 100)
 
     Output Files:
 
@@ -66,56 +70,73 @@ if (!params.output.endsWith("/")){
 }
 
 // Download the genomes from the FTP server
+// This process will download multiple genomes
+// The set of genomes to download is contained in ${input_string_list}
+// which contains a single string for each genome, formatted
+// with tabs separating each field. Each string is separated by a newline.
 process downloadGenome {
     container "quay.io/fhcrc-microbiome/wget@sha256:98b90e8bb8a171182505f1e255b0bd85cbbda68f08c08b4877c3fc48e63ac82f"
     label "io_limited"
     errorStrategy "retry"
     
     input:
-    tuple val(org_name), val(assembly_name), val(ftp_prefix)
+    val genome_input_list
 
     output:
-    file "*.fasta.gz"
-    file "*.fasta.gz.csv.gz"
+    file "ALL_GENOMES.fasta.gz"
+    file "ALL_GENOMES.csv.gz"
 
     """
 # Break on any errors
 set -e
 
-# Download from the specified folder
-ftp_prefix="${ftp_prefix.replaceAll(/"/, "")}"
-ftp_suffix="\$(echo \$ftp_prefix | sed 's/.*\\///')"
-genome_suffix=_genomic.fna.gz
-url=\$ftp_prefix/\$ftp_suffix\$genome_suffix
+# Iterate over each genome
+echo \"\"\"${genome_input_list}\"\"\" | while read org_name assembly_name ftp_prefix; do
 
-# Get the name of the genome
-genome_name=\$( echo "${org_name}_${assembly_name}" | sed 's/[^A-Za-z0-9.]/_/g' )
+    echo "Organism: \$org_name"
+    echo "Assembly: \$assembly_name"
+    echo "FTP Prefix: \$ftp_prefix"
 
-# Set the name of the downloaded file
-genome_fp="\$genome_name.fasta.gz"
+    # Download from the specified folder
+    ftp_suffix="\$(echo \$ftp_prefix | sed 's/.*\\///')"
+    genome_suffix=_genomic.fna.gz
+    url=\$ftp_prefix/\$ftp_suffix\$genome_suffix
 
-echo Fetching \$url
-wget \$url -O \$genome_fp || \
-wget \$url -O \$genome_fp
+    # Get the name of the genome
+    genome_name=\$( echo "\${org_name}_\${assembly_name}" | sed 's/[^A-Za-z0-9.]/_/g' )
 
-# Make sure the resulting file is gzipped
-gzip -t \$genome_fp
+    # Set the name of the downloaded file
+    genome_fp="\$genome_name.fasta.gz"
 
-# Make sure that the file isn't empty
-(( \$(gunzip -c \$genome_fp | wc -l) > 0 ))
+    echo Fetching \$url
+    wget \$url -O \$genome_fp || \
+    wget \$url -O \$genome_fp
 
-# Strip everything after the first whitespace from the header
-gunzip -c \$genome_fp | sed 's/ .*//' | gzip -c > TEMP && \
-mv TEMP \$genome_fp
+    # Make sure the resulting file is gzipped
+    gzip -t \$genome_fp
 
-# Make a headerless CSV with the first column containing the
-# headers from this FASTA, and the second containing a name
-# for this organism which includes both the #Organism Name
-# as well as the Assembly
+    # Make sure that the file isn't empty
+    (( \$(gunzip -c \$genome_fp | wc -l) > 0 ))
 
-gunzip -c \$genome_fp | grep '>' | tr -d '>' | while read header; do
-    echo \$header,\$genome_name
-done | gzip -c > \$genome_fp.csv.gz
+    # Strip everything after the first whitespace from the header
+    # Concatenate this genome to the set of ALL_GENOMES.fasta.gz
+    gunzip -c \$genome_fp | sed 's/ .*//' | gzip -c >> ALL_GENOMES.fasta.gz
+
+    # Make a headerless CSV with the first column containing the
+    # headers from this FASTA, and the second containing a name
+    # for this organism which includes both the #Organism Name
+    # as well as the Assembly
+
+    # Concatenate this text to the file ALL_GENOMES.csv.gz
+
+    gunzip -c \$genome_fp | grep '>' | tr -d '>' | while read header; do
+        echo \$header,\$genome_name
+    done | gzip -c >> ALL_GENOMES.csv.gz
+    
+
+    echo "\\n\\n"
+done
+
     """
 
 }
@@ -136,7 +157,13 @@ workflow {
     ).filter {
         r -> r["GenBank FTP"].length() > 0
     }.map {
-        r -> [r["#Organism Name"], r["Assembly"], r["GenBank FTP"]]
+        r -> "${r['#Organism Name'].replaceAll(/|/, '').replaceAll(/ /, '_')} ${r['Assembly'].replaceAll(/ /, '_')} ${r['GenBank FTP'].replaceAll(/"/, "").replaceAll(/ /, '_')}"
+    }.toSortedList(
+    ).flatten(
+    ).collate(
+        params.batchsize
+    ).map { 
+        it -> it.join("\n") 
     }.set {
         genome_ch
     }
