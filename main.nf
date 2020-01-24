@@ -339,6 +339,7 @@ workflow {
     } else {
         addGeneAssembly(
             collectAbundances.out,
+            assembly_wf.out.allele_gene_tsv,
             assembly_wf.out.allele_assembly_csv
         )
         finalHDF = addGeneAssembly.out

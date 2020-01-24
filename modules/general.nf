@@ -141,7 +141,7 @@ cat __INPUT* > ${output_name}
 process collectAbundances{
     container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
     label 'mem_veryhigh'
-    // errorStrategy 'retry'
+    errorStrategy 'retry'
 
     input:
         path cag_csv
@@ -246,10 +246,11 @@ with pd.HDFStore("results.hdf5", "w") as store:
 process addGeneAssembly{
     container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
     label 'mem_veryhigh'
-    // errorStrategy 'retry'
+    errorStrategy 'retry'
 
     input:
         path results_hdf
+        path allele_gene_tsv
         path allele_assembly_csv
 
     output:
@@ -268,11 +269,39 @@ print(
     (allele_assembly.shape[0], allele_assembly["specimen"].unique().shape[0])
 )
 
+# Read in the listing of which alleles were grouped into which genes
+allele_gene = pd.read_csv(
+    "${allele_gene_tsv}", 
+    sep="\\t", 
+    header=None
+).loc[
+    :, :1
+].rename(
+    columns=dict([
+        (0, "gene"),
+        (1, "allele")
+    ])
+)
+print(
+    "Read in a table grouping %d alleles into %d genes" % 
+    (
+        allele_gene["allele"].unique().shape[0],
+        allele_gene["gene"].unique().shape[0]
+    )
+)
+
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
-    # Write to HDF5
+    # Write assembly summary to HDF5
     allele_assembly.to_hdf(store, "/abund/allele/assembly")
+
+    # Write gene <-> allele table to HDF5
+    allele_gene.to_hdf(store, "/annot/allele/gene")
+
+"""
+
+}
 
 """
 
