@@ -82,7 +82,7 @@ workflow annotation_wf {
     if ( run_tax ) {
         taxonomic_annotation(
             gene_fasta,
-            path(params.taxonomic_dmnd)
+            file(params.taxonomic_dmnd)
         )
     }
 
