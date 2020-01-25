@@ -179,7 +179,7 @@ ${I1} ${I2} \
 // Process to run catadapt
 process cutadapt {
     container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
-    label 'io_limited'
+    label 'mem_medium'
     errorStrategy 'retry'
     maxRetries 10
 
