@@ -156,6 +156,7 @@ include './modules/preprocess' params(
     adapter_F: params.adapter_F,
     adapter_R: params.adapter_R,
     hg_index: params.hg_index,
+    hg_index_url: params.hg_index_url,
     min_hg_align_score: params.min_hg_align_score,
 )
 // Import some general tasks, such as combineReads and writeManifest
