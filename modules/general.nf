@@ -30,7 +30,7 @@ combine_fastq_pairs.py \
 }
 
 process outputManifest {
-    container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
+    container "ubuntu:18.04"
 
     publishDir path: "${params.output_folder}qc/", enabled: params.savereads, mode: "copy"
 
