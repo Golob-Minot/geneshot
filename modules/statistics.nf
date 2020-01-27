@@ -125,9 +125,17 @@ df = pd.read_csv("${corncob_output_csv}")
 # Make sure that we have results for every CAG
 assert set(df["CAG"].tolist()) == set(["CAG-%d" % i for i in range(5)])
 
+# Check to see if any CAGs returned 'failed'
+if "failed" in df["type"].values:
+    n_failed_cags = df.query("type == 'failed'")["CAG"].unique().shape[0]
+    n_total_cags = df["CAG"].unique().shape[0]
+    msg = "%d / %d CAGs failed processing with this formula" % (n_failed_cags, n_total_cags)
+    assert False, msg
+
 # Make sure that every CAG has each expected row
 print("Making sure that every CAG has results for p_value, std_error, and estimate")
 for cag_id, cag_df in df.groupby("CAG"):
+
     msg = "%s: Found %s" % (cag_id, ", t".join(cag_df["type"].tolist()))
     assert set(cag_df["type"].tolist()) == set(["p_value", "std_error", "estimate"]), msg
 """
