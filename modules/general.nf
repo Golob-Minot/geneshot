@@ -1,6 +1,6 @@
 
 process combineReads {
-    container = 'golob/fastatools:0.7.0__bcw.0.3.0'
+    container 'quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.1A'
     label = 'io_limited'
     errorStrategy 'retry'
     maxRetries 10
@@ -68,7 +68,7 @@ workflow writeManifest {
 
 // Count the number of input reads for a single sample
 process countReads {
-    container "golob/fastatools:0.7.0__bcw.0.3.0"
+    container "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.1A"
     cpus 1
     memory "4 GB"
     errorStrategy "retry"
@@ -95,7 +95,7 @@ echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
 // 'total_counts' channel, which is transformed by the .collect() command into
 // a single list containing all of the data from all samples.
 process countReadsSummary {
-    container "golob/fastatools:0.7.0__bcw.0.3.0"
+    container "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.1A"
     // The output from this process will be copied to the --output_folder specified by the user
     publishDir "${params.output_folder}/qc/", mode: 'copy'
     errorStrategy "retry"
