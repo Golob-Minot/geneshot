@@ -217,7 +217,7 @@ process download_hg_index {
 """
 set -e
 
-wget ${params.hg_index_url} -O hg_index.tar.gz
+wget --quiet ${params.hg_index_url} -O hg_index.tar.gz
 """
 }
 
