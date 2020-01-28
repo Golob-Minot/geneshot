@@ -1,7 +1,7 @@
 
 process combineReads {
     container 'quay.io/fhcrc-microbiome/fastatools@sha256:171884eba1fb5561a8a42cf23a5ffd9857e6e34e1331d9e5dca220ada44555a7'
-    label = 'io_limited'
+    label = 'mem_medium'
     errorStrategy 'retry'
     maxRetries 10
 
