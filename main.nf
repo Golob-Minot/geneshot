@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
 /*
-  Geneshot: A pipeline to robustly identify which alleles (n.e.e peptide coding sequences)
+  Geneshot: A pipeline to robustly identify which alleles (I.e. peptide coding sequences)
   are present in a microbial community.
 
   There is an optional preprocessing submodule, 
