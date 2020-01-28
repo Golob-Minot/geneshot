@@ -231,7 +231,7 @@ process downloadSRA {
     container "quay.io/fhcrc-microbiome/get_sra@sha256:16b7988e435da5d21bb1fbd7c83e97db769f1c95c9d32823fde49c729a64774a"
     label "mem_medium"
     errorStrategy 'retry'
-    publishDir "${output_folder}", mode: "copy"
+    publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
     val accession from accession_list.splitText().map { r -> r.replaceAll(/\n/, "")}
@@ -278,7 +278,7 @@ process gatherReadnames {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_limited"
     errorStrategy 'retry'
-    publishDir "${output_folder}", mode: "copy"
+    publishDir "${output_folder}", mode: "copy", overwrite: "true"
 
     input:
         val manifestStr
