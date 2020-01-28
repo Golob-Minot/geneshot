@@ -1,7 +1,7 @@
 // Container versions
 container__barcodecop = "quay.io/fhcrc-microbiome/barcodecop:barcodecop_0.5.2"
 container__cutadapt = "quay.io/fhcrc-microbiome/cutadapt/cutadapt_2.3_bcw_0.3.0"
-container__bwa = "quay.io/fhcrc-microbiome/bwa/bwa.0.7.17__bcw.0.3.0I
+container__bwa = "quay.io/fhcrc-microbiome/bwa/bwa.0.7.17__bcw.0.3.0I"
 
 // Input to this workflow is a manifest CSV 
 
