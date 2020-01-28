@@ -253,7 +253,6 @@ process downloadSRA {
     fastq-dump \
         --split-files \
         --outdir ./ \
-        --readids \
         \$accession
 
     echo "Compressing downloaded FASTQ files"
