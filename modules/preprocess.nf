@@ -1,3 +1,8 @@
+// container versions!
+container__barcodecop = "golob/barcodecop:0.5__bc"
+container__cutadapt = "golob/cutadapt:2.8__BCv1.1.0_cv2"
+container__bwa = "golob/bwa:0.7.17__bcw.0.3.0I"
+
 // Input to this workflow is a manifest CSV 
 
 // Function to read in a CSV and return a Channel
@@ -149,7 +154,7 @@ workflow preprocess_wf {
 
 // Run barcodecop to validate the demultiplex
 process barcodecop {
-    container "golob/barcodecop:0.4.1__bcw_0.3.0"
+    container "${container__barcodecop}"
     label 'io_limited'
     errorStrategy 'retry'
     maxRetries 10
@@ -178,7 +183,7 @@ ${I1} ${I2} \
 
 // Process to run catadapt
 process cutadapt {
-    container "golob/cutadapt:2.3__bcw.0.3.0_al38B_FH"
+    container "${container__cutadapt}"
     label 'mem_medium'
     errorStrategy 'retry'
     maxRetries 10
@@ -202,7 +207,7 @@ ${R1} ${R1} > ${R1.getSimpleName()}.cutadapt.log
 
 // Process to download the human genome BWA index, already tarballed
 process download_hg_index {
-    container "golob/bwa:0.7.17__bcw.0.3.0I"
+    container "${container__bwa}"
     errorStrategy "retry"
     label 'io_limited'
 
@@ -219,7 +224,7 @@ wget ${params.hg_index_url} -O hg_index.tar.gz
 
 // Process to remove human reads
 process removeHuman {
-    container "golob/bwa:0.7.17__bcw.0.3.0I"
+    container "${container__bwa}"
     errorStrategy 'retry'
     maxRetries 10
     label 'mem_veryhigh'
