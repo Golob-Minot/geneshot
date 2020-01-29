@@ -145,10 +145,6 @@ metaspades.py \
 
 echo "\\n\\nDone\\n\\n"
 
-# Print the spades log to help with troubleshooting in the future
-echo "Log file:\\n\\n"
-cat spades.log
-
 # Make sure there were no errors in the log
 (( \$(cat ${specimen}.metaspades.log | grep -c "== Error ==" ) == 0 ))
 
