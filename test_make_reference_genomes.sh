@@ -17,4 +17,6 @@ NXF_VER=19.10.0 nextflow run make_reference_genomes.nf \
     --manifest data/genome-manifest.csv \
     --output output_reference_genomes/ \
     -w work/ \
+    -with-trace \
+    -with-report \
     -resume
