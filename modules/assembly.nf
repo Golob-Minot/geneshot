@@ -116,6 +116,7 @@ workflow annotation_wf {
 
 // Assembly with metaspades
 process metaspadesAssembly {
+    tag "De novo assembly with metaSPAdes"
     container 'golob/spades:3.13.1__bcw.0.3.1'
     label 'mem_veryhigh'
     errorStrategy "retry"
@@ -152,6 +153,7 @@ cat scaffolds.fasta | sed 's/>/>${specimen}_/' | gzip -c > ${specimen}.scaffolds
 // Annotation of coding sequences with prodigal
 
 process prodigalAnnotate {
+    tag "Identify protein-coding genes"
     container 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
     label 'io_limited'
     errorStrategy "retry"
@@ -185,6 +187,7 @@ gzip ${specimen}.faa
 
 // Summarize the depth of sequencing and GC content for every assembled gene
 process geneAssemblyMetrics {
+    tag "Summarize every assembled gene"
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label 'io_limited'
     errorStrategy 'retry'
@@ -279,6 +282,7 @@ df.to_csv(
 
 
 process combineCDS {
+    tag "Combine gene sequences"
     container "ubuntu:16.04"
     label 'io_limited'
     errorStrategy 'retry'
@@ -300,6 +304,7 @@ gzip -t all_CDS.fasta.gz
 
 
 process clusterCDS {
+    tag "Cluster genes with similar sequences"
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label 'mem_veryhigh'
     errorStrategy 'retry'
@@ -334,6 +339,7 @@ gzip genes.fasta
 
 
 process taxonomic_annotation {
+    tag "Annotate genes by taxonomy"
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
     publishDir "${params.output_folder}/annot/", mode: "copy"
@@ -368,6 +374,7 @@ rm ${diamond_tax_db}
 
 
 process eggnog_annotation {
+    tag "Annotate genes by predicted function"
     container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
     label 'mem_veryhigh'
     publishDir "${params.output_folder}/annot/", mode: "copy"
@@ -407,6 +414,7 @@ gzip genes.emapper.annotations
 }
 
 process alignGenomes {
+    tag "Align genes against reference genomes"
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label "mem_veryhigh"
     // errorStrategy "retry"

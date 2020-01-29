@@ -49,6 +49,7 @@ workflow alignment_wf {
 
 // Align each sample against the reference database of genes using DIAMOND
 process makeDiamondDB {
+    tag "Make a DIAMOND database"
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
     errorStrategy 'retry'
@@ -74,6 +75,7 @@ process makeDiamondDB {
 
 // Align each sample against the reference database of genes using DIAMOND
 process diamond {
+    tag "Align to the gene catalog"
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
     errorStrategy 'retry'
@@ -116,6 +118,7 @@ process diamond {
 
 // Filter the alignments with the FAMLI algorithm
 process famli {
+    tag "Deduplicate multi-mapping reads"
     container "quay.io/fhcrc-microbiome/famli@sha256:241a7db60cb735abd59f4829e8ddda0451622b6eb2321f176fd9d76297d8c9e7"
     label 'mem_veryhigh'
     errorStrategy 'retry'
@@ -142,6 +145,7 @@ process famli {
 
 // Make a single feather file with the abundance of every gene across every sample
 process assembleAbundances {
+    tag "Make gene ~ sample abundance matrix"
     container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
     label "mem_veryhigh"
     errorStrategy 'retry'
@@ -250,6 +254,7 @@ logging.info("Done")
 
 // Make CAGs for each set of samples, at each level of clustering
 process makeCAGs {
+    tag "Group genes by co-abundance"
     container "quay.io/fhcrc-microbiome/find-cags@sha256:30ec0e8b25ef142b68eebcfa84a7a2eeb44ebb25481a60db923fed288abec4a9"
     label "mem_veryhigh"
     errorStrategy 'retry'
@@ -381,6 +386,7 @@ logging.info("Done")
 
 // Summarize the abundance of every CAG across each sample
 process calcCAGabund {
+    tag "Make CAG ~ sample abundance matrix"
     container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
     label "mem_veryhigh"
     errorStrategy 'retry'

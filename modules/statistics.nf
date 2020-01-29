@@ -50,6 +50,7 @@ workflow corncob_wf {
 }
 
 process mockData {
+    tag "Simulate dataset for validation"
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label 'io_limited'
 
@@ -104,6 +105,7 @@ df.reset_index(
 }
 
 process validateFormula {
+    tag "Validate user-provided formula"
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label 'io_limited'
 
@@ -146,6 +148,7 @@ for cag_id, cag_df in df.groupby("CAG"):
 // Corncob takes the absolute number of reads from each sample into account
 // and so it needs to have access to those integer values
 process extractCounts {
+    tag "Make CAG ~ sample read-count matrix"
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label 'mem_veryhigh'
     publishDir "${params.output_folder}/abund/", mode: "copy"
@@ -263,6 +266,7 @@ logging.info("Done")
 
 // Extract the counts table from the results HDF5
 process runCorncob {
+    tag "Perform statistical analysis"
     container "quay.io/fhcrc-microbiome/corncob"
     label "mem_veryhigh"
     errorStrategy "retry"

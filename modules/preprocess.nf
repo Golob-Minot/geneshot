@@ -155,6 +155,7 @@ workflow preprocess_wf {
 
 // Run barcodecop to validate the demultiplex
 process barcodecop {
+    tag "Validate barcode demultiplexing for WGS reads"
     container "${container__barcodecop}"
     label 'io_limited'
     errorStrategy 'retry'
@@ -184,6 +185,7 @@ ${I1} ${I2} \
 
 // Process to run catadapt
 process cutadapt {
+    tag "Trim adapters from WGS reads"
     container "${container__cutadapt}"
     label 'mem_medium'
     errorStrategy 'retry'
@@ -208,6 +210,7 @@ ${R1} ${R1} > ${R1.getSimpleName()}.cutadapt.log
 
 // Process to download the human genome BWA index, already tarballed
 process download_hg_index {
+    tag "Download human reference genome"
     container "${container__bwa}"
     errorStrategy "retry"
     label 'io_limited'
@@ -225,6 +228,7 @@ wget --quiet ${params.hg_index_url} -O hg_index.tar.gz
 
 // Process to remove human reads
 process removeHuman {
+    tag "Remove human reads by alignment"
     container "${container__bwa}"
     errorStrategy 'retry'
     maxRetries 10
