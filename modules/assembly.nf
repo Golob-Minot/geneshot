@@ -143,6 +143,9 @@ metaspades.py \
     -t ${task.cpus} -m ${task.memory.toMega() / 1024} | 
     tee -a ${specimen}.metaspades.log
 
+# Make sure there were no errors in the log
+(( \$(cat ${specimen}.metaspades.log | grep -c "== Error ==" ) == 0 ))
+
 # Make sure that the contig files aren't empty
 [[ -s contigs.fasta ]] && (( \$(cat contigs.fasta | wc -l) > 1))
 [[ -s scaffolds.fasta ]] && (( \$(cat scaffolds.fasta | wc -l) > 1))
