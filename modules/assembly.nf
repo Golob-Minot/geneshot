@@ -1,5 +1,8 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 
+// Containers
+container__spades = "quay.io/biocontainers/spades:3.14.0--h2d02072_0"
+
 include makeDiamondDB from "./alignment"
 
 workflow assembly_wf {
@@ -117,7 +120,7 @@ workflow annotation_wf {
 // Assembly with metaspades
 process metaspadesAssembly {
     tag "De novo assembly with metaSPAdes"
-    container 'golob/spades:3.13.1__bcw.0.3.1'
+    container "${container__spades}"
     label 'mem_veryhigh'
     errorStrategy "retry"
 
