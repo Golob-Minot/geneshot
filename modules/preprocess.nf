@@ -135,7 +135,8 @@ workflow preprocess_wf {
 
     // Download the human index if needed
     if (!params.hg_index) {
-        hg_index_tgz = download_hg_index().out
+        download_hg_index()
+        hg_index_tgz = download_hg_index.out
     } else {
         hg_index_tgz = file(params.hg_index)
     }
