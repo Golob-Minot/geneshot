@@ -1,6 +1,12 @@
 
+// Container versions
+container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
+container__ubuntu = "ubuntu:18.04"
+container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
+
 process combineReads {
-    container 'quay.io/fhcrc-microbiome/fastatools@sha256:171884eba1fb5561a8a42cf23a5ffd9857e6e34e1331d9e5dca220ada44555a7'
+    container "${container__fastatools}"
     label = 'mem_medium'
     errorStrategy 'retry'
     maxRetries 10
@@ -34,7 +40,7 @@ combine_fastq_pairs.py \
 }
 
 process outputManifest {
-    container "ubuntu:18.04"
+    container "${container__ubuntu}"
 
     publishDir path: "${params.output_folder}qc/", enabled: params.savereads, mode: "copy"
 
@@ -72,7 +78,7 @@ workflow writeManifest {
 
 // Count the number of input reads for a single sample
 process countReads {
-    container "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.1A"
+    container "${container__fastatools}"
     cpus 1
     memory "4 GB"
     errorStrategy "retry"
@@ -99,7 +105,7 @@ echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
 // 'total_counts' channel, which is transformed by the .collect() command into
 // a single list containing all of the data from all samples.
 process countReadsSummary {
-    container "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.1A"
+    container "${container__fastatools}"
     // The output from this process will be copied to the --output_folder specified by the user
     publishDir "${params.output_folder}/qc/", mode: 'copy'
     errorStrategy "retry"
@@ -123,7 +129,7 @@ cat ${readcount_csv_list} >> readcounts.csv
 
 // Process which will concatenate a set of files
 process concatenateFiles {
-    container "ubuntu:18.04"
+    container "${container__ubuntu}"
     label "mem_medium"
     errorStrategy "retry"
     
@@ -143,7 +149,7 @@ cat __INPUT* > ${output_name}
 }
 
 process collectAbundances{
-    container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+    container "${container__experiment_collection}"
     label 'mem_veryhigh'
     errorStrategy 'retry'
 
@@ -248,7 +254,7 @@ with pd.HDFStore("results.hdf5", "w") as store:
 }
 
 process addGeneAssembly{
-    container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+    container "${container__experiment_collection}"
     label 'mem_veryhigh'
     errorStrategy 'retry'
 
@@ -308,7 +314,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 }
 
 process addCorncobResults{
-    container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+    container "${container__experiment_collection}"
     label 'mem_veryhigh'
     errorStrategy 'retry'
 
@@ -346,7 +352,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 // Repack an HDF5 file
 process repackHDF {
 
-    container "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
+    container "${container__pandas}"
     label "mem_veryhigh"
     errorStrategy "retry"
     
