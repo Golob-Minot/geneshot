@@ -15,4 +15,4 @@ jobs:
           sudo mv nextflow /usr/local/bin/
       - name:  Test with preprocessing and a formula
         run: |
-          tree -lahtr && cat test.sh && bash test.sh
+          ls -lahtr && ls -lahtr data/ && cat test.sh && bash test.sh
