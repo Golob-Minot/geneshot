@@ -165,8 +165,8 @@ process barcodecop {
         tuple specimen, file(R1), file(R2), file(I1), file(I2)
 
     output:
-        tuple specimen, file("${R1.getSimpleName()}_R1.bcc.fq.gz"), file("${R2.getSimpleName()}_R2.bcc.fq.gz"), emit: bcc_to_cutadapt_ch
-        tuple specimen, file("${R1.getSimpleName()}_R1.bcc.fq.gz"), file("${R2.getSimpleName()}_R2.bcc.fq.gz"), emit: bcc_empty_ch
+        tuple specimen, file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_to_cutadapt_ch
+        tuple specimen, file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_empty_ch
 """
 set -e
 
@@ -174,12 +174,12 @@ barcodecop \
 ${I1} ${I2} \
 --match-filter \
 -f ${R1} \
--o ${R1.getSimpleName()}_R1.bcc.fq.gz &&
+-o ${R1}.bcc.fq.gz &&
 barcodecop \
 ${I1} ${I2} \
 --match-filter \
 -f ${R2} \
--o ${R2.getSimpleName()}_R2.bcc.fq.gz
+-o ${R2}.bcc.fq.gz
 """
 }
 
