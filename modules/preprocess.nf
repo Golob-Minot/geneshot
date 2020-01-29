@@ -135,7 +135,8 @@ workflow preprocess_wf {
 
     // Download the human index if needed
     if (!params.hg_index) {
-        hg_index_tgz = download_hg_index().out
+        download_hg_index()
+        hg_index_tgz = download_hg_index.out
     } else {
         hg_index_tgz = file(params.hg_index)
     }
@@ -206,7 +207,8 @@ ${R1} ${R1} > ${R1.getSimpleName()}.cutadapt.log
 }
 
 // Process to download the human genome BWA index, already tarballed
-process download_hg_index {
+download_hg_index {
+procesdownload_hg_indexs 
     container "${container__bwa}"
     errorStrategy "retry"
     label 'io_limited'
