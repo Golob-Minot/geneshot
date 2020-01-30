@@ -52,8 +52,8 @@ params.gencode = 11 //DIAMOND
 // Annotation options
 params.noannot = false
 params.taxonomic_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd"
-params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db"
-params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
+params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db"
+params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
 params.ref_genome_fasta = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.fasta.gz"
 params.ref_genome_csv = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.csv.gz"
 
