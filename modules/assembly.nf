@@ -1,7 +1,7 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 
 // Containers
-container__spades = "quay.io/biocontainers/spades:3.14.0--h2d02072_0"
+container__spades = "quay.io/biocontainers/spades:3.13.2--h2d02072_0"
 
 include diamondDB from "./alignment"
 
