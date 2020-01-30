@@ -142,11 +142,11 @@ workflow preprocess_wf {
     }
 
     // Remove the human reads
-    removeHuman(hg_index_tgz, cutadapt.out)
+    bwa(hg_index_tgz, cutadapt.out)
 
     // Set the outputs of the workflow
     emit:
-        removeHuman.out
+        bwa.out
 
 }
 
@@ -240,8 +240,8 @@ wget --quiet ${params.hg_index_url} -O hg_index.tar.gz
 
 
 // Process to remove human reads
-process removeHuman {
-    tag "Remove human reads by alignment"
+process bwa {
+    tag "Remove human reads"
     container "${container__bwa}"
     errorStrategy 'retry'
     maxRetries 10

@@ -3,7 +3,7 @@
 // Containers
 container__spades = "quay.io/biocontainers/spades:3.14.0--h2d02072_0"
 
-include makeDiamondDB from "./alignment"
+include diamondDB from "./alignment"
 
 workflow assembly_wf {
     get:
@@ -12,33 +12,33 @@ workflow assembly_wf {
     main:
 
     // Assemble samples with metaSPAdes
-    metaspadesAssembly(
+    metaspades(
         combined_reads_ch
     )
 
     // Annotate those contigs with Prokka
-    prodigalAnnotate(
-        metaspadesAssembly.out
+    prodigal(
+        metaspades.out
     )
 
     // Calculate summary metrics for every assembled gene
     geneAssemblyMetrics(
-        prodigalAnnotate.out[0].collect()
+        prodigal.out[0].collect()
     )
 
     // Combine the gene sequences across all samples
     combineCDS(
-        prodigalAnnotate.out[0].collect()
+        prodigal.out[0].collect()
     )
 
     // Combine genes by amino acid identity
-    clusterCDS(
+    mmseqs(
         combineCDS.out
     )
 
     emit:
-        gene_fasta = clusterCDS.out[0]
-        allele_gene_tsv = clusterCDS.out[1]
+        gene_fasta = mmseqs.out[0]
+        allele_gene_tsv = mmseqs.out[1]
         allele_assembly_csv = geneAssemblyMetrics.out
 
 }
@@ -63,7 +63,7 @@ workflow annotation_wf {
 
     // Annotate the clustered genes with eggNOG
     if ( run_eggnog ){
-        eggnog_annotation(
+        eggnog(
             gene_fasta,
             file(params.eggnog_db),
             file(params.eggnog_dmnd)
@@ -83,7 +83,7 @@ workflow annotation_wf {
 
     // Annotate the clustered genes with DIAMOND for taxonomic ID
     if ( run_tax ) {
-        taxonomic_annotation(
+        diamond_tax(
             gene_fasta,
             file(params.taxonomic_dmnd)
         )
@@ -104,12 +104,12 @@ workflow annotation_wf {
     if ( run_genome_alignment ) {
 
         // Make a DIAMOND database for the provided genes
-        makeDiamondDB(
+        diamondDB(
             gene_fasta
         )
 
         alignGenomes(
-            makeDiamondDB.out,
+            diamondDB.out,
             file(params.ref_genome_fasta)
         )
     }
@@ -118,7 +118,7 @@ workflow annotation_wf {
 
 
 // Assembly with metaspades
-process metaspadesAssembly {
+process metaspades {
     tag "De novo assembly with metaSPAdes"
     container "${container__spades}"
     label 'mem_veryhigh'
@@ -160,7 +160,7 @@ cat scaffolds.fasta | sed 's/>/>${specimen}_/' | gzip -c > ${specimen}.scaffolds
 
 // Annotation of coding sequences with prodigal
 
-process prodigalAnnotate {
+process prodigal {
     tag "Identify protein-coding genes"
     container 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
     label 'io_limited'
@@ -311,7 +311,7 @@ gzip -t all_CDS.fasta.gz
 }
 
 
-process clusterCDS {
+process mmseqs {
     tag "Cluster genes with similar sequences"
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label 'mem_veryhigh'
@@ -346,7 +346,7 @@ gzip genes.fasta
 }
 
 
-process taxonomic_annotation {
+process diamond_tax {
     tag "Annotate genes by taxonomy"
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
@@ -381,7 +381,7 @@ rm ${diamond_tax_db}
 }
 
 
-process eggnog_annotation {
+process eggnog {
     tag "Annotate genes by predicted function"
     container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
     label 'mem_veryhigh'
