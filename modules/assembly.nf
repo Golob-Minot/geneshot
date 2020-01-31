@@ -97,40 +97,9 @@ workflow annotation_wf {
         tax_tsv = false
     }
 
-    // Determine whether or not to run the genome alignment based
-    // on --noannot, --ref_genome_fasta, and --ref_genome_csv
-    run_genome_alignment = false
-    if ( params.noannot == false ) {
-        if ( params.ref_genome_fasta && params.ref_genome_csv ) {
-            if ( !file(params.ref_genome_fasta).isEmpty() && !file(params.ref_genome_csv).isEmpty() ){
-                run_genome_alignment = true
-            }
-        }
-    }
-
-    // Annotate the clustered genes by alignment against whole reference genomes
-    if ( run_genome_alignment ) {
-
-        // Make a DIAMOND database for the provided genes
-        diamondDB(
-            gene_fasta
-        )
-
-        alignGenomes(
-            diamondDB.out,
-            file(params.ref_genome_fasta)
-        )
-        genome_alignment_tsv = alignGenomes.out
-    } else {
-        genome_alignment_tsv = false
-    }
-
     emit:
 
-        run_tax = run_tax
         tax_tsv = tax_tsv
-
-        run_eggnog = run_eggnog
         eggnog_tsv = eggnog_tsv
 
 }
@@ -436,53 +405,6 @@ emapper.py \
 
 gzip genes.emapper.annotations
     
-    """
-
-}
-
-process alignGenomes {
-    tag "Align genes against reference genomes"
-    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
-    label "mem_veryhigh"
-    // errorStrategy "retry"
-    
-    input:
-    file genes_dmnd
-    file fasta_gz
-
-    output:
-    file "reference_genomes.aln.gz"
-
-    """
-set -e
-
-# Make sure all files are present
-echo "Making sure ${genes_dmnd} is present"
-[[ -s ${genes_dmnd} ]]
-echo "Making sure ${fasta_gz} is present"
-[[ -s ${fasta_gz} ]]
-
-echo "Processing ${fasta_gz} and ${genes_dmnd}"
-
-diamond \
-    blastx \
-    --query ${fasta_gz} \
-    --out reference_genomes.aln.gz \
-    --threads ${task.cpus} \
-    --db ${genes_dmnd} \
-    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen \
-    --range-cover ${params.min_coverage} \
-    --subject-cover ${params.min_coverage} \
-    --range-culling \
-    --id ${params.min_identity} \
-    --top 1 \
-    --block-size ${task.memory.toMega() / (1024 * 6)} \
-    --query-gencode ${params.gencode} \
-    -F 15 \
-    --unal 0 \
-    --compress 1
-
-echo "Done"
     """
 
 }
