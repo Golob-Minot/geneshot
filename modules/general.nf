@@ -86,7 +86,7 @@ process countReads {
     errorStrategy "retry"
 
     input:
-    tuple sample_name, file(fastq)
+    tuple sample_name, file(R1), file(R2)
 
     output:
     file "${sample_name}.countReads.csv"
@@ -94,9 +94,10 @@ process countReads {
 """
 set -e
 
-[[ -s ${fastq} ]]
+[[ -s ${R1} ]]
+[[ -s ${R2} ]]
 
-n=\$(gunzip -c "${fastq}" | awk 'NR % 4 == 1' | wc -l)
+n=\$(cat <(gunzip -c "${R1}") <(gunzip -c "${R2}") | awk 'NR % 4 == 1' | wc -l)
 echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
 """
 }
@@ -124,7 +125,7 @@ process countReadsSummary {
 """
 set -e
 
-echo name,n_reads > readcounts.csv
+echo specimen,n_reads > readcounts.csv
 cat ${readcount_csv_list} >> readcounts.csv
 """
 }
@@ -216,9 +217,13 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     # Read in the summary of the number of reads across all samples
     readcount_df = pd.read_csv(readcount_csv)
 
+    # Add the number of aligned reads per sample
+    readcount_df["aligned_reads"] = readcount_df["specimen"].apply(
+        famli_df.groupby("specimen")["nreads"].sum().get
+    )
+
     # Write to HDF5
     readcount_df.to_hdf(store, "/summary/readcount")
-    
 
     # Read in the table with the CAG-level abundances across all samples
     cag_abund_df = pd.read_feather(
@@ -654,6 +659,9 @@ with pd.HDFStore("${full_results_hdf}", "r") as store:
     # Table with gene annotations (including CAG membership)
     gene_annot_df = pd.read_hdf(store, "/annot/gene/all")
 
+    # Number of read pairs
+    readcount_df = pd.read_hdf(store, "/summary/readcount")
+
     # Check to see if we have any corncob results
     if "/stats/cag/corncob" in store:
 
@@ -669,6 +677,10 @@ with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
     manifest_df.to_hdf(
         store,
         "/manifest"
+    )
+    readcount_df.to_hdf(
+        store,
+        "/summary/readcount"
     )
     cag_abund_df.to_hdf(
         store, 

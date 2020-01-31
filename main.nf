@@ -258,7 +258,7 @@ workflow {
     // Count the reads for every sample individually (just take the first of the pair of reads)
     countReads(
         combineReads.out.map {
-            r -> [r[0], r[1]]
+            r -> [r[0], r[1], r[2]]
         }
     )
 
