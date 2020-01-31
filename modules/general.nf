@@ -6,6 +6,7 @@ container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collecti
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
 
 process combineReads {
+    tag "Join FASTQ files per-specimen"
     container "${container__fastatools}"
     label = 'mem_medium'
     errorStrategy 'retry'
@@ -78,6 +79,7 @@ workflow writeManifest {
 
 // Count the number of input reads for a single sample
 process countReads {
+    tag "Count the number of reads per sample"
     container "${container__fastatools}"
     cpus 1
     memory "4 GB"
