@@ -580,7 +580,7 @@ with pd.HDFStore("${results_hdf}", "r") as store:
 
 # Add the taxonomic annotation results
 gene_annot = gene_annot.assign(
-    tax_id = tax_df.set_index("gene")["tax_id"]
+    tax_id = tax_df.set_index("gene")["tax_id"].apply(str)
 ).reset_index()
 
 # Read the taxonomy CSV
