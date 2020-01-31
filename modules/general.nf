@@ -159,9 +159,10 @@ process collectAbundances{
         path cag_abund_feather
         path famli_json_list
         path readcount_csv
+        path manifest_csv
 
     output:
-        path "results.hdf5"
+        path "${params.output_prefix}.full.hdf5"
 
 """
 #!/usr/bin/env python3
@@ -175,6 +176,7 @@ gene_abund_feather = "${gene_abund_feather}"
 cag_abund_feather = "${cag_abund_feather}"
 famli_json_list = "${famli_json_list}".split(" ")
 readcount_csv = "${readcount_csv}"
+manifest_csv = "${manifest_csv}"
 
 # Function to read in the FAMLI output
 def read_famli_json(fp, suffix=".json.gz"):
@@ -195,7 +197,7 @@ def read_famli_json(fp, suffix=".json.gz"):
 
 
 # Open a connection to the HDF5
-with pd.HDFStore("results.hdf5", "w") as store:
+with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
 
     # Read in the complete set of FAMLI results
     famli_df = pd.concat([
@@ -251,6 +253,9 @@ with pd.HDFStore("results.hdf5", "w") as store:
 
     # Also create the `/annot/gene/all` table, which will be added to later
     cag_df.to_hdf(store, "/annot/gene/all")
+
+    # Write out the manifest provided by the user
+    pd.read_csv("${manifest_csv}").to_hdf(store, "/manifest")
 
 """
 
@@ -408,27 +413,24 @@ with pd.HDFStore("${results_hdf}", "a") as store:
     # Write summary annotation table to HDF5
     gene_annot.to_hdf(
         store, 
-        "/annot/gene/all",
-        format="table",
-        data_columns=["CAG"]
+        "/annot/gene/all"
     )
 
 """
 
 }
 
-process addTaxonomy {
-    tag "Add the NCBI taxonomy"
+process readTaxonomy {
+    tag "Read the NCBI taxonomy"
     container "${container__experiment_collection}"
-    label 'mem_medium'
+    label 'io_limited'
     errorStrategy 'retry'
 
     input:
-        path results_hdf
         path taxdump_tar_gz
 
     output:
-        path "${results_hdf}"
+        path "ncbi_taxonomy.csv.gz"
 
 """
 #!/usr/bin/env python3
@@ -511,15 +513,11 @@ tax_df = pd.concat([
     ).dropna()
 ]).reset_index()
 
-# Open a connection to the HDF5
-with pd.HDFStore("${results_hdf}", "a") as store:
-    # Save to the HDF5
-    tax_df.to_hdf(
-        store,
-        "/ref/taxonomy",
-        format="table",
-        data_columns=["tax_id"]
-    )
+# Write to CSV
+tax_df.to_csv(
+    "ncbi_taxonomy.csv.gz",
+    compression="gzip"
+)
 """
 
 }
@@ -527,12 +525,13 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
 process addTaxResults {
     container "${container__experiment_collection}"
-    label 'mem_medium'
+    label 'mem_veryhigh'
     errorStrategy 'retry'
 
     input:
         path results_hdf
         path diamond_tax_csv
+        path taxonomy_csv
 
     output:
         path "${results_hdf}"
@@ -574,6 +573,20 @@ gene_annot = gene_annot.assign(
     tax_id = tax_df.set_index("gene")["tax_id"]
 ).reset_index()
 
+# Read the taxonomy CSV
+taxonomy_df = pd.read_csv(
+    "${taxonomy_csv}"
+).applymap(
+    str
+)
+
+# Add the name of the assigned tax_id
+gene_annot = gene_annot.assign(
+    tax_name = gene_annot["tax_id"].apply(
+        taxonomy_df.set_index("tax_id")["name"].get
+    )
+)
+
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
@@ -584,15 +597,87 @@ with pd.HDFStore("${results_hdf}", "a") as store:
     # Write summary gene annotation table to HDF5
     gene_annot.to_hdf(
         store, 
-        "/annot/gene/all",
-        format="table",
-        data_columns=["CAG"]
+        "/annot/gene/all"
+    )
+
+    # Write the taxonomy table
+    taxonomy_df.to_hdf(
+        store,
+        "/ref/taxonomy"
     )
 
 """
 
 }
 
+
+process makeSummaryHDF {
+    container "${container__experiment_collection}"
+    label 'mem_veryhigh'
+    errorStrategy 'retry'
+
+    input:
+        path full_results_hdf
+
+    output:
+        path "${params.output_prefix}.summary.hdf5"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in all of the tables needed from the full results HDF5
+with pd.HDFStore("${full_results_hdf}", "r") as store:
+
+    # Read in the manifest
+    manifest_df = pd.read_hdf(store, "/manifest")
+
+    # Table with the abundance of every CAG in every sample
+    cag_abund_df = pd.read_hdf(store, "/abund/cag/wide")
+
+    # Table with gene annotations (including CAG membership)
+    gene_annot_df = pd.read_hdf(store, "/annot/gene/all")
+
+    # Check to see if we have any corncob results
+    if "/stats/cag/corncob" in store:
+
+        # Read in the table of corncob results
+        corncob_df = pd.read_hdf(store, "/stats/cag/corncob")
+    else:
+        corncob_df = None
+
+# Now write to the new HDF store
+with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
+
+    # Write out each table, while indexing the appropriate columns
+    manifest_df.to_hdf(
+        store,
+        "/manifest"
+    )
+    cag_abund_df.to_hdf(
+        store, 
+        "/abund/cag/wide", 
+        format="table",
+        data_columns=["CAG"]
+    )
+    gene_annot_df.to_hdf(
+        store, 
+        "/annot/gene/all", 
+        format="table",
+        data_columns=["CAG"]
+    )
+
+    if corncob_df is not None:
+        corncob_df.to_hdf(
+            store, 
+            "/stats/cag/corncob", 
+            format="fixed"
+        )
+
+"""
+
+}
 
 
 // Repack an HDF5 file

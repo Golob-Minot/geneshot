@@ -29,6 +29,7 @@ params.nopreprocess = false
 params.savereads = false
 params.help = false
 params.output = './results'
+params.output_prefix = 'geneshot'
 params.manifest = null
 
 // Preprocessing options
@@ -76,6 +77,7 @@ def helpMessage() {
 
     Options:
       --output              Folder to place analysis outputs (default ./results)
+      --output_prefix       Text used as a prefix for summary HDF5 output files (default: geneshot)
       --nopreprocess        If specified, omit the preprocessing steps (removing adapters and human sequences)
       --savereads           If specified, save the preprocessed reads to the output folder (inside qc/)
       -w                    Working directory. Defaults to `./work`
@@ -159,8 +161,11 @@ include './modules/preprocess' params(
 // Import some general tasks, such as combineReads and writeManifest
 include './modules/general' params(
     savereads: params.savereads,
-    output_folder: output_folder
+    output_folder: output_folder,
+    output_prefix: params.output_prefix
 )
+include repackHDF as repackFullHDF from './modules/general'
+include repackHDF as repackSummaryHDF from './modules/general'
 
 // Import the workflows used for assembly and annotation
 include './modules/assembly' params(
@@ -326,7 +331,8 @@ workflow {
         alignment_wf.out.gene_abund_feather,
         alignment_wf.out.cag_abund_feather,
         alignment_wf.out.famli_json_list,
-        countReadsSummary.out
+        countReadsSummary.out,
+        manifest_file
     )
 
     // If we performed de novo assembly, add the gene assembly information
@@ -369,29 +375,40 @@ workflow {
     if ( params.noannot == false ) {
         if ( params.taxonomic_dmnd ) {
             if ( !file(params.taxonomic_dmnd).isEmpty() ){
-                addTaxResults(
-                    finalHDF,
-                    annotation_wf.out.tax_tsv
-                )
-
-                addTaxonomy(
-                    addTaxResults.out,
+                readTaxonomy(
                     file(params.ncbi_taxdump)
                 )
 
-                finalHDF = addTaxonomy.out
+                addTaxResults(
+                    finalHDF,
+                    annotation_wf.out.tax_tsv,
+                    readTaxonomy.out
+                )
+
+                finalHDF = addTaxResults.out
             }
         }
     }
 
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
-    repackHDF(
+    repackFullHDF(
         finalHDF
+    )
+
+    // Make a smaller summary HDF5 with a subset of the total data
+    makeSummaryHDF(
+        repackFullHDF.out
+    )
+
+    // "Repack" and compress that summary HDF5 as well
+    repackSummaryHDF(
+        makeSummaryHDF.out
     )
 
     publish:
         corncob_results to: "${output_folder}/stats/", enabled: params.formula
         alignment_wf.out.famli_json_list to: "${output_folder}/abund/details/"
-        repackHDF.out to: "${output_folder}", mode: "copy", overwrite: true
+        repackFullHDF.out to: "${output_folder}", mode: "copy", overwrite: true
+        repackSummaryHDF.out to: "${output_folder}", mode: "copy", overwrite: true
 
 }
