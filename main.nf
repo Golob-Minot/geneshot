@@ -357,23 +357,31 @@ workflow {
     }
 
     // If we performed functional analysis with eggNOG, add the results to the HDF5
-    if ( annotation_wf.out.run_eggnog ) {
-        addEggnogResults(
-            finalHDF,
-            annotation_wf.out.eggnog_tsv
-        )
+    if ( params.noannot == false ) {
+        if ( params.eggnog_db && params.eggnog_dmnd ) {
+            if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
+                addEggnogResults(
+                    finalHDF,
+                    annotation_wf.out.eggnog_tsv
+                )
 
-        finalHDF = addEggnogResults.out
+                finalHDF = addEggnogResults.out
+            }
+        }
     }
 
     // If we performed taxonomic analysis with DIAMOND, add the results to the HDF5
-    if ( annotation_wf.out.run_tax ) {
-        addTaxResults(
-            finalHDF,
-            annotation_wf.out.tax_tsv
-        )
+    if ( params.noannot == false ) {
+        if ( params.taxonomic_dmnd ) {
+            if ( !file(params.taxonomic_dmnd).isEmpty() ){
+                addTaxResults(
+                    finalHDF,
+                    annotation_wf.out.tax_tsv
+                )
 
-        finalHDF = addTaxResults.out
+                finalHDF = addTaxResults.out
+            }
+        }
     }
 
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
