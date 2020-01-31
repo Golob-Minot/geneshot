@@ -517,12 +517,13 @@ tax_df = pd.concat([
     tax_df.apply(
         lambda v: v.apply(merged_df.set_index("new")["old"].get) if v.name == "tax_id" else v
     ).dropna()
-]).reset_index()
+])
 
 # Write to CSV
 tax_df.to_csv(
     "ncbi_taxonomy.csv.gz",
-    compression="gzip"
+    compression="gzip",
+    index=None
 )
 """
 
