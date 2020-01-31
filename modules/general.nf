@@ -593,6 +593,10 @@ gene_annot = gene_annot.assign(
     tax_name = gene_annot["tax_id"].apply(
         taxonomy_df.set_index("tax_id")["name"].get
     )
+).assign(
+    tax_rank = gene_annot["tax_id"].apply(
+        taxonomy_df.set_index("tax_id")["rank"].get
+    )
 )
 
 
