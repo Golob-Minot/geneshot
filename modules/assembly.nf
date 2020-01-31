@@ -4,7 +4,7 @@
 container__spades = "quay.io/biocontainers/spades:3.13.2--h2d02072_0"
 
 include diamondDB from "./alignment" params(
-    output_folder: output_folder
+    output_folder: params.output_folder
 )
 
 workflow assembly_wf {
