@@ -3,7 +3,9 @@
 // Containers
 container__spades = "quay.io/biocontainers/spades:3.13.2--h2d02072_0"
 
-include diamondDB from "./alignment"
+include diamondDB from "./alignment" params(
+    output_folder: output_folder
+)
 
 workflow assembly_wf {
     get:
@@ -68,6 +70,9 @@ workflow annotation_wf {
             file(params.eggnog_db),
             file(params.eggnog_dmnd)
         )
+        eggnog_tsv = eggnog.out
+    } else {
+        eggnog_tsv = false
     }
 
     // Determine whether or not to run the taxnomic annotation based
@@ -87,6 +92,9 @@ workflow annotation_wf {
             gene_fasta,
             file(params.taxonomic_dmnd)
         )
+        tax_tsv = diamond_tax.out
+    } else {
+        tax_tsv = false
     }
 
     // Determine whether or not to run the genome alignment based
@@ -112,7 +120,18 @@ workflow annotation_wf {
             diamondDB.out,
             file(params.ref_genome_fasta)
         )
+        genome_alignment_tsv = alignGenomes.out
+    } else {
+        genome_alignment_tsv = false
     }
+
+    emit:
+
+        run_tax = run_tax
+        tax_tsv = tax_tsv
+
+        run_eggnog = run_eggnog
+        eggnog_tsv = eggnog_tsv
 
 }
 

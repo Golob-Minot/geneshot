@@ -315,7 +315,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
 process addCorncobResults{
     container "${container__experiment_collection}"
-    label 'mem_veryhigh'
+    label 'mem_medium'
     errorStrategy 'retry'
 
     input:
@@ -348,6 +348,94 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 """
 
 }
+
+process addEggnogResults {
+    container "${container__experiment_collection}"
+    label 'mem_medium'
+    errorStrategy 'retry'
+
+    input:
+        path results_hdf
+        path eggnog_csv
+
+    output:
+        path "${results_hdf}"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in the eggNOG-mapper results
+eggnog_df = pd.read_csv(
+    "${eggnog_csv}", 
+    header=3, 
+    sep="\\t"
+).rename(columns=dict([("#query_name", "query_name")]))
+
+print(
+    "Read in eggnog results for %d genes" % 
+    eggnog_df.shape[0]
+)
+
+
+# Open a connection to the HDF5
+with pd.HDFStore("${results_hdf}", "a") as store:
+
+    # Write eggnog results to HDF5
+    eggnog_df.to_hdf(store, "/annot/gene/eggnog")
+
+"""
+
+}
+
+process addTaxResults {
+    container "${container__experiment_collection}"
+    label 'mem_medium'
+    errorStrategy 'retry'
+
+    input:
+        path results_hdf
+        path diamond_tax_csv
+
+    output:
+        path "${results_hdf}"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in the DIAMOND-tax results
+tax_df = pd.read_csv(
+    "${diamond_tax_csv}", 
+    sep="\\t", 
+    header=None
+).rename(
+    columns=dict([
+        (0, "gene"), 
+        (1, "tax_id"), 
+        (2, "evalue")
+    ])
+)
+
+print(
+    "Read in taxonomic results for %d genes" % 
+    tax_df.shape[0]
+)
+
+
+# Open a connection to the HDF5
+with pd.HDFStore("${results_hdf}", "a") as store:
+
+    # Write taxonomic results to HDF5
+    tax_df.to_hdf(store, "/annot/gene/tax")
+
+"""
+
+}
+
+
 
 // Repack an HDF5 file
 process repackHDF {

@@ -356,6 +356,26 @@ workflow {
         finalHDF = addCorncobResults.out
     }
 
+    // If we performed functional analysis with eggNOG, add the results to the HDF5
+    if ( annotation_wf.out.run_eggnog ) {
+        addEggnogResults(
+            finalHDF,
+            annotation_wf.out.eggnog_tsv
+        )
+
+        finalHDF = addEggnogResults.out
+    }
+
+    // If we performed taxonomic analysis with DIAMOND, add the results to the HDF5
+    if ( annotation_wf.out.run_tax ) {
+        addTaxResults(
+            finalHDF,
+            annotation_wf.out.tax_tsv
+        )
+
+        finalHDF = addTaxResults.out
+    }
+
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
     repackHDF(
         finalHDF
@@ -364,6 +384,6 @@ workflow {
     publish:
         corncob_results to: "${output_folder}/stats/", enabled: params.formula
         alignment_wf.out.famli_json_list to: "${output_folder}/abund/details/"
-        repackHDF.out to: "${output_folder}", mode: "copy"
+        repackHDF.out to: "${output_folder}", mode: "copy", overwrite: true
 
 }
