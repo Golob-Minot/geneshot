@@ -105,6 +105,7 @@ echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
 // 'total_counts' channel, which is transformed by the .collect() command into
 // a single list containing all of the data from all samples.
 process countReadsSummary {
+    tag "Summarize the number of reads per sample"
     container "${container__fastatools}"
     // The output from this process will be copied to the --output_folder specified by the user
     publishDir "${params.output_folder}/qc/", mode: 'copy'
@@ -129,6 +130,7 @@ cat ${readcount_csv_list} >> readcounts.csv
 
 // Process which will concatenate a set of files
 process concatenateFiles {
+    tag "Directly combine a group of files"
     container "${container__ubuntu}"
     label "mem_medium"
     errorStrategy "retry"
@@ -149,6 +151,7 @@ cat __INPUT* > ${output_name}
 }
 
 process collectAbundances{
+    tag "Add gene abundances to HDF"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
     errorStrategy 'retry'
@@ -262,6 +265,7 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
 }
 
 process addGeneAssembly{
+    tag "Add gene assembly data to HDF"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
     errorStrategy 'retry'
@@ -322,6 +326,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 }
 
 process addCorncobResults{
+    tag "Add statistical analysis to HDF"
     container "${container__experiment_collection}"
     label 'mem_medium'
     errorStrategy 'retry'
@@ -358,6 +363,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 }
 
 process addEggnogResults {
+    tag "Add functional predictions to HDF"
     container "${container__experiment_collection}"
     label 'mem_medium'
     errorStrategy 'retry'
@@ -524,6 +530,7 @@ tax_df.to_csv(
 
 
 process addTaxResults {
+    tag "Add taxonomic annotations to HDF"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
     errorStrategy 'retry'
@@ -612,6 +619,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
 
 process makeSummaryHDF {
+    tag "Make a summary HDF store"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
     errorStrategy 'retry'
@@ -684,6 +692,7 @@ with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
 process repackHDF {
 
     container "${container__pandas}"
+    tag "Compress HDF store"
     label "mem_veryhigh"
     errorStrategy "retry"
     
