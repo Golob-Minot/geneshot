@@ -249,6 +249,9 @@ with pd.HDFStore("results.hdf5", "w") as store:
     # Write to HDF5
     cag_df.to_hdf(store, "/annot/gene/cag")
 
+    # Also create the `/annot/gene/all` table, which will be added to later
+    cag_df.to_hdf(store, "/annot/gene/all")
+
 """
 
 }
@@ -378,16 +381,149 @@ print(
     eggnog_df.shape[0]
 )
 
+# Read in the existing set of gene annotations
+with pd.HDFStore("${results_hdf}", "r") as store:
+
+    # Set an index on the `gene` column
+    gene_annot = pd.read_hdf(
+        "${results_hdf}", 
+        "/annot/gene/all"
+    ).set_index("gene")
+
+# Add in a subset of the eggnog results
+gene_annot = gene_annot.assign(
+    eggNOG_ortholog = eggnog_df.set_index("query_name")["seed_eggNOG_ortholog"]
+).assign(
+    eggNOG_tax = eggnog_df.set_index("query_name")["best_tax_level"]
+).assign(
+    eggNOG_desc = eggnog_df.set_index("query_name")["eggNOG free text desc."]
+).reset_index()
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write eggnog results to HDF5
     eggnog_df.to_hdf(store, "/annot/gene/eggnog")
+    
+    # Write summary annotation table to HDF5
+    gene_annot.to_hdf(
+        store, 
+        "/annot/gene/all",
+        format="table",
+        data_columns=["CAG"]
+    )
 
 """
 
 }
+
+process addTaxonomy {
+    tag "Add the NCBI taxonomy"
+    container "${container__experiment_collection}"
+    label 'mem_medium'
+    errorStrategy 'retry'
+
+    input:
+        path results_hdf
+        path taxdump_tar_gz
+
+    output:
+        path "${results_hdf}"
+
+"""
+#!/usr/bin/env python3
+
+import gzip
+from io import BytesIO
+import pandas as pd
+import tarfile
+
+tar = tarfile.open(
+    "${taxdump_tar_gz}", 
+    "r:gz", 
+    encoding='utf-8'
+)
+
+# Read in the table of merged taxids
+merged_df = pd.read_csv(
+    BytesIO(
+        tar.extractfile(
+            "merged.dmp"
+        ).read()
+    ),
+    sep="\\t",
+    header=None
+).rename(columns=dict([
+    (0, "old"),
+    (2, "new"),
+    (6, "level")
+])).reindex(
+    columns=["old", "new"]
+)
+
+# Get the name of each taxon
+names_df = pd.read_csv(
+    BytesIO(
+        tar.extractfile(
+            "names.dmp"
+        ).read()
+    ),
+    sep="\\t",
+    header=None
+).rename(columns=dict([
+    (0, "tax_id"),
+    (2, "name"),
+    (6, "level")
+])).query(
+    "level == 'scientific name'"
+).reindex(
+    columns=["tax_id", "name"]
+)
+
+# Get the rank and parent of every taxon
+nodes_df = pd.read_csv(
+    BytesIO(
+        tar.extractfile(
+            "nodes.dmp"
+        ).read()
+    ),
+    sep="\\t",
+    header=None
+).rename(columns=dict([
+    (0, "tax_id"),
+    (2, "parent"),
+    (4, "rank")
+])).reindex(
+    columns=["tax_id", "parent", "rank"]
+)
+
+# Join the names and the nodes
+tax_df = pd.concat([
+    names_df.set_index("tax_id"),
+    nodes_df.set_index("tax_id")
+], axis=1).reset_index()
+
+# Add in the merged taxids
+tax_df = pd.concat([
+    tax_df,
+    tax_df.apply(
+        lambda v: v.apply(merged_df.set_index("new")["old"].get) if v.name == "tax_id" else v
+    ).dropna()
+]).reset_index()
+
+# Open a connection to the HDF5
+with pd.HDFStore("${results_hdf}", "a") as store:
+    # Save to the HDF5
+    tax_df.to_hdf(
+        store,
+        "/ref/taxonomy",
+        format="table",
+        data_columns=["tax_id"]
+    )
+"""
+
+}
+
 
 process addTaxResults {
     container "${container__experiment_collection}"
@@ -424,12 +560,34 @@ print(
     tax_df.shape[0]
 )
 
+# Read in the existing set of gene annotations
+with pd.HDFStore("${results_hdf}", "r") as store:
+
+    # Set an index on the `gene` column
+    gene_annot = pd.read_hdf(
+        "${results_hdf}", 
+        "/annot/gene/all"
+    ).set_index("gene")
+
+# Add the taxonomic annotation results
+gene_annot = gene_annot.assign(
+    tax_id = tax_df.set_index("gene")["tax_id"]
+).reset_index()
+
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write taxonomic results to HDF5
     tax_df.to_hdf(store, "/annot/gene/tax")
+
+    # Write summary gene annotation table to HDF5
+    gene_annot.to_hdf(
+        store, 
+        "/annot/gene/all",
+        format="table",
+        data_columns=["CAG"]
+    )
 
 """
 
