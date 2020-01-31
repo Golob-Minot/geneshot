@@ -54,8 +54,6 @@ params.noannot = false
 params.taxonomic_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd"
 params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db"
 params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
-params.ref_genome_fasta = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.fasta.gz"
-params.ref_genome_csv = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.csv.gz"
 
 // CAG options
 params.distance_threshold = 0.5
@@ -107,10 +105,6 @@ def helpMessage() {
                             (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG 
                             (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
-      --ref_genome_fasta    FASTA of microbial genomes to perform whole-genome alignment of the gene catalog against.
-                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.fasta.gz)
-      --ref_genome_csv      CSV needed to perform whole-genome alignment of the gene catalog against a set of microbial genomes.
-                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-21-RefSeq/2020-01-21-RefSeq.csv.gz)
     
     For Alignment:
       --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
@@ -175,8 +169,6 @@ include './modules/assembly' params(
     eggnog_db: params.eggnog_db,
     eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
-    ref_genome_fasta: params.ref_genome_fasta,
-    ref_genome_csv: params.ref_genome_csv,
     gencode: params.gencode,
 )
 
