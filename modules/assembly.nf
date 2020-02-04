@@ -1,7 +1,7 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 
 // Containers
-container__spades = "quay.io/biocontainers/spades:3.13.2--h2d02072_0"
+container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
 
 include diamondDB from "./alignment" params(
     output_folder: params.output_folder
@@ -13,14 +13,14 @@ workflow assembly_wf {
 
     main:
 
-    // Assemble samples with metaSPAdes
-    metaspades(
+    // Perform de novo assembly
+    assembly(
         combined_reads_ch
     )
 
     // Annotate those contigs with Prokka
     prodigal(
-        metaspades.out
+        assembly.out
     )
 
     // Calculate summary metrics for every assembled gene
@@ -105,10 +105,10 @@ workflow annotation_wf {
 }
 
 
-// Assembly with metaspades
-process metaspades {
-    tag "De novo assembly with metaSPAdes"
-    container "${container__spades}"
+// De novo assembly
+process assembly {
+    tag "De novo metagenomic assembly"
+    container "${container__assembler}"
     label 'mem_veryhigh'
     errorStrategy "retry"
 
@@ -118,31 +118,26 @@ process metaspades {
         tuple specimen, file(R1), file(R2)
     
     output:
-        tuple specimen, file("${specimen}.contigs.fasta.gz"), file("${specimen}.scaffolds.fasta.gz"), file("${specimen}.metaspades.log")
+        tuple specimen, file("${specimen}.contigs.fasta.gz"), file("${specimen}.megahit.log")
     
 """
 set -e 
 
-metaspades.py \
-    --meta \
-    --phred-offset ${params.phred_offset} \
+echo -e "Running Megahit\\n"
+
+megahit \
     -1 ${R1} -2 ${R2} \
-    -o . \
-    -t ${task.cpus} -m ${task.memory.toMega() / 1024} | 
-    tee -a ${specimen}.metaspades.log
+    -o OUTPUT \
+    -t ${task.cpus}
 
-echo "\\n\\nDone\\n\\n"
+echo -e "\\nRenaming output files\\n"
 
-# Make sure there were no errors in the log
-(( \$(cat ${specimen}.metaspades.log | grep -c "== Error ==" ) == 0 ))
-
-# Make sure that the contig files aren't empty
-[[ -s contigs.fasta ]] && (( \$(cat contigs.fasta | wc -l) > 1))
-[[ -s scaffolds.fasta ]] && (( \$(cat scaffolds.fasta | wc -l) > 1))
+mv OUTPUT/log "${specimen}.megahit.log"
 
 # Add the specimen name to the contig name
-cat contigs.fasta | sed 's/>/>${specimen}_/' | gzip -c > ${specimen}.contigs.fasta.gz
-cat scaffolds.fasta | sed 's/>/>${specimen}_/' | gzip -c > ${specimen}.scaffolds.fasta.gz
+cat OUTPUT/final.contigs.fa | sed 's/>/>${specimen}__/' | sed 's/ /__/g' | gzip -c > "${specimen}.contigs.fasta.gz"
+
+echo -e "\\nDone\\n"
 """
 }
 
@@ -156,7 +151,7 @@ process prodigal {
     publishDir "${params.output_folder}/assembly/${specimen}/", mode: "copy"
 
     input:
-        tuple val(specimen), file(contigs), file(scaffolds), file(spades_log)
+        tuple val(specimen), file(contigs), file(spades_log)
     
     output:
         file "${specimen}.faa.gz"
@@ -232,10 +227,14 @@ def parse_header(line):
     gene_name, start, stop, strand, details = line.split(" # ")
 
     # The first field in the gene name is the specimen
-    specimen, gene_name = gene_name[1:].split("_NODE_", 1)
+    specimen, gene_name = gene_name[1:].split("__", 1)
 
     # There is more good information to get from the gene name
-    contig_num, _, length, _, depth, gene_num = gene_name.split("_")
+    output_dat = dict([
+        (field.split("=",1)[0], field.split("=",1)[1])
+        for field in gene_name.split("__")
+        if "=" in field
+    ])
 
     # The final piece we want to get is the GC content, from the `details`
     gc = None
@@ -244,19 +243,16 @@ def parse_header(line):
             gc = f[len("gc_cont="):]
     assert gc is not None
 
-    return dict([
-        ("gene_name", gene_name),
-        ("start", int(start)),
-        ("stop", int(stop)),
-        ("strand", strand),
-        ("details", details),
-        ("specimen", specimen),
-        ("contig_num", contig_num),
-        ("contig_length", float(length)),
-        ("contig_depth", float(depth)),
-        ("gene_num", gene_num),
-        ("gc", float(gc))
-    ])
+    # Add the other metrics to the output
+    output["gene_name"] = gene_name
+    output["start"] = int(start)
+    output["stop"] = int(stop)
+    output["strand"] = strand
+    output["details"] = details
+    output["specimen"] = specimen
+    output["gc"] = float(gc)
+
+    return output_dat
 
 # Read in all of the files
 df = pd.DataFrame([
