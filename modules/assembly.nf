@@ -244,13 +244,13 @@ def parse_header(line):
     assert gc is not None
 
     # Add the other metrics to the output
-    output["gene_name"] = gene_name
-    output["start"] = int(start)
-    output["stop"] = int(stop)
-    output["strand"] = strand
-    output["details"] = details
-    output["specimen"] = specimen
-    output["gc"] = float(gc)
+    output_dat["gene_name"] = gene_name
+    output_dat["start"] = int(start)
+    output_dat["stop"] = int(stop)
+    output_dat["strand"] = strand
+    output_dat["details"] = details
+    output_dat["specimen"] = specimen
+    output_dat["gc"] = float(gc)
 
     return output_dat
 
