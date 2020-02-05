@@ -180,7 +180,7 @@ gzip ${specimen}.faa
 process geneAssemblyMetrics {
     tag "Summarize every assembled gene"
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
-    label 'io_limited'
+    label 'mem_medium'
     errorStrategy 'retry'
     publishDir "${params.output_folder}/assembly/", mode: "copy"
     
