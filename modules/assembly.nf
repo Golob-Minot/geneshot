@@ -23,9 +23,14 @@ workflow assembly_wf {
         assembly.out
     )
 
-    // Calculate summary metrics for every assembled gene
+    // Calculate summary metrics for every assembled gene in batches of 10 samples
     geneAssemblyMetrics(
-        prodigal.out[0].collect()
+        prodigal.out[0].collate(10)
+    )
+
+    // Join together each batch of assembly summaries
+    joinAssemblyMetrics(
+        geneAssemblyMetrics.out.collect()
     )
 
     // Combine the gene sequences across all samples
@@ -41,7 +46,7 @@ workflow assembly_wf {
     emit:
         gene_fasta = mmseqs.out[0]
         allele_gene_tsv = mmseqs.out[1]
-        allele_assembly_csv = geneAssemblyMetrics.out
+        allele_assembly_csv = joinAssemblyMetrics.out
 
 }
 
@@ -182,7 +187,6 @@ process geneAssemblyMetrics {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label 'mem_medium'
     errorStrategy 'retry'
-    publishDir "${params.output_folder}/assembly/", mode: "copy"
     
     input:
     file faa_list
@@ -259,6 +263,48 @@ df = pd.DataFrame([
     gene_details
     for fp in faa_list
     for gene_details in parse_prodigal_faa(fp)
+])
+
+# Write out to a file
+df.to_csv(
+    "allele.assembly.metrics.csv.gz",
+    index = None,
+    compression = "gzip"
+)
+
+
+"""
+}
+
+// Join together the assembly summaries from each batch of 10 samples processed earlier
+process joinAssemblyMetrics {
+    tag "Summarize every assembled gene"
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    label 'mem_medium'
+    errorStrategy 'retry'
+    publishDir "${params.output_folder}/assembly/", mode: "copy"
+    
+    input:
+    file "allele.assembly.metrics.*.csv.gz"
+    
+    output:
+    file "allele.assembly.metrics.csv.gz"
+
+"""
+#!/usr/bin/env python3
+import gzip
+import os
+import pandas as pd
+
+# Parse the list of CSV files to read in
+csv_list = [fp for fp in os.listdir(".") if fp.startswith("allele.assembly.metrics.") and fp.endswith(".csv.gz")]
+
+print("Preparing to read in %d CSV files" % len(csv_list))
+
+# Read in all of the CSV files
+df = pd.concat([
+    pd.read_csv(fp, sep=",", compression="gzip")
+    for fp in csv_list
 ])
 
 # Write out to a file
