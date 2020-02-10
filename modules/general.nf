@@ -377,7 +377,7 @@ process addEggnogResults {
 
     input:
         path results_hdf
-        path eggnog_csv
+        path eggnog_csv_list
 
     output:
         path "${results_hdf}"
@@ -388,11 +388,14 @@ process addEggnogResults {
 import pandas as pd
 
 # Read in the eggNOG-mapper results
-eggnog_df = pd.read_csv(
-    "${eggnog_csv}", 
-    header=3, 
-    sep="\\t"
-).rename(columns=dict([("#query_name", "query_name")]))
+eggnog_df = pd.concat([
+    pd.read_csv(
+        fp, 
+        header=3, 
+        sep="\\t"
+    ).rename(columns=dict([("#query_name", "query_name")]))
+    for fp in "${eggnog_csv_list}".split(" ")
+])
 
 print(
     "Read in eggnog results for %d genes" % 
@@ -545,7 +548,7 @@ process addTaxResults {
 
     input:
         path results_hdf
-        path diamond_tax_csv
+        path diamond_tax_csv_list
         path taxonomy_csv
 
     output:
@@ -557,17 +560,20 @@ process addTaxResults {
 import pandas as pd
 
 # Read in the DIAMOND-tax results
-tax_df = pd.read_csv(
-    "${diamond_tax_csv}", 
-    sep="\\t", 
-    header=None
-).rename(
-    columns=dict([
-        (0, "gene"), 
-        (1, "tax_id"), 
-        (2, "evalue")
-    ])
-)
+tax_df = pd.concat([
+    pd.read_csv(
+        fp, 
+        sep="\\t", 
+        header=None
+    ).rename(
+        columns=dict([
+            (0, "gene"), 
+            (1, "tax_id"), 
+            (2, "evalue")
+        ])
+    )
+    for fp in "${diamond_tax_csv_list}".split(" ")
+])
 
 print(
     "Read in taxonomic results for %d genes" % 

@@ -52,6 +52,11 @@ workflow annotation_wf {
 
     main:
 
+    // Split up the gene catalog into shards for more efficient processing
+    shard_genes(
+        gene_fasta
+    )
+
     // Determine whether or not to run the eggNOG annotation based
     // on --noannot and --eggnog_db / --eggnog_dmnd
     run_eggnog = false
@@ -66,11 +71,11 @@ workflow annotation_wf {
     // Annotate the clustered genes with eggNOG
     if ( run_eggnog ){
         eggnog(
-            gene_fasta,
+            shard_genes.out,
             file(params.eggnog_db),
             file(params.eggnog_dmnd)
         )
-        eggnog_tsv = eggnog.out
+        eggnog_tsv = eggnog.out.collect()
     } else {
         eggnog_tsv = false
     }
@@ -89,10 +94,10 @@ workflow annotation_wf {
     // Annotate the clustered genes with DIAMOND for taxonomic ID
     if ( run_tax ) {
         diamond_tax(
-            gene_fasta,
+            shard_genes.out,
             file(params.taxonomic_dmnd)
         )
-        tax_tsv = diamond_tax.out
+        tax_tsv = diamond_tax.out.collect()
     } else {
         tax_tsv = false
     }
@@ -327,6 +332,30 @@ mmseqs result2flat db db genes genes.fasta --use-fasta-header
 gzip genes.alleles.tsv
 gzip genes.fasta
     """
+}
+
+
+process shard_genes {
+    tag "Split the gene catalog into smaller shards"
+    container "ubuntu:18.04"
+    label 'mem_medium'
+    errorStrategy 'retry'
+    
+    input:
+    file fasta_gz
+    
+    output:
+    file "genes.shard.*.fasta.gz"
+    
+"""
+#!/bin/bash
+
+set -e
+
+split --additional-suffix .fasta -t ">" -l 1000000 <(gunzip -c ${fasta_gz}) genes.shard.
+
+gzip genes.shard.*.fasta
+"""
 }
 
 
