@@ -1,5 +1,7 @@
 // Processes used for alignment of reads against gene databases
 
+params.cag_batchsize = 1000000
+
 workflow alignment_wf {
     get:
         gene_fasta
@@ -25,23 +27,31 @@ workflow alignment_wf {
 
     // Make a single table with the abundance of every gene across every sample
     assembleAbundances(
-        famli.out.toSortedList()
+        famli.out.toSortedList(),
+        params.cag_batchsize
     )
 
-    // Group genes into Co-Abundant Gene Groups (CAGs)
-    makeCAGs(
-        assembleAbundances.out
+    // Group shards of genes into Co-Abundant Gene Groups (CAGs)
+    makeInitialCAGs(
+        assembleAbundances.out[0],
+        assembleAbundances.out[1].flatten()
+    )
+
+    // Combine the shards and make a new set of CAGs
+    makeFinalCAGs(
+        assembleAbundances.out[0],
+        makeInitialCAGs.out.collect()
     )
 
     // Calculate the relative abundance of each CAG in these samples
     calcCAGabund(
-        assembleAbundances.out,
-        makeCAGs.out
+        assembleAbundances.out[0],
+        makeFinalCAGs.out
     )
 
     emit:
-        cag_csv = makeCAGs.out
-        gene_abund_feather = assembleAbundances.out
+        cag_csv = makeFinalCAGs.out
+        gene_abund_feather = assembleAbundances.out[0]
         cag_abund_feather = calcCAGabund.out
         famli_json_list = famli.out.toSortedList()
 
@@ -153,9 +163,11 @@ process assembleAbundances {
 
     input:
     file sample_jsons
+    val cag_batchsize
 
     output:
     file "gene.abund.feather"
+    file "gene_list.*.csv.gz"
 
 
     """
@@ -241,10 +253,19 @@ for sample_name, sample_abund in all_abund.items():
         np.float32
     ).values
 
-# Write out to a feather file
+# Write out the abundances to a feather file
 logging.info("Writing to disk")
 df.reset_index(inplace=True)
 df.to_feather("gene.abund.feather")
+
+# Write out the gene names in batches of ${params.cag_batchsize}
+for ix, gene_list in enumerate([
+    all_gene_names[ix: (ix + ${cag_batchsize})]
+    for ix in range(0, len(all_gene_names), ${cag_batchsize})
+]):
+    print("Writing out %d genes in batch %d" % (len(gene_list), ix))
+    with gzip.open("gene_list.%d.csv.gz" % ix, "wt") as handle:
+        handle.write("\\n".join(gene_list))
 
 logging.info("Done")
 
@@ -252,16 +273,16 @@ logging.info("Done")
 
 }
 
-// Make CAGs for each set of samples, at each level of clustering
-process makeCAGs {
-    tag "Group genes by co-abundance"
+// Make CAGs for each set of samples, with the subset of genes for this shard
+process makeInitialCAGs {
+    tag "Group gene subsets by co-abundance"
     container "quay.io/fhcrc-microbiome/find-cags@sha256:30ec0e8b25ef142b68eebcfa84a7a2eeb44ebb25481a60db923fed288abec4a9"
     label "mem_veryhigh"
     errorStrategy 'retry'
-    publishDir "${params.output_folder}/ref/", mode: "copy"
 
     input:
     path gene_feather
+    path gene_list_csv
 
     output:
     file "CAGs.csv.gz"
@@ -284,7 +305,7 @@ from ann_linkage_clustering.lib import make_nmslib_index
 
 # Set up logging
 logFormatter = logging.Formatter(
-    '%(asctime)s %(levelname)-8s [makeCAGs] %(message)s'
+    '%(asctime)s %(levelname)-8s [makeInitialCAGs] %(message)s'
 )
 rootLogger = logging.getLogger()
 rootLogger.setLevel(logging.INFO)
@@ -298,11 +319,15 @@ rootLogger.addHandler(consoleHandler)
 threads = int("${task.cpus}")
 pool = Pool(threads)
 
-# Set the file path
+# Set the file path to the feather with gene abundances
 gene_feather = "${gene_feather}"
 
-# Make sure the file exists
+# Set the file path to the genes for this subset
+gene_list_csv = "${gene_list_csv}"
+
+# Make sure the files exist
 assert os.path.exists(gene_feather), gene_feather
+assert os.path.exists(gene_list_csv), gene_list_csv
 
 logging.info("Reading in gene abundances from %s" % gene_feather)
 df = feather.read_dataframe(
@@ -310,6 +335,21 @@ df = feather.read_dataframe(
 ).set_index("index").applymap(
     np.float16
 )
+
+logging.info("Reading in the list of genes for this shard from %s" % (gene_list_csv))
+gene_list = [
+    line.rstrip("\\n")
+    for line in gzip.open(gene_list_csv, "rt")
+]
+logging.info("This shard contains %d genes" % (len(gene_list)))
+
+# Subset the gene abundances
+logging.info("Making sure that the gene names match between the feather and CSV")
+n_mismatch = len(set(gene_list) - set(df.index.values))
+msg = "Gene names do not match between the feather and CSV (n= %d / %d)" % (n_mismatch, len(gene_list))
+assert n_mismatch == 0, msg
+df = df.reindex(index=gene_list)
+logging.info("Subset down to %d genes for this shard" % (len(gene_list)))
 
 max_dist = float("${params.distance_threshold}")
 logging.info("Maximum cosine distance: %s" % max_dist)
@@ -340,6 +380,137 @@ pool.close()
 
 logging.info("Clearing the previous index from memory")
 del index
+
+logging.info("Refining CAGS")
+iteratively_refine_cags(
+    cags,
+    df.copy(),
+    max_dist,
+    threads=threads,
+    distance_metric="${params.distance_metric}",
+    linkage_type="${params.linkage_type}"
+)
+
+logging.info("Formatting CAGs as a DataFrame")
+cags_df = pd.DataFrame(
+    [
+        [ix, gene_id]
+        for ix, list_of_genes in enumerate(
+            sorted(
+                list(
+                    cags.values()
+                ), 
+                key=len, 
+                reverse=True
+            )
+        )
+        for gene_id in list_of_genes
+    ],
+    columns=["CAG", "gene"]
+)
+
+# Make sure that we have every gene assigned to a CAG
+assert cags_df.shape[0] == df.shape[0], (cags_df.shape[0], df.shape[0])
+
+logging.info("Largest CAGs:")
+print(cags_df["CAG"].value_counts().head())
+
+fp_out = "CAGs.csv.gz"
+
+logging.info("Writing out CAGs to %s" % fp_out)
+cags_df.to_csv(fp_out, compression="gzip", index=None)
+
+logging.info("Done")
+    """
+}
+
+// Make CAGs for each set of samples, combining CAGs made for each individual shard
+process makeFinalCAGs {
+    tag "Group all genes by co-abundance"
+    container "quay.io/fhcrc-microbiome/find-cags@sha256:30ec0e8b25ef142b68eebcfa84a7a2eeb44ebb25481a60db923fed288abec4a9"
+    label "mem_veryhigh"
+    errorStrategy 'retry'
+    publishDir "${params.output_folder}/ref/", mode: "copy"
+
+    input:
+    path gene_feather
+    path "shard.CAG.*.csv.gz"
+
+    output:
+    file "CAGs.csv.gz"
+
+    """
+#!/usr/bin/env python3
+
+import feather
+import gzip
+import json
+import logging
+from multiprocessing import Pool
+import nmslib
+import numpy as np
+import os
+import pandas as pd
+from ann_linkage_clustering.lib import make_cags_with_ann
+from ann_linkage_clustering.lib import iteratively_refine_cags
+from ann_linkage_clustering.lib import make_nmslib_index
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [makeFinalCAGs] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+# Set up the multiprocessing pool
+threads = int("${task.cpus}")
+pool = Pool(threads)
+
+# Set the file path to the feather with gene abundances
+gene_feather = "${gene_feather}"
+
+# Make sure the files exist
+assert os.path.exists(gene_feather), gene_feather
+
+# Set the file path to the CAGs made for each subset
+cag_csv_list = [
+    fp
+    for fp in os.listdir(".")
+    if fp.startswith("shard.CAG.")
+]
+# Make sure all of the files have the complete ending
+# (incompletely staged files will have a random suffix appended)
+for fp in cag_csv_list:
+    assert fp.endswith(".csv.gz"), "Incomplete input file found: %s" % (fp)
+
+assert len(cag_csv_list) > 0, "Didn't find CAGs from any previous shard"
+
+logging.info("Reading in gene abundances from %s" % gene_feather)
+df = feather.read_dataframe(
+    gene_feather
+).set_index("index").applymap(
+    np.float16
+)
+
+logging.info("Reading in CAGs from previous shard")
+cags = dict()
+ix = 0
+n = 0
+for fp in cag_csv_list:
+    shard_cags = pd.read_csv(fp, compression="gzip", sep=",")
+    for _, gene_list in shard_cags.groupby("CAG"):
+        cags[ix] = gene_list['gene'].tolist()
+        ix += 1
+        n += gene_list.shape[0]
+logging.info("Read in %d CAGs from %d shards covering %d genes" % (len(cags), len(cag_csv_list), n))
+
+max_dist = float("${params.distance_threshold}")
+logging.info("Maximum cosine distance: %s" % max_dist)
 
 logging.info("Refining CAGS")
 iteratively_refine_cags(
