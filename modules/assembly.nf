@@ -76,7 +76,7 @@ workflow annotation_wf {
     // Annotate the clustered genes with eggNOG
     if ( run_eggnog ){
         eggnog(
-            shard_genes.out,
+            shard_genes.out.flatten(),
             file(params.eggnog_db),
             file(params.eggnog_dmnd)
         )
@@ -99,7 +99,7 @@ workflow annotation_wf {
     // Annotate the clustered genes with DIAMOND for taxonomic ID
     if ( run_tax ) {
         diamond_tax(
-            shard_genes.out,
+            shard_genes.out.flatten(),
             file(params.taxonomic_dmnd)
         )
         tax_tsv = diamond_tax.out.collect()
