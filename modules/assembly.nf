@@ -398,7 +398,7 @@ process shard_genes {
 
 set -e
 
-split --additional-suffix .fasta -t ">" -l 1000000 <(gunzip -c ${fasta_gz}) genes.shard.
+split --additional-suffix .fasta -l 1000000 <(gunzip -c ${fasta_gz}) genes.shard.
 
 gzip genes.shard.*.fasta
 """
