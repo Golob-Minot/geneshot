@@ -58,7 +58,7 @@ process outputManifest {
 
 // Workflow to publish a set of reads to a folder, along with a manifest
 workflow writeManifest {
-    get:
+    take:
         reads_ch
 
     main:

@@ -3,7 +3,7 @@
 params.cag_batchsize = 1000000
 
 workflow alignment_wf {
-    get:
+    take:
         gene_fasta
         reads_ch
 

@@ -51,7 +51,7 @@ def filter_valid_index(manifest_ch){
 
 workflow preprocess_wf {
 
-    get:
+    take:
     manifest_file
 
     main:

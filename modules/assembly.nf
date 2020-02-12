@@ -8,7 +8,7 @@ include diamondDB from "./alignment" params(
 )
 
 workflow assembly_wf {
-    get:
+    take:
         combined_reads_ch
 
     main:
@@ -52,7 +52,7 @@ workflow assembly_wf {
 
 // Break out the annotation into a separate workflow
 workflow annotation_wf {
-    get:
+    take:
     gene_fasta
 
     main:

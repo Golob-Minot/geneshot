@@ -4,7 +4,7 @@
 // This is intended to catch the case early on where the provided formula
 // is not formatted correctly, or does not match the manifest (sample sheet)
 workflow validation_wf {
-    get: manifest_csv
+    take: manifest_csv
     main: 
 
     mockData(
@@ -28,7 +28,7 @@ workflow validation_wf {
 
 // Workflow to run corncob on the actual data
 workflow corncob_wf {
-    get:
+    take:
     famli_json_list
     cag_csv
     manifest_csv
