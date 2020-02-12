@@ -70,7 +70,7 @@ def helpMessage() {
     log.info"""
     Usage:
 
-    nextflow run jgolob/geneshot <ARGUMENTS>
+    nextflow run Golob-Minot/geneshot <ARGUMENTS>
     
     Required Arguments:
       --manifest            CSV file listing samples (see below)
