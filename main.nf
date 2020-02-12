@@ -150,6 +150,7 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
+include read_manifest from './modules/preprocess'
 include preprocess_wf from './modules/preprocess' params(
     manifest: params.manifest,
     adapter_F: params.adapter_F,
@@ -175,7 +176,10 @@ include combineReads from './modules/general' params(
     output_folder: output_folder
 )
 include addGeneAssembly from './modules/general'
+include readTaxonomy from './modules/general'
+include addEggnogResults from './modules/general'
 include addCorncobResults from './modules/general'
+include addTaxResults from './modules/general'
 include makeSummaryHDF from './modules/general' params(
     output_prefix: params.output_prefix
 )
