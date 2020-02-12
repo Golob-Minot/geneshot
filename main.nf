@@ -150,7 +150,7 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include './modules/preprocess' params(
+include preprocess_wf from './modules/preprocess' params(
     manifest: params.manifest,
     adapter_F: params.adapter_F,
     adapter_R: params.adapter_R,
@@ -159,16 +159,44 @@ include './modules/preprocess' params(
     min_hg_align_score: params.min_hg_align_score,
 )
 // Import some general tasks, such as combineReads and writeManifest
-include './modules/general' params(
+include countReads from './modules/general'
+include countReadsSummary from './modules/general' params(
+    output_folder: output_folder
+)
+include collectAbundances from './modules/general' params(
+    output_prefix: params.output_prefix
+)
+include writeManifest from './modules/general' params(
     savereads: params.savereads,
-    output_folder: output_folder,
+    output_folder: output_folder
+)
+include combineReads from './modules/general' params(
+    savereads: params.savereads,
+    output_folder: output_folder
+)
+include addGeneAssembly from './modules/general'
+include addCorncobResults from './modules/general'
+include makeSummaryHDF from './modules/general' params(
     output_prefix: params.output_prefix
 )
 include repackHDF as repackFullHDF from './modules/general'
 include repackHDF as repackSummaryHDF from './modules/general'
 
-// Import the workflows used for assembly and annotation
-include './modules/assembly' params(
+// Import the workflows used for assembly
+include assembly_wf from './modules/assembly' params(
+    output_folder: output_folder,
+    phred_offset: params.phred_offset,
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage,
+    noannot: params.noannot,
+    eggnog_db: params.eggnog_db,
+    eggnog_dmnd: params.eggnog_dmnd,
+    taxonomic_dmnd: params.taxonomic_dmnd,
+    gencode: params.gencode,
+)
+
+// Import the workflows used for annotation
+include annotation_wf from './modules/assembly' params(
     output_folder: output_folder,
     phred_offset: params.phred_offset,
     min_identity: params.min_identity,
@@ -181,7 +209,7 @@ include './modules/assembly' params(
 )
 
 // Import the workflows used for alignment-based analysis
-include './modules/alignment' params(
+include alignment_wf from './modules/alignment' params(
     output_folder: output_folder,
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
@@ -193,7 +221,12 @@ include './modules/alignment' params(
     linkage_type: params.linkage_type,
 )
 
-include './modules/statistics' params(
+// Import the workflows used for statistical analysis
+include validation_wf from './modules/statistics' params(
+    output_folder: output_folder,
+    formula: params.formula
+)
+include corncob_wf from './modules/statistics' params(
     output_folder: output_folder,
     formula: params.formula
 )
