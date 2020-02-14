@@ -143,7 +143,7 @@ megahit \
 
 date
 echo -e "\\nMaking sure output files are not empty\\n"
-[[ $(cat OUTPUT/final.contigs.fa | wc -l) > 0 ]]
+[[ \$(cat OUTPUT/final.contigs.fa | wc -l) > 0 ]]
 
 date
 echo -e "\\nRenaming output files\\n"
