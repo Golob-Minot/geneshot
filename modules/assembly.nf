@@ -133,6 +133,7 @@ process assembly {
 """
 set -e 
 
+date
 echo -e "Running Megahit\\n"
 
 megahit \
@@ -140,6 +141,11 @@ megahit \
     -o OUTPUT \
     -t ${task.cpus}
 
+date
+echo -e "\\nMaking sure output files are not empty\\n"
+[[ $(cat OUTPUT/final.contigs.fa | wc -l) > 0 ]]
+
+date
 echo -e "\\nRenaming output files\\n"
 
 mv OUTPUT/log "${specimen}.megahit.log"
@@ -147,6 +153,7 @@ mv OUTPUT/log "${specimen}.megahit.log"
 # Add the specimen name to the contig name
 cat OUTPUT/final.contigs.fa | sed 's/>/>${specimen}__/' | sed 's/ /__/g' | gzip -c > "${specimen}.contigs.fasta.gz"
 
+date
 echo -e "\\nDone\\n"
 """
 }
