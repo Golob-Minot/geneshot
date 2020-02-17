@@ -183,22 +183,18 @@ cag_abund_feather = "${cag_abund_feather}"
 famli_json_list = "${famli_json_list}".split(" ")
 readcount_csv = "${readcount_csv}"
 manifest_csv = "${manifest_csv}"
+suffix=".json.gz"
 
 # Function to read in the FAMLI output
-def read_famli_json(fp, suffix=".json.gz"):
+def read_famli_json(fp):
 
-    # Get the sample name from the file name
-    assert fp.endswith(suffix)
-    sample_name = fp[:-len(suffix)]
-
+    # Read in the JSON as a DataFrame
     df = pd.DataFrame(
         json.load(
             gzip.open(
                 fp, "rt"
             )
         )
-    ).assign(
-        specimen=sample_name
     )
 
     assert df.shape[0] == df.dropna().shape[0], "Missing values for %s" % (sample_name)
@@ -210,13 +206,17 @@ def read_famli_json(fp, suffix=".json.gz"):
 with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
 
     # Read in the complete set of FAMLI results
-    famli_df = pd.concat([
-        read_famli_json(fp)
-        for fp in famli_json_list
-    ])
+    for fp in famli_json_list:
 
-    # Write to HDF5
-    famli_df.to_hdf(store, "/abund/gene/long")
+        # Get the sample name from the file name
+        assert fp.endswith(suffix)
+        sample_name = fp[:-len(suffix)]
+
+        # Write to HDF5 for this sample
+        print("Saving gene information for %s from %s" % (sample_name, fp))
+        read_famli_json(fp).to_hdf(
+            store, "/abund/gene/long/%s" % sample_name
+        )
     
     # Read in the summary of the number of reads across all samples
     readcount_df = pd.read_csv(readcount_csv)
