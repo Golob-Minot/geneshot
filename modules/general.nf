@@ -205,6 +205,9 @@ def read_famli_json(fp):
 # Open a connection to the HDF5
 with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
 
+    # Keep track of the total number of aligned reads for each sample
+    aligned_reads_dict = dict()
+
     # Read in the complete set of FAMLI results
     for fp in famli_json_list:
 
@@ -212,18 +215,24 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
         assert fp.endswith(suffix)
         sample_name = fp[:-len(suffix)]
 
-        # Write to HDF5 for this sample
-        print("Saving gene information for %s from %s" % (sample_name, fp))
-        read_famli_json(fp).to_hdf(
+        # Read from JSON for this sample
+        print("Reading gene information for %s from %s" % (sample_name, fp))
+        df = read_famli_json(fp)
+        
+        print("Saving to HDF")
+        df.to_hdf(
             store, "/abund/gene/long/%s" % sample_name
         )
+
+        # Record the total number of aligned reads for this sample
+        aligned_reads_dict[sample_name] = df["nreads"].sum()
     
     # Read in the summary of the number of reads across all samples
     readcount_df = pd.read_csv(readcount_csv)
 
     # Add the number of aligned reads per sample
     readcount_df["aligned_reads"] = readcount_df["specimen"].apply(
-        famli_df.groupby("specimen")["nreads"].sum().get
+        aligned_reads_dict.get
     )
 
     # Write to HDF5
