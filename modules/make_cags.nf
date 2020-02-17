@@ -137,9 +137,6 @@ cags_df = pd.DataFrame(
     columns=["CAG", "gene"]
 )
 
-# Make sure that we have every gene assigned to a CAG
-assert cags_df.shape[0] == df.shape[0], (cags_df.shape[0], df.shape[0])
-
 logging.info("Largest CAGs:")
 print(cags_df["CAG"].value_counts().head())
 
@@ -267,9 +264,6 @@ cags_df = pd.DataFrame(
     ],
     columns=["CAG", "gene"]
 )
-
-# Make sure that we have every gene assigned to a CAG
-assert cags_df.shape[0] == df.shape[0], (cags_df.shape[0], df.shape[0])
 
 logging.info("Largest CAGs:")
 print(cags_df["CAG"].value_counts().head())
