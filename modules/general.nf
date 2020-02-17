@@ -191,7 +191,7 @@ def read_famli_json(fp, suffix=".json.gz"):
     assert fp.endswith(suffix)
     sample_name = fp[:-len(suffix)]
 
-    return pd.DataFrame(
+    df = pd.DataFrame(
         json.load(
             gzip.open(
                 fp, "rt"
@@ -200,6 +200,10 @@ def read_famli_json(fp, suffix=".json.gz"):
     ).assign(
         specimen=sample_name
     )
+
+    assert df.shape[0] == df.dropna().shape[0], "Missing values for %s" % (sample_name)
+
+    return df
 
 
 # Open a connection to the HDF5
