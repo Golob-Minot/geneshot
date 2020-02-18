@@ -81,6 +81,9 @@ workflow annotation_wf {
             file(params.eggnog_dmnd)
         )
         eggnog_tsv = eggnog.out.collect()
+        join_eggnog(
+            eggnog_tsv
+        )
     } else {
         eggnog_tsv = false
     }
@@ -103,6 +106,9 @@ workflow annotation_wf {
             file(params.taxonomic_dmnd)
         )
         tax_tsv = diamond_tax.out.collect()
+        join_tax(
+            tax_tsv
+        )
     } else {
         tax_tsv = false
     }
@@ -416,7 +422,6 @@ process diamond_tax {
     tag "Annotate genes by taxonomy"
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
-    publishDir "${params.output_folder}/annot/", mode: "copy"
 
     input:
     file query
@@ -446,12 +451,37 @@ rm ${diamond_tax_db}
 
 }
 
+process join_tax {
+    tag "Concatenate taxonomy annotation files"
+    container "ubuntu:18.04"
+    label 'mem_medium'
+    publishDir "${params.output_folder}/annot/", mode: "copy"
+
+    input:
+    file diamond_tax_tsv_list
+    
+    output:
+    file "genes.tax.aln.gz"
+
+    
+"""
+set -e
+
+for fp in ${diamond_tax_tsv_list}; do
+
+    cat \$fp
+    rm \$fm
+
+done > genes.tax.aln.gz
+"""
+
+}
+
 
 process eggnog {
     tag "Annotate genes by predicted function"
     container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
     label 'mem_veryhigh'
-    publishDir "${params.output_folder}/annot/", mode: "copy"
     
     input:
     path query
@@ -484,5 +514,31 @@ emapper.py \
 gzip genes.emapper.annotations
     
     """
+
+}
+
+process join_eggnog {
+    tag "Concatenate eggNOG annotation files"
+    container "ubuntu:18.04"
+    label 'mem_medium'
+    publishDir "${params.output_folder}/annot/", mode: "copy"
+
+    input:
+    file eggnog_tsv_list
+    
+    output:
+    file "genes.emapper.annotations.gz"
+
+    
+"""
+set -e
+
+for fp in ${eggnog_tsv_list}; do
+
+    cat \$fp
+    rm \$fm
+
+done > genes.emapper.annotations.gz
+"""
 
 }
