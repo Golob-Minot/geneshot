@@ -576,7 +576,7 @@ process addTaxResults {
 
     input:
         path results_hdf
-        path diamond_tax_csv_list
+        path "genes.tax.aln.*.gz"
         path taxonomy_csv
 
     output:
@@ -585,7 +585,18 @@ process addTaxResults {
 """
 #!/usr/bin/env python3
 
+import os
 import pandas as pd
+
+diamond_tax_csv_list = [
+    fp
+    for fp in os.listdir(".")
+    if fp.startswith("genes.tax.aln")
+]
+for fp in diamond_tax_csv_list:
+    assert fp.endswith(".gz")
+
+print("Found %d taxonomy results CSVs to import" % len(diamond_tax_csv_list))
 
 # Read in the DIAMOND-tax results
 tax_df = pd.concat([
@@ -600,7 +611,7 @@ tax_df = pd.concat([
             (2, "evalue")
         ])
     )
-    for fp in "${diamond_tax_csv_list}".split(" ")
+    for fp in diamond_tax_csv_list
 ])
 
 print(
