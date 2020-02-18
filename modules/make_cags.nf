@@ -1,5 +1,10 @@
 container__find_cags = "quay.io/fhcrc-microbiome/find-cags:v0.12.1"
 
+// Default options
+params.distance_threshold = 0.5
+params.distance_metric = "cosine"
+params.linkage_type = "average"
+
 // Make CAGs for each set of samples, with the subset of genes for this shard
 process makeInitialCAGs {
     tag "Group gene subsets by co-abundance"

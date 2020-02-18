@@ -6,6 +6,27 @@ container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
 include diamondDB from "./alignment" params(
     output_folder: params.output_folder
 )
+include mmseqs as mmseqsRound1 from "./mmseqs" params(
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
+)
+include mmseqs as mmseqsRound2 from "./mmseqs" params(
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
+)
+include mmseqs as mmseqsRound3 from "./mmseqs" params(
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
+)
+include mmseqs as mmseqsRound4 from "./mmseqs" params(
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
+)
+include mmseqs as mmseqsRound5 from "./mmseqs" params(
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
+)
+include joinGeneClusters from "./mmseqs"
 
 workflow assembly_wf {
     take:
@@ -38,14 +59,38 @@ workflow assembly_wf {
         prodigal.out[0].collect()
     )
 
-    // Combine genes by amino acid identity
-    mmseqs(
+    // Combine genes by amino acid identity in five rounds
+    mmseqsRound1(
         combineCDS.out
+    )
+    mmseqsRound2(
+        mmseqsRound1.out[0]
+    )
+    mmseqsRound3(
+        mmseqsRound2.out[0]
+    )
+    mmseqsRound4(
+        mmseqsRound3.out[0]
+    )
+    mmseqsRound5(
+        mmseqsRound4.out[0]
+    )
+    // Combine all of the gene table annotations
+    joinGeneClusters(
+        mmseqsRound1.out[1].mix(
+            mmseqsRound2.out[1]
+        ).mix(
+            mmseqsRound3.out[1]
+        ).mix(
+            mmseqsRound4.out[1]
+        ).mix(
+            mmseqsRound5.out[1]
+        ).collect()
     )
 
     emit:
-        gene_fasta = mmseqs.out[0]
-        allele_gene_tsv = mmseqs.out[1]
+        gene_fasta = mmseqsRound5.out[0]
+        allele_gene_tsv = joinGeneClusters.out
         allele_assembly_csv = joinAssemblyMetrics.out
 
 }
@@ -355,41 +400,6 @@ process combineCDS {
 set -e
 cat *fasta.gz > all_CDS.fasta.gz
 gzip -t all_CDS.fasta.gz
-    """
-}
-
-
-process mmseqs {
-    tag "Cluster genes with similar sequences"
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-    label 'mem_veryhigh'
-    errorStrategy 'retry'
-    publishDir "${params.output_folder}/ref/", mode: "copy"
-    
-    input:
-    file all_cds
-    
-    output:
-    file "genes.fasta.gz"
-    file "genes.alleles.tsv.gz"
-    
-    """
-#!/bin/bash
-set -e
-# Make the MMSeqs2 database
-mmseqs createdb ${all_cds} db
-# Cluster the protein sequences
-mmseqs linclust db cluster_db ./ \
-    --min-seq-id ${params.min_identity / 100} \
-    --max-seqs 100000 \
-    -c ${params.min_coverage / 100}
-# Make TSV output for clustering
-mmseqs createtsv db db cluster_db genes.alleles.tsv
-# Get the representative sequences
-mmseqs result2repseq db cluster_db genes
-mmseqs result2flat db db genes genes.fasta --use-fasta-header
-gzip genes.alleles.tsv
-gzip genes.fasta
     """
 }
 

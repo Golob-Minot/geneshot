@@ -2,6 +2,11 @@
 
 params.cag_batchsize = 100000
 
+// Default options
+params.distance_threshold = 0.5
+params.distance_metric = "cosine"
+params.linkage_type = "average"
+
 include makeInitialCAGs from "./make_cags" params(
     distance_threshold: params.distance_threshold,
     distance_metric: params.distance_metric,
