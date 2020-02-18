@@ -46,7 +46,7 @@ process joinGeneClusters {
     tag "Combine multiple rounds of gene clustering"
     container "${container__pandas}"
     label 'mem_medium'
-    // errorStrategy 'retry'
+    errorStrategy 'retry'
 
     input:
     file "genes.alleles.*.tsv.gz"
