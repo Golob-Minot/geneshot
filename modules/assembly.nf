@@ -470,7 +470,7 @@ set -e
 for fp in ${diamond_tax_tsv_list}; do
 
     cat \$fp
-    rm \$fm
+    rm \$fp
 
 done > genes.tax.aln.gz
 """
@@ -536,7 +536,7 @@ set -e
 for fp in ${eggnog_tsv_list}; do
 
     cat \$fp
-    rm \$fm
+    rm \$fp
 
 done > genes.emapper.annotations.gz
 """
