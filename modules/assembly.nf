@@ -25,12 +25,12 @@ workflow assembly_wf {
 
     // Calculate summary metrics for every assembled gene in batches of 10 samples
     geneAssemblyMetrics(
-        prodigal.out[0].collate(10)
+        prodigal.out[0].toSortedList().flatten().collate(10)
     )
 
     // Join together each batch of assembly summaries
     joinAssemblyMetrics(
-        geneAssemblyMetrics.out.collect()
+        geneAssemblyMetrics.out.toSortedList()
     )
 
     // Combine the gene sequences across all samples
