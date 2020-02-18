@@ -277,6 +277,19 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     # Also create the `/annot/gene/all` table, which will be added to later
     cag_df.to_hdf(store, "/annot/gene/all")
 
+    # Make a summary table describing each CAG with size, mean_abundance, and prevalence
+    # Save it in the HDF5 as "/annot/cag/all"
+    cag_abund_df.set_index("CAG", inplace=True)
+    cag_summary_df = pd.DataFrame(dict([
+        ("size", cag_df["CAG"].value_counts()),
+        ("prevalence", (cag_abund_df > 0).mean(axis=1)),
+        ("mean_abundance", cag_abund_df.mean(axis=1))
+    ])).reset_index(
+    ).to_hdf(
+        store,
+        "/annot/cag/all"
+    )
+
     # Write out the manifest provided by the user
     pd.read_csv("${manifest_csv}").to_hdf(store, "/manifest")
 
@@ -704,6 +717,9 @@ with pd.HDFStore("${full_results_hdf}", "r") as store:
     # Table with gene annotations (including CAG membership)
     gene_annot_df = pd.read_hdf(store, "/annot/gene/all")
 
+    # Table summarizing the size, prevalence, and mean abundance of every CAG
+    cag_summary_df = pd.read_hdf(store, "/annot/cag/all")
+
     # Number of read pairs
     readcount_df = pd.read_hdf(store, "/summary/readcount")
 
@@ -738,6 +754,11 @@ with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
         "/annot/gene/all", 
         format="table",
         data_columns=["CAG"]
+    )
+    cag_summary_df.to_hdf(
+        store,
+        "/annot/cag/all",
+        format="fixed"
     )
 
     if corncob_df is not None:
