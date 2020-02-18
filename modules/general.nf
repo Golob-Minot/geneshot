@@ -390,7 +390,7 @@ process addEggnogResults {
 
     input:
         path results_hdf
-        path eggnog_csv_list
+        path "genes.emapper.annotations.*.gz"
 
     output:
         path "${results_hdf}"
@@ -398,7 +398,22 @@ process addEggnogResults {
 """
 #!/usr/bin/env python3
 
+import os
 import pandas as pd
+
+# Get the list of files with eggNOG results
+eggnog_csv_list = [
+    fp
+    for fp in os.listdir(".")
+    if fp.startswith("genes.emapper.annotations")
+]
+
+# Make sure that every eggNOG file ends with '.gz'
+# If not, this is a sign that the file was staged incorrectly
+for fp in eggnog_csv_list:
+    assert fp.endswith('.gz'), "Unexpected: %s" % fp
+
+print("Found %d files with eggNOG results" % len(eggnog_csv_list))
 
 # Read in the eggNOG-mapper results
 eggnog_df = pd.concat([
@@ -407,7 +422,7 @@ eggnog_df = pd.concat([
         header=3, 
         sep="\\t"
     ).rename(columns=dict([("#query_name", "query_name")]))
-    for fp in "${eggnog_csv_list}".split(" ")
+    for fp in eggnog_csv_list
 ])
 
 print(
