@@ -458,7 +458,7 @@ process join_tax {
     publishDir "${params.output_folder}/annot/", mode: "copy"
 
     input:
-    file diamond_tax_tsv_list
+    file "genes.tax.aln.*.gz"
     
     output:
     file "genes.tax.aln.gz"
@@ -467,7 +467,7 @@ process join_tax {
 """
 set -e
 
-for fp in ${diamond_tax_tsv_list}; do
+for fp in genes.tax.aln.*.gz; do
 
     cat \$fp
     rm \$fp
@@ -524,7 +524,7 @@ process join_eggnog {
     publishDir "${params.output_folder}/annot/", mode: "copy"
 
     input:
-    file eggnog_tsv_list
+    file "genes.emapper.annotations.*.gz"
     
     output:
     file "genes.emapper.annotations.gz"
@@ -533,12 +533,13 @@ process join_eggnog {
 """
 set -e
 
-for fp in ${eggnog_tsv_list}; do
+for fp in genes.emapper.annotations.*.gz; do
 
     cat \$fp
     rm \$fp
 
 done > genes.emapper.annotations.gz
+
 """
 
 }
