@@ -285,6 +285,8 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
         ("prevalence", (cag_abund_df > 0).mean(axis=1)),
         ("mean_abundance", cag_abund_df.mean(axis=1))
     ])).reset_index(
+    ).rename(
+        columns=dict([("index", "CAG")])
     ).to_hdf(
         store,
         "/annot/cag/all"
