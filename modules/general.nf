@@ -176,6 +176,8 @@ process collectAbundances{
 import gzip
 import json
 import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 cag_csv = "${cag_csv}"
 gene_abund_feather = "${gene_abund_feather}"
@@ -201,6 +203,66 @@ def read_famli_json(fp):
 
     return df
 
+# Perform different types of ordination and include them in the output HDF
+def run_ordination(abund_df, ordination_type):
+
+    if ordination_type == "pca":
+        return run_pca(abund_df)
+    elif ordination_type == "tsne":
+        return run_tsne(abund_df)
+    else:
+        assert "No code available to run ordination type: %s" % ordination_type
+
+# Dimensionality reduction with PCA
+def run_pca(abund_df):
+    
+    # Initialize the PCA object
+    pca = PCA()
+    
+    # Fit to the data
+    pca.fit(abund_df)
+
+    # Make an output DataFrame
+    return pd.DataFrame(
+        pca.transform(
+            abund_df
+        ),
+        index=abund_df.index.values,
+        columns=[
+            "PC%d (%s%s)" % (
+                ix + 1,
+                round(100 * r, 1) if r > 0.01 else "%.1E" % (100 * r),
+                '%'
+            )
+            for ix, r in enumerate(
+                pca.explained_variance_ratio_
+            )
+        ]
+    ).reset_index(
+    )
+
+# Dimensionality reduction with t-SNE
+def run_tsne(abund_df, n_components=2):
+    
+    # Initialize the TSNE object
+    tsne = TSNE(
+        n_components=n_components
+    )
+
+    # Make an output DataFrame with the transformed data
+    return pd.DataFrame(
+        tsne.fit_transform(
+            abund_df
+        ),
+        index=abund_df.index.values,
+        columns=[
+            "t-SNE %d" % (
+                ix + 1
+            )
+            for ix in range(n_components)
+        ]
+    ).reset_index(
+    )
 
 # Open a connection to the HDF5
 with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
@@ -250,6 +312,19 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
 
     # Write to HDF5
     cag_abund_df.to_hdf(store, "/abund/cag/wide")
+
+    # Perform ordination, both PCA and t-SNE and write to store
+    for ordination_type in ["pca", "tsne"]:
+
+        # The ordination methods expect samples to be in rows
+        # and so we need to rotate the /abund/cags/wide object
+        run_ordination(
+            cag_abund_df.set_index("CAG").T,
+            ordination_type
+        ).to_hdf(
+            store,
+            "/ordination/%s" % ordination_type
+        )
 
     # Read in the table with the gene-level abundances across all samples
     gene_abund_df = pd.read_feather(
@@ -716,6 +791,12 @@ with pd.HDFStore("${full_results_hdf}", "r") as store:
     # Table with the abundance of every CAG in every sample
     cag_abund_df = pd.read_hdf(store, "/abund/cag/wide")
 
+    # Table with PCA for every sample, based on CAG abundances
+    pca_df = pd.read_hdf(store, "/ordination/pca")
+
+    # Table with t-SNE for every sample, based on CAG abundances
+    tsne_df = pd.read_hdf(store, "/ordination/tsne")
+
     # Table with gene annotations (including CAG membership)
     gene_annot_df = pd.read_hdf(store, "/annot/gene/all")
 
@@ -750,6 +831,16 @@ with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
         "/abund/cag/wide", 
         format="table",
         data_columns=["CAG"]
+    )
+    pca_df.to_hdf(
+        store,
+        "/ordination/pca",
+        format="fixed"
+    )
+    tsne_df.to_hdf(
+        store,
+        "/ordination/tsne",
+        format="fixed"
     )
     gene_annot_df.to_hdf(
         store, 
