@@ -45,7 +45,7 @@ echo "Done"
 process joinGeneClusters {
     tag "Combine multiple rounds of gene clustering"
     container "${container__pandas}"
-    label 'mem_medium'
+    label 'mem_veryhigh'
     errorStrategy 'retry'
 
     input:
