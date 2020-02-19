@@ -83,6 +83,8 @@ for fp in os.listdir("."):
             header=None,
             names=['gene', 'allele'], 
             usecols=[0, 1]
+        ).applymap(
+            str
         )
     )
     print(cluster_list[-1].head())
