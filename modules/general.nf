@@ -239,7 +239,7 @@ def run_pca(abund_df):
             )
         ]
     ).reset_index(
-    )
+    ).rename(columns=dict([('index', 'specimen')]))
 
 # Dimensionality reduction with t-SNE
 def run_tsne(abund_df, n_components=2):
@@ -262,7 +262,7 @@ def run_tsne(abund_df, n_components=2):
             for ix in range(n_components)
         ]
     ).reset_index(
-    )
+    ).rename(columns=dict([('index', 'specimen')]))
 
 # Open a connection to the HDF5
 with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
