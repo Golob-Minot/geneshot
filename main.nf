@@ -95,7 +95,7 @@ def helpMessage() {
                             If provided, then the entire de novo assembly process will be skipped entirely.
       --phred_offset        for spades. Default 33.
       --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90)
-      --min_coverage        Length cutoff used to combine similar genes (default: 50) (mmseqs2)
+      --min_coverage        Length cutoff used to combine similar genes (default: 50) (linclust)
 
     For Annotation:
       --noannot             If specified, disable annotation for taxonomy or function.
