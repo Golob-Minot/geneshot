@@ -26,7 +26,10 @@ include mmseqs as mmseqsRound5 from "./mmseqs" params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
-include joinGeneClusters from "./mmseqs"
+include joinGeneClusters as joinGeneClusters1to2 from "./mmseqs"
+include joinGeneClusters as joinGeneClusters2to3 from "./mmseqs"
+include joinGeneClusters as joinGeneClusters3to4 from "./mmseqs"
+include joinGeneClusters as joinGeneClusters4to5 from "./mmseqs"
 
 workflow assembly_wf {
     take:
@@ -75,22 +78,27 @@ workflow assembly_wf {
     mmseqsRound5(
         mmseqsRound4.out[0]
     )
-    // Combine all of the gene table annotations
-    joinGeneClusters(
-        mmseqsRound1.out[1].mix(
-            mmseqsRound2.out[1]
-        ).mix(
-            mmseqsRound3.out[1]
-        ).mix(
-            mmseqsRound4.out[1]
-        ).mix(
-            mmseqsRound5.out[1]
-        ).collect()
+    // Combine all of the gene table annotations, in reverse order
+    joinGeneClusters4to5(
+        mmseqsRound4.out[1],
+        mmseqsRound5.out[1]
+    )
+    joinGeneClusters3to4(
+        mmseqsRound3.out[1],
+        joinGeneClusters4to5.out
+    )
+    joinGeneClusters2to3(
+        mmseqsRound2.out[1],
+        joinGeneClusters3to4.out
+    )
+    joinGeneClusters1to2(
+        mmseqsRound1.out[1],
+        joinGeneClusters2to3.out
     )
 
     emit:
         gene_fasta = mmseqsRound5.out[0]
-        allele_gene_tsv = joinGeneClusters.out
+        allele_gene_tsv = joinGeneClusters1to2.out
         allele_assembly_csv = joinAssemblyMetrics.out
 
 }
