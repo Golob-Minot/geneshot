@@ -2,34 +2,31 @@
 
 // Containers
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
 
 include diamondDB from "./alignment" params(
     output_folder: params.output_folder
 )
-include mmseqs as mmseqsRound1 from "./mmseqs" params(
+include linclust as linclustRound1 from "./mmseqs" params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
-include mmseqs as mmseqsRound2 from "./mmseqs" params(
+include linclust as linclustRound2 from "./mmseqs" params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
-include mmseqs as mmseqsRound3 from "./mmseqs" params(
+include linclust as linclustRound3 from "./mmseqs" params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
-include mmseqs as mmseqsRound4 from "./mmseqs" params(
+include linclust as linclustRound4 from "./mmseqs" params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
-include mmseqs as mmseqsRound5 from "./mmseqs" params(
+include linclust as linclustRound5 from "./mmseqs" params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
-include joinGeneClusters as joinGeneClusters1to2 from "./mmseqs"
-include joinGeneClusters as joinGeneClusters2to3 from "./mmseqs"
-include joinGeneClusters as joinGeneClusters3to4 from "./mmseqs"
-include joinGeneClusters as joinGeneClusters4to5 from "./mmseqs"
 
 workflow assembly_wf {
     take:
@@ -57,48 +54,47 @@ workflow assembly_wf {
         geneAssemblyMetrics.out.toSortedList()
     )
 
-    // Combine the gene sequences across all samples
-    combineCDS(
-        prodigal.out[0].collect()
+    // Combine genes by amino acid identity in five rounds
+    linclustRound1(
+        prodigal.out[0].toSortedList().flatten().collate(4)
+    )
+    linclustRound2(
+        linclustRound1.out.toSortedList().flatten().collate(4)
+    )
+    linclustRound3(
+        linclustRound2.out.toSortedList().flatten().collate(4)
+    )
+    linclustRound4(
+        linclustRound3.out.toSortedList().flatten().collate(4)
+    )
+    linclustRound5(
+        linclustRound4.out.toSortedList()
     )
 
-    // Combine genes by amino acid identity in five rounds
-    mmseqsRound1(
-        combineCDS.out
+    // Make new, shorter names for each gene
+    renameGenes(
+        linclustRound5.out
     )
-    mmseqsRound2(
-        mmseqsRound1.out[0]
+
+    // Index the assembled alleles for alignment
+    diamondDB(
+        renameGenes.out
     )
-    mmseqsRound3(
-        mmseqsRound2.out[0]
+
+    // Align the assembled alleles against the gene centroids
+    alignAlleles(
+        prodigal.out[0],
+        diamondDB.out
     )
-    mmseqsRound4(
-        mmseqsRound3.out[0]
+
+    // Make a single table with all of the allele - gene pairings
+    makeAlleleTable(
+        alignAlleles.out.toSortedList()
     )
-    mmseqsRound5(
-        mmseqsRound4.out[0]
-    )
-    // // Combine all of the gene table annotations, in reverse order
-    // joinGeneClusters4to5(
-    //     mmseqsRound4.out[1],
-    //     mmseqsRound5.out[1]
-    // )
-    // joinGeneClusters3to4(
-    //     mmseqsRound3.out[1],
-    //     joinGeneClusters4to5.out
-    // )
-    // joinGeneClusters2to3(
-    //     mmseqsRound2.out[1],
-    //     joinGeneClusters3to4.out
-    // )
-    // joinGeneClusters1to2(
-    //     mmseqsRound1.out[1],
-    //     joinGeneClusters2to3.out
-    // )
 
     emit:
-        gene_fasta = mmseqsRound5.out[0]
-        // allele_gene_tsv = joinGeneClusters1to2.out
+        gene_fasta = renameGenes.out
+        allele_gene_tsv = makeAlleleTable.out
         allele_assembly_csv = joinAssemblyMetrics.out
 
 }
@@ -255,7 +251,7 @@ gzip ${specimen}.faa
 // Summarize the depth of sequencing and GC content for every assembled gene
 process geneAssemblyMetrics {
     tag "Summarize every assembled gene"
-    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    container "${container__pandas}"
     label 'mem_medium'
     errorStrategy 'retry'
     
@@ -350,7 +346,7 @@ df.to_csv(
 // Join together the assembly summaries from each batch of 10 samples processed earlier
 process joinAssemblyMetrics {
     tag "Summarize every assembled gene"
-    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    container "${container__pandas}"
     label 'mem_medium'
     errorStrategy 'retry'
     publishDir "${params.output_folder}/assembly/", mode: "copy"
@@ -387,28 +383,6 @@ df.to_csv(
 
 
 """
-}
-
-
-process combineCDS {
-    tag "Combine gene sequences"
-    container "ubuntu:16.04"
-    label 'io_limited'
-    errorStrategy 'retry'
-    maxRetries 10
-    
-    input:
-    file "assembly.*.fasta.gz"
-    
-    output:
-    file "all_CDS.fasta.gz"
-
-    """
-#!/bin/bash
-set -e
-cat *fasta.gz > all_CDS.fasta.gz
-gzip -t all_CDS.fasta.gz
-    """
 }
 
 
@@ -558,6 +532,126 @@ for fp in genes.emapper.annotations.*.gz; do
 
 done > genes.emapper.annotations.gz
 
+"""
+
+}
+
+// Assign a new, shorter name to a set of genes
+process renameGenes {
+    tag "Make concise unique gene names"
+    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    label 'io_limited'
+    errorStrategy 'retry'
+
+    input:
+    file "input.genes.fasta.gz"
+
+    output:
+    file "genes.fasta.gz"
+
+"""
+#!/usr/bin/env python3
+
+from Bio.SeqIO.FastaIO import SimpleFastaParser
+import gzip
+import uuid
+
+def random_string(n=8):
+    return str(uuid.uuid4())[:n]
+
+with gzip.open("genes.fasta.gz", "wt") as fo:
+    with gzip.open("input.genes.fasta.gz", "rt") as fi:
+        for header, seq in SimpleFastaParser(fi):
+            fo.write(">gene_%s_%daa\\n%s\\n" % (random_string(), len(seq), seq))
+
+"""
+}
+
+// Use alignment to figure out which assembled allele was grouped into which gene
+process alignAlleles {
+    tag "Match alleles to gene centroids"
+    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    label 'mem_medium'
+    errorStrategy 'retry'
+    
+    input:
+    file alleles_fasta
+    file refdb
+    
+    output:
+    file "${alleles_fasta}.tsv.gz"
+
+    """
+    set -e
+
+    diamond \
+      blastp \
+      --query ${alleles_fasta} \
+      --out ${alleles_fasta}.tsv.gz \
+      --threads ${task.cpus} \
+      --db ${refdb} \
+      --outfmt 6 qseqid sseqid pident length qlen slen \
+      --query-cover ${params.min_coverage} \
+      --id ${params.min_identity} \
+      --top 0 \
+      --block-size ${task.memory.toMega() / (1024 * 6)} \
+      --compress 1 \
+      --unal 0
+    """
+
+}
+
+// Make a single table linking every assembledallele to every gene centroid
+process makeAlleleTable {
+    tag "Combine allele tables across samples"
+    container "${container__pandas}"
+    label 'mem_veryhigh'
+    errorStrategy 'retry'
+    
+    input:
+    file tsv_list
+    
+    output:
+    file "alleles.genes.tsv.gz"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+import os
+
+# Function to read in the allele tables
+def read_allele_table(fp):
+
+    assert os.path.exists(fp)
+
+    print("Reading in %s" % fp)
+
+    return pd.read_csv(
+        fp,
+        sep = "\\t",
+        header = None,
+        names = [
+            "allele",
+            "gene",
+            "pct_iden",
+            "alignment_len",
+            "allele_len",
+            "gene_len"
+        ],
+        compression = "gzip"
+    )
+
+# Make a single table and write it out
+pd.concat([
+    read_allele_table(fp)
+    for fp in "${tsv_list}".split(" ")
+]).to_csv(
+    "alleles.genes.tsv.gz",
+    sep = "\\t",
+    compression = "gzip",
+    index = None
+)
 """
 
 }

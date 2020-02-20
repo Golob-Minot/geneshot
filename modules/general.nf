@@ -433,18 +433,11 @@ print(
 # Read in the listing of which alleles were grouped into which genes
 allele_gene = pd.read_csv(
     "${allele_gene_tsv}", 
-    sep="\\t", 
-    header=None
-).loc[
-    :, :1
-].rename(
-    columns=dict([
-        (0, "gene"),
-        (1, "allele")
-    ])
+    sep = "\\t",
+    compression = "gzip"
 )
 print(
-    "Read in a table grouping %d alleles into %d genes" % 
+    "Read in a table matching %d alleles against %d genes" % 
     (
         allele_gene["allele"].unique().shape[0],
         allele_gene["gene"].unique().shape[0]
