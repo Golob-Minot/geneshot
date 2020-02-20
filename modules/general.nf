@@ -193,6 +193,7 @@ summary_dict = dict([
     ("distance_threshold", "${params.distance_threshold}"),
     ("distance_threshold", "${params.distance_threshold}"),
     ("linkage_type", "${params.linkage_type}"),
+    ("sd_mean_cutoff", ${params.sd_mean_cutoff})
 ])
 
 # Function to read in the FAMLI output

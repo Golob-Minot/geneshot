@@ -209,7 +209,8 @@ process famli {
       --input ${input_aln} \
       --output ${sample_name}.json \
       --threads ${task.cpus} \
-      --batchsize 5000000
+      --batchsize 5000000 \
+      --sd-mean-cutoff ${params.sd_mean_cutoff}
     gzip ${sample_name}.json
     """
 
