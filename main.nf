@@ -375,16 +375,17 @@ workflow {
     )
 
     // If we performed de novo assembly, add the gene assembly information
-    if ( params.gene_fasta ) {
-        finalHDF = collectAbundances.out
-    } else {
-        addGeneAssembly(
-            collectAbundances.out,
-            assembly_wf.out.allele_gene_tsv,
-            assembly_wf.out.allele_assembly_csv
-        )
-        finalHDF = addGeneAssembly.out
-    }
+    finalHDF = collectAbundances.out
+    // if ( params.gene_fasta ) {
+    //     finalHDF = collectAbundances.out
+    // } else {
+    //     addGeneAssembly(
+    //         collectAbundances.out,
+    //         assembly_wf.out.allele_gene_tsv,
+    //         assembly_wf.out.allele_assembly_csv
+    //     )
+    //     finalHDF = addGeneAssembly.out
+    // }
 
     // If we performed statistical analysis, add the results to the HDF5
     if ( params.formula ) {

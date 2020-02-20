@@ -78,27 +78,27 @@ workflow assembly_wf {
     mmseqsRound5(
         mmseqsRound4.out[0]
     )
-    // Combine all of the gene table annotations, in reverse order
-    joinGeneClusters4to5(
-        mmseqsRound4.out[1],
-        mmseqsRound5.out[1]
-    )
-    joinGeneClusters3to4(
-        mmseqsRound3.out[1],
-        joinGeneClusters4to5.out
-    )
-    joinGeneClusters2to3(
-        mmseqsRound2.out[1],
-        joinGeneClusters3to4.out
-    )
-    joinGeneClusters1to2(
-        mmseqsRound1.out[1],
-        joinGeneClusters2to3.out
-    )
+    // // Combine all of the gene table annotations, in reverse order
+    // joinGeneClusters4to5(
+    //     mmseqsRound4.out[1],
+    //     mmseqsRound5.out[1]
+    // )
+    // joinGeneClusters3to4(
+    //     mmseqsRound3.out[1],
+    //     joinGeneClusters4to5.out
+    // )
+    // joinGeneClusters2to3(
+    //     mmseqsRound2.out[1],
+    //     joinGeneClusters3to4.out
+    // )
+    // joinGeneClusters1to2(
+    //     mmseqsRound1.out[1],
+    //     joinGeneClusters2to3.out
+    // )
 
     emit:
         gene_fasta = mmseqsRound5.out[0]
-        allele_gene_tsv = joinGeneClusters1to2.out
+        // allele_gene_tsv = joinGeneClusters1to2.out
         allele_assembly_csv = joinAssemblyMetrics.out
 
 }
