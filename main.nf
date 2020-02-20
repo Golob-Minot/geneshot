@@ -170,7 +170,12 @@ include collectAbundances from './modules/general' params(
     distance_metric: params.distance_metric,
     distance_threshold: params.distance_threshold,
     linkage_type: params.linkage_type,
-    sd_mean_cutoff: params.sd_mean_cutoff
+    sd_mean_cutoff: params.sd_mean_cutoff,
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage,
+    dmnd_min_identity: params.dmnd_min_identity,
+    dmnd_min_coverage: params.dmnd_min_coverage,
+    formula: params.formula,
 )
 include writeManifest from './modules/general' params(
     savereads: params.savereads,
