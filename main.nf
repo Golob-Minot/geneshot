@@ -58,7 +58,7 @@ params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/genesho
 params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
 
 // CAG options
-params.distance_threshold = 0.5
+params.distance_threshold = 0.25
 params.distance_metric = "cosine"
 params.linkage_type = "average"
 
