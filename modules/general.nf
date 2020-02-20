@@ -808,33 +808,42 @@ import pandas as pd
 with pd.HDFStore("${full_results_hdf}", "r") as store:
 
     # Read in the manifest
+    print("Reading the manifest")
     manifest_df = pd.read_hdf(store, "/manifest")
 
     # Read in the summary of the entire experiment
+    print("Reading the summary")
     exp_summary_df = pd.read_hdf(store, "/summary/experiment")
 
     # Table with the abundance of every CAG in every sample
+    print("Reading the CAG abundance")
     cag_abund_df = pd.read_hdf(store, "/abund/cag/wide")
 
     # Table with PCA for every sample, based on CAG abundances
+    print("Reading the PCA")
     pca_df = pd.read_hdf(store, "/ordination/pca")
 
     # Table with t-SNE for every sample, based on CAG abundances
+    print("Reading the t-SNE")
     tsne_df = pd.read_hdf(store, "/ordination/tsne")
 
     # Table with gene annotations (including CAG membership)
+    print("Reading the gene annotations")
     gene_annot_df = pd.read_hdf(store, "/annot/gene/all")
 
     # Table summarizing the size, prevalence, and mean abundance of every CAG
+    print("Reading the CAG annotations")
     cag_summary_df = pd.read_hdf(store, "/annot/cag/all")
 
     # Number of read pairs
+    print("Reading the readcounts")
     readcount_df = pd.read_hdf(store, "/summary/readcount")
 
     # Check to see if we have any corncob results
     if "/stats/cag/corncob" in store:
 
         # Read in the table of corncob results
+        print("Reading the statistical analysis results")
         corncob_df = pd.read_hdf(store, "/stats/cag/corncob")
     else:
         corncob_df = None
@@ -843,40 +852,48 @@ with pd.HDFStore("${full_results_hdf}", "r") as store:
 with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
 
     # Write out each table, while indexing the appropriate columns
+    print("Writing the manifest")
     manifest_df.to_hdf(
         store,
         "/manifest"
     )
+    print("Writing the summary")
     exp_summary_df.to_hdf(
         store,
         "/summary/experiment"
     )
+    print("Writing the readcounts")
     readcount_df.to_hdf(
         store,
         "/summary/readcount"
     )
+    print("Writing the CAG abundance")
     cag_abund_df.to_hdf(
         store, 
         "/abund/cag/wide", 
         format="table",
         data_columns=["CAG"]
     )
+    print("Writing the PCA")
     pca_df.to_hdf(
         store,
         "/ordination/pca",
         format="fixed"
     )
+    print("Writing the t-SNE")
     tsne_df.to_hdf(
         store,
         "/ordination/tsne",
         format="fixed"
     )
+    print("Writing the gene annotations")
     gene_annot_df.to_hdf(
         store, 
         "/annot/gene/all", 
         format="table",
         data_columns=["CAG"]
     )
+    print("Writing the CAG annotations")
     cag_summary_df.to_hdf(
         store,
         "/annot/cag/all",
@@ -884,6 +901,7 @@ with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
     )
 
     if corncob_df is not None:
+        print("Writing the statistical analysis results")
         corncob_df.to_hdf(
             store, 
             "/stats/cag/corncob", 
