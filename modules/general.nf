@@ -197,8 +197,7 @@ summary_dict = dict([
     ("min_identity", ${params.min_identity}),
     ("min_coverage", ${params.min_coverage}),
     ("dmnd_min_identity", ${params.dmnd_min_identity}),
-    ("dmnd_min_coverage", ${params.dmnd_min_coverage}),
-    ("formula", ${params.formula}),
+    ("dmnd_min_coverage", ${params.dmnd_min_coverage})
 ])
 
 # Function to read in the FAMLI output

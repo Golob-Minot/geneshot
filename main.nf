@@ -174,8 +174,7 @@ include collectAbundances from './modules/general' params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,
     dmnd_min_identity: params.dmnd_min_identity,
-    dmnd_min_coverage: params.dmnd_min_coverage,
-    formula: params.formula,
+    dmnd_min_coverage: params.dmnd_min_coverage
 )
 include writeManifest from './modules/general' params(
     savereads: params.savereads,
