@@ -163,7 +163,11 @@ include countReadsSummary from './modules/general' params(
     output_folder: output_folder
 )
 include collectAbundances from './modules/general' params(
-    output_prefix: params.output_prefix
+    output_prefix: params.output_prefix,
+    formula: params.formula,
+    distance_metric: params.distance_metric,
+    distance_threshold: params.distance_threshold,
+    linkage_type: params.linkage_type,
 )
 include writeManifest from './modules/general' params(
     savereads: params.savereads,

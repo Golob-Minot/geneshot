@@ -187,6 +187,14 @@ readcount_csv = "${readcount_csv}"
 manifest_csv = "${manifest_csv}"
 suffix=".json.gz"
 
+# Keep a list of descriptive statistics
+summary_dict = dict([
+    ("formula", "${params.formula}"),
+    ("distance_threshold", "${params.distance_threshold}"),
+    ("distance_threshold", "${params.distance_threshold}"),
+    ("linkage_type", "${params.linkage_type}"),
+])
+
 # Function to read in the FAMLI output
 def read_famli_json(fp):
 
@@ -292,6 +300,10 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     # Read in the summary of the number of reads across all samples
     readcount_df = pd.read_csv(readcount_csv)
 
+    # Add some descriptive statistics
+    summary_dict["num_samples"] = readcount_df.shape[0]
+    summary_dict["total_reads"] = readcount_df["n_reads"].sum()
+
     # Add the number of aligned reads per sample
     readcount_df["aligned_reads"] = readcount_df["specimen"].apply(
         aligned_reads_dict.get
@@ -308,6 +320,8 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
         "Read in abundances for %d CAGs across %d samples" %
         (cag_abund_df.shape[0], cag_abund_df.shape[1] - 1)
     )
+    # Add some descriptive statistics
+    summary_dict["num_cags"] = cag_abund_df.shape[0]
 
 
     # Write to HDF5
@@ -334,6 +348,9 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
         "Read in abundances for %d genes across %d samples" %
         (gene_abund_df.shape[0], gene_abund_df.shape[1] - 1)
     )
+    # Add some descriptive statistics
+    summary_dict["num_genes"] = gene_abund_df.shape[0]
+
 
     # Write to HDF5
     gene_abund_df.to_hdf(store, "/abund/gene/wide")
@@ -365,6 +382,18 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     ).to_hdf(
         store,
         "/annot/cag/all"
+    )
+
+    # Write out the descriptive statistics
+    pd.DataFrame([
+        dict([
+            ("variable", k),
+            ("value", v)
+        ])
+        for k, v in summary_dict.items()
+    ]).to_hdf(
+        store,
+        "/summary/experiment"
     )
 
     # Write out the manifest provided by the user
@@ -788,6 +817,9 @@ with pd.HDFStore("${full_results_hdf}", "r") as store:
     # Read in the manifest
     manifest_df = pd.read_hdf(store, "/manifest")
 
+    # Read in the summary of the entire experiment
+    exp_summary_df = pd.read_hdf(store, "/summary/experiment")
+
     # Table with the abundance of every CAG in every sample
     cag_abund_df = pd.read_hdf(store, "/abund/cag/wide")
 
@@ -821,6 +853,10 @@ with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
     manifest_df.to_hdf(
         store,
         "/manifest"
+    )
+    exp_summary_df.to_hdf(
+        store,
+        "/summary/experiment"
     )
     readcount_df.to_hdf(
         store,
