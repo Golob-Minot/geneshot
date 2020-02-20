@@ -42,8 +42,8 @@ params.min_hg_align_score = 30
 // Assembly options
 params.gene_fasta = false
 params.phred_offset = 33 // spades
-params.min_identity = 90 // mmseqs2 and reference genome alignment
-params.min_coverage = 50 // mmseqs2 and reference genome alignment
+params.min_identity = 90 // linclust and reference genome alignment
+params.min_coverage = 50 // linclust and reference genome alignment
 params.dmnd_min_identity = 80 // DIAMOND
 params.dmnd_min_coverage = 50 // DIAMOND
 params.dmnd_top_pct = 1 // DIAMOND
