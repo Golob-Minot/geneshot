@@ -49,7 +49,7 @@ params.dmnd_min_coverage = 50 // DIAMOND
 params.dmnd_top_pct = 1 // DIAMOND
 params.dmnd_min_score = 20 // DIAMOND
 params.gencode = 11 //DIAMOND
-params.sd_mean_cutoff = 2.0 // FAMLI
+params.sd_mean_cutoff = 3.0 // FAMLI
 
 // Annotation options
 params.noannot = false
@@ -116,7 +116,7 @@ def helpMessage() {
       --dmnd_top_pct        Keep top X% of alignments for each short read (default: 1) (DIAMOND)
       --dmnd_min_score      Minimum score for short read alignment (default: 20) (DIAMOND)
       --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
-      --sd_mean_cutoff      Ratio of standard deviation / mean depth of sequencing used to filter genes (default: 2.0) (FAMLI)
+      --sd_mean_cutoff      Ratio of standard deviation / mean depth of sequencing used to filter genes (default: 3.0) (FAMLI)
 
     For CAGs:
       --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
