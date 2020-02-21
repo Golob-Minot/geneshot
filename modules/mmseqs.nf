@@ -117,8 +117,6 @@ assert ix > 0, "Didn't read any alignments"
 print("Read %d lines of alignment - found %d duplicated genes" % (ix, len(duplicate_genes)))
 print("Done reading alignments")
 
-print("\\n".join([x for x in duplicate_genes]))
-
 # Now let's make the filtered FASTA with all duplicated genes removed
 n_found = 0
 n = 0
@@ -127,7 +125,7 @@ with gzip.open("input.genes.fasta.gz", "rt") as handle_in:
         for header, seq in SimpleFastaParser(handle_in):
 
             header = header.split(" ", 1)[0]
-            
+
             n += 1
             if header in duplicate_genes:
                 n_found += 1
