@@ -27,6 +27,21 @@ include linclust as linclustRound5 from "./mmseqs" params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
+include diamondDedup as dedupRound1 from "./mmseqs" params(
+    min_identity: params.min_identity
+)
+include diamondDedup as dedupRound2 from "./mmseqs" params(
+    min_identity: params.min_identity
+)
+include diamondDedup as dedupRound3 from "./mmseqs" params(
+    min_identity: params.min_identity
+)
+include diamondDedup as dedupRound4 from "./mmseqs" params(
+    min_identity: params.min_identity
+)
+include diamondDedup as dedupRound5 from "./mmseqs" params(
+    min_identity: params.min_identity
+)
 
 workflow assembly_wf {
     take:
@@ -55,25 +70,43 @@ workflow assembly_wf {
     )
 
     // Combine genes by amino acid identity in five rounds
+    // Each round will include both linclust- and DIAMOND-based deduplication
+    // linclust provides fast symmetrical overlap search, while
+    // DIAMOND performs slower, asymmetrical overlap search
     linclustRound1(
         prodigal.out[0].toSortedList().flatten().collate(4)
     )
+    dedupRound1(
+        linclustRound1.out
+    )
     linclustRound2(
-        linclustRound1.out.toSortedList().flatten().collate(4)
+        dedupRound1.out.toSortedList().flatten().collate(4)
+    )
+    dedupRound2(
+        linclustRound2.out
     )
     linclustRound3(
-        linclustRound2.out.toSortedList().flatten().collate(4)
+        dedupRound2.out.toSortedList().flatten().collate(4)
+    )
+    dedupRound3(
+        linclustRound3.out
     )
     linclustRound4(
-        linclustRound3.out.toSortedList().flatten().collate(4)
+        dedupRound3.out.toSortedList().flatten().collate(4)
+    )
+    dedupRound4(
+        linclustRound4.out
     )
     linclustRound5(
-        linclustRound4.out.toSortedList()
+        dedupRound4.out.toSortedList()
+    )
+    dedupRound5(
+        linclustRound5.out
     )
 
     // Make new, shorter names for each gene
     renameGenes(
-        linclustRound5.out
+        dedupRound5.out
     )
 
     // Index the assembled alleles for alignment

@@ -40,3 +40,97 @@ gzip output.genes.fasta
 echo "Done"
 """
 }
+
+
+process diamondDedup {
+    tag "Deduplicate sequences by alignment with DIAMOND"
+    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    label 'mem_medium'
+    // errorStrategy 'retry'
+    
+    input:
+    file "input.genes.fasta.gz"
+    
+    output:
+    file "output.genes.fasta.gz"
+    
+"""
+#!/bin/bash
+
+set -e
+
+# Make a DIAMOND database
+diamond \
+    makedb \
+    --in input.genes.fasta.gz \
+    --db input.genes.dmnd \
+    --threads ${task.cpus}
+
+# Align the genes against themselves and filter any which align
+diamond \
+    blastp \
+    --query input.genes.fasta.gz \
+    --threads ${task.cpus} \
+    --db input.genes.dmnd \
+    --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen \
+    --query-cover 90 \
+    --id ${params.min_identity} \
+    --top 0 \
+    --block-size ${task.memory.toMega() / (1024 * 6)} \
+    --unal 0 | python << END
+
+from Bio.SeqIO.FastaIO import SimpleFastaParser
+import gzip
+import sys
+
+# Keep track of the genes which have been filtered out
+duplicate_genes = set([])
+
+# Iterate over the alignment
+print("Reading alignments")
+ix = 0
+for line in sys.stdin:
+
+    ix += 1
+
+    if ix % 100000 == 0:
+        print("Read %d lines of alignment - found %d duplicated genes" % (ix, len(duplicate_genes)))
+
+    qname, sname, _, _, _, _, _, _, _, _, _, _, qlen, slen = line.rstrip("\\n").split("\\t")
+
+    # Skip self alignments
+    if qname == sname:
+        continue
+    # If we have excluded either of the genes before, skip the line
+    if qname in duplicate_genes or rname in duplicate_genes:
+        continue
+    # For non-self alignments, remove the smaller of the two
+    if int(slen) < int(qlen):
+        duplicate_genes.add(sname)
+    else:
+        duplicate_genes.add(qname)
+
+print("Read %d lines of alignment - found %d duplicated genes" % (ix, len(duplicate_genes)))
+print("Done reading alignments")
+
+# Now let's make the filtered FASTA with all duplicated genes removed
+n_found = 0
+n = 0
+with gzip.open("input.genes.fasta.gz", "rt") as handle_in:
+    with gzip.open("output.genes.fasta.gz", "wt") as handle_out:
+        for header, seq in SimpleFastaParser(handle_in):
+            n += 1
+            if header in duplicate_genes:
+                n_found += 1
+            else:
+                handle_out.write(">%s\\n%s\\n" % (header, seq))
+
+# Make sure that we encountered all of the duplicated genes
+print("Read in %d sequences, filtered out %d, wrote out the rest" % (n, n_found))
+assert n_found == len(duplicate_genes), "%d != %d" % (n_found, len(duplicate_genes))
+
+END
+
+echo "Done"
+"""
+}
