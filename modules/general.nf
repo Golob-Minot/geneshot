@@ -488,12 +488,29 @@ print(
     corncob_df["CAG"].unique().shape[0]
 )
 
+# Make a wide version of the table with just the mu. values
+corncob_wide = corncob_df.loc[
+    corncob_df["parameter"].apply(
+        lambda s: s.startswith("mu.")
+    )
+].pivot_table(
+    index = ["CAG", "parameter"],
+    columns = "type",
+    values = "value"
+).reset_index(
+).apply(
+    lambda v: v.apply(lambda s: s.replace("mu.", "")) if v.name == "parameter" else v
+)
+
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write corncob results to HDF5
     corncob_df.to_hdf(store, "/stats/cag/corncob")
+
+    # Write corncob results to HDF5 in wide format
+    corncob_wide.to_hdf(store, "/stats/cag/corncob_wide")
 
 """
 
@@ -850,8 +867,14 @@ with pd.HDFStore("${full_results_hdf}", "r") as store:
         # Read in the table of corncob results
         print("Reading the statistical analysis results")
         corncob_df = pd.read_hdf(store, "/stats/cag/corncob")
+
+        # Read in the table of corncob results in wide format
+        print("Reading the statistical analysis results in wide format")
+        corncob_wide = pd.read_hdf(store, "/stats/cag/corncob_wide")
+
     else:
         corncob_df = None
+        corncob_wide = None
 
 # Now write to the new HDF store
 with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
@@ -910,6 +933,12 @@ with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
         corncob_df.to_hdf(
             store, 
             "/stats/cag/corncob", 
+            format="fixed"
+        )
+        print("Writing the statistical analysis results in wide format")
+        corncob_wide.to_hdf(
+            store, 
+            "/stats/cag/corncob_wide", 
             format="fixed"
         )
 
