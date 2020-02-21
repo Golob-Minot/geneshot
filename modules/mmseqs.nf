@@ -72,12 +72,15 @@ diamond \
     --query input.genes.fasta.gz \
     --threads ${task.cpus} \
     --db input.genes.dmnd \
+    --out input.genes.aln \
     --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen \
     --query-cover 90 \
     --id ${params.min_identity} \
     --top 0 \
     --block-size ${task.memory.toMega() / (1024 * 6)} \
-    --unal 0 | python << END
+    --unal 0
+
+python << END
 
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import gzip
@@ -89,7 +92,7 @@ duplicate_genes = set([])
 # Iterate over the alignment
 print("Reading alignments")
 ix = 0
-for line in sys.stdin:
+for line in open("input.genes.aln", "r"):
 
     ix += 1
 
@@ -102,7 +105,7 @@ for line in sys.stdin:
     if qname == sname:
         continue
     # If we have excluded either of the genes before, skip the line
-    if qname in duplicate_genes or rname in duplicate_genes:
+    if qname in duplicate_genes or sname in duplicate_genes:
         continue
     # For non-self alignments, remove the smaller of the two
     if int(slen) < int(qlen):
@@ -110,8 +113,11 @@ for line in sys.stdin:
     else:
         duplicate_genes.add(qname)
 
+assert ix > 0, "Didn't read any alignments"
 print("Read %d lines of alignment - found %d duplicated genes" % (ix, len(duplicate_genes)))
 print("Done reading alignments")
+
+print("\\n".join([x for x in duplicate_genes]))
 
 # Now let's make the filtered FASTA with all duplicated genes removed
 n_found = 0
@@ -119,6 +125,9 @@ n = 0
 with gzip.open("input.genes.fasta.gz", "rt") as handle_in:
     with gzip.open("output.genes.fasta.gz", "wt") as handle_out:
         for header, seq in SimpleFastaParser(handle_in):
+
+            header = header.split(" ", 1)[0]
+            
             n += 1
             if header in duplicate_genes:
                 n_found += 1
