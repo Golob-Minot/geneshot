@@ -601,7 +601,7 @@ with gzip.open("genes.fasta.gz", "wt") as fo:
             while new_string in used_strings:
                 new_string = random_string()
             used_strings.add(new_string)
-            fo.write(">%s\\n%s\\n" % (new_string, len(seq), seq))
+            fo.write(">gene_%s_%daa\\n%s\\n" % (new_string, len(seq), seq))
 
 """
 }
