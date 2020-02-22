@@ -592,10 +592,16 @@ import uuid
 def random_string(n=8):
     return str(uuid.uuid4())[:n]
 
+used_strings = set([])
+
 with gzip.open("genes.fasta.gz", "wt") as fo:
     with gzip.open("input.genes.fasta.gz", "rt") as fi:
         for header, seq in SimpleFastaParser(fi):
-            fo.write(">gene_%s_%daa\\n%s\\n" % (random_string(), len(seq), seq))
+            new_string = random_string()
+            while new_string in used_strings:
+                new_string = random_string()
+            used_strings.add(new_string)
+            fo.write(">%s\\n%s\\n" % (new_string, len(seq), seq))
 
 """
 }
