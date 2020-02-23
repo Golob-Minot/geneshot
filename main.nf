@@ -50,6 +50,7 @@ params.dmnd_top_pct = 1 // DIAMOND
 params.dmnd_min_score = 20 // DIAMOND
 params.gencode = 11 //DIAMOND
 params.sd_mean_cutoff = 3.0 // FAMLI
+params.famli_batchsize = 10000000 // FAMLI
 
 // Annotation options
 params.noannot = false
@@ -117,6 +118,7 @@ def helpMessage() {
       --dmnd_min_score      Minimum score for short read alignment (default: 20) (DIAMOND)
       --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
       --sd_mean_cutoff      Ratio of standard deviation / mean depth of sequencing used to filter genes (default: 3.0) (FAMLI)
+      --famli_batchsize     Number of alignments to deduplicate in batches (default: 10000000) (FAMLI)
 
     For CAGs:
       --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
@@ -232,7 +234,8 @@ include alignment_wf from './modules/alignment' params(
     distance_metric: params.distance_metric,
     distance_threshold: params.distance_threshold,
     linkage_type: params.linkage_type,
-    sd_mean_cutoff: params.sd_mean_cutoff
+    sd_mean_cutoff: params.sd_mean_cutoff,
+    famli_batchsize: params.famli_batchsize
 )
 
 // Import the workflows used for statistical analysis

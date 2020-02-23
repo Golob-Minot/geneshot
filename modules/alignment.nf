@@ -6,6 +6,7 @@ params.cag_batchsize = 100000
 params.distance_threshold = 0.5
 params.distance_metric = "cosine"
 params.linkage_type = "average"
+params.famli_batchsize = 10000000
 
 include makeInitialCAGs from "./make_cags" params(
     distance_threshold: params.distance_threshold,
@@ -192,7 +193,7 @@ process diamond {
 // Filter the alignments with the FAMLI algorithm
 process famli {
     tag "Deduplicate multi-mapping reads"
-    container "quay.io/fhcrc-microbiome/famli@sha256:241a7db60cb735abd59f4829e8ddda0451622b6eb2321f176fd9d76297d8c9e7"
+    container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
     errorStrategy 'retry'
     
@@ -209,7 +210,7 @@ process famli {
       --input ${input_aln} \
       --output ${sample_name}.json \
       --threads ${task.cpus} \
-      --batchsize 5000000 \
+      --batchsize ${params.famli_batchsize} \
       --sd-mean-cutoff ${params.sd_mean_cutoff}
     gzip ${sample_name}.json
     """
