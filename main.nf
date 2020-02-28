@@ -223,6 +223,7 @@ include annotation_wf from './modules/assembly' params(
     gencode: params.gencode,
 )
 
+<<<<<<< HEAD
 // Import the workflows used for alignment-based analysis
 include alignment_wf from './modules/alignment' params(
     output_folder: output_folder,
@@ -237,6 +238,31 @@ include alignment_wf from './modules/alignment' params(
     sd_mean_cutoff: params.sd_mean_cutoff,
     famli_batchsize: params.famli_batchsize
 )
+=======
+// Concatenate reads by sample name
+process concatenate {
+  container "ubuntu:16.04"
+  errorStrategy "retry"
+  
+  input:
+  set sample_name, file(fastq_list) from concatenate_ch.groupTuple()
+  
+  output:
+  set sample_name, file("${sample_name}.fastq.gz") into correct_headers_ch
+
+  afterScript "rm *"
+
+  """
+set -e
+
+for fp in ${fastq_list}; do
+    echo "Checking for \$fp"
+    [[ -s \$fp ]]
+done
+
+cat ${fastq_list} > TEMP && mv TEMP ${sample_name}.fastq.gz
+  """
+>>>>>>> master
 
 // Import the workflows used for statistical analysis
 include validation_wf from './modules/statistics' params(
@@ -248,6 +274,7 @@ include corncob_wf from './modules/statistics' params(
     formula: params.formula
 )
 
+<<<<<<< HEAD
 workflow {
     main:
 
@@ -264,6 +291,29 @@ workflow {
     } else {
         manifest_file = Channel.from(file(params.manifest))
     }
+=======
+// Make sure that every read has a unique name
+process correctHeaders {
+  container "ubuntu:16.04"
+  errorStrategy "retry"
+  
+  input:
+  set sample_name, file(fastq) from correct_headers_ch
+  
+  output:
+  set sample_name, file("${sample_name}.unique.headers.fastq.gz") into count_reads, metaphlan_ch, diamond_ch, humann_ch
+
+  afterScript "rm *"
+
+  """
+set -e
+
+gunzip -c ${fastq} | \
+awk '{if(NR % 4 == 1){print("@" 1 + ((NR - 1) / 4))}else{print}}' | \
+gzip -c > \
+${sample_name}.unique.headers.fastq.gz
+  """
+>>>>>>> master
 
     // Phase I: Preprocessing
     if (!params.nopreprocess) {
@@ -296,7 +346,20 @@ workflow {
             }.groupTuple()
         )
 
+<<<<<<< HEAD
     }
+=======
+// Count the number of input reads
+process countReads {
+  container "ubuntu:16.04"
+  errorStrategy "retry"
+  
+  input:
+  set sample_name, file(fastq) from count_reads
+  
+  output:
+  file "${sample_name}.countReads.csv" into total_counts
+>>>>>>> master
 
     // If the user specified --savereads, write out the manifest
     if (params.savereads) {
@@ -324,15 +387,58 @@ workflow {
     // A gene catalog was provided, so skip de novo assembly
     if ( params.gene_fasta ) {
 
+<<<<<<< HEAD
         // Point to the file provided
         gene_fasta = file(params.gene_fasta)
+=======
+// Make a single file which summarizes the number of reads across all samples
+// This is only run after all of the samples are done processing through the
+// 'total_counts' channel, which is transformed by the .toSortedList() command
+// into a single list containing all of the data from all samples.
+process countReadsSummary {
+  container "ubuntu:16.04"
+  // The output from this process will be copied to the --output_folder specified by the user
+  publishDir "${params.output_folder}"
+  errorStrategy "retry"
+
+  input:
+  // Because the input channel has been collected into a single list, this process will only be run once
+  file readcount_csv_list from total_counts.toSortedList()
+  val output_prefix from params.output_prefix
+  
+  output:
+  file "${output_prefix}.readcounts.csv" into readcounts_csv
+
+  afterScript "rm *"
+
+  """
+set -e
+
+echo name,n_reads > TEMP
+
+for fp in ${readcount_csv_list}; do
+
+    echo "Checking to make sure that \$fp exists"
+    [[ -s \$fp ]]
+
+done
+
+cat ${readcount_csv_list} >> TEMP && mv TEMP ${output_prefix}.readcounts.csv
+  """
+>>>>>>> master
 
     } else {
 
+<<<<<<< HEAD
         // Run the assembly and annotation workflow (in modules/assembly.nf)
         assembly_wf(
             combineReads.out
         )
+=======
+// Process to quantify the microbial species present using the metaphlan2 tool
+process metaphlan2 {
+    container "quay.io/fhcrc-microbiome/metaphlan@sha256:51b416458088e83d0bd8d840a5a74fb75066b2435d189c5e9036277d2409d7ea"
+>>>>>>> master
 
         gene_fasta = assembly_wf.out.gene_fasta
     }
@@ -346,11 +452,153 @@ workflow {
     // # ALIGNMENT-BASED ANALYSIS #
     // ############################
 
+<<<<<<< HEAD
     // Run the alignment-based analysis steps (in modules/alignment.nf)
     alignment_wf(
         gene_fasta,
         combineReads.out
     )
+=======
+// If the user specifies --humann, run the tasks below
+if (params.humann) {
+
+  // Download the HUMAnN2 reference database
+  process HUMAnN2_DB {
+    container "quay.io/fhcrc-microbiome/humann2:v0.11.2--1"
+
+    output:
+    file "HUMANn2_DB.tar" into humann_db
+
+    afterScript "rm -rf *"
+
+    """
+set -e
+
+# Make a folder for the database files
+mkdir HUMANn2_DB
+
+# Download the databases
+humann2_databases --download chocophlan full HUMANn2_DB
+humann2_databases --download uniref uniref90_diamond HUMANn2_DB
+
+# Tar up the database
+tar cvf HUMANn2_DB.tar HUMANn2_DB
+
+    """
+  }
+
+  // Make a channel which links the sample name to the metaphlan output
+  // so that it can be combined with the raw reads for the HUMAnN2 execution
+  metaphlan_for_humann
+    .map{ mpn -> tuple(mpn.name.replaceFirst(/.metaphlan.tsv/, ""), mpn) }
+    .set{ keyed_metaphlan_for_humann }
+
+  // Run HUMAnN2
+  process HUMAnN2 {
+    container "quay.io/fhcrc-microbiome/humann2:v0.11.2--1"
+
+    // The .join() call below combines the FASTQ and metaphlan output which share the same sample name
+    input:
+    set sample_name, file(fastq), file(metaphlan_output) from humann_ch.join(keyed_metaphlan_for_humann)
+    val threads from 16
+    // Reference database from above
+    file humann_db
+
+    output:
+    set file("${sample_name}_genefamilies.tsv"), file("${sample_name}_pathabundance.tsv"), file("${sample_name}_pathcoverage.tsv") into humann_summary
+
+    """
+set -e
+
+# Untar the database
+tar xvf ${humann_db}
+
+# Folder for output
+mkdir output
+
+humann2 \
+  --input ${fastq} \
+  --output output \
+  --nucleotide-database HUMANn2_DB/chocophlan \
+  --protein-database HUMANn2_DB/uniref \
+  --threads ${threads} \
+  --taxonomic-profile ${metaphlan_output}
+
+mv output/*_genefamilies.tsv ${sample_name}_genefamilies.tsv
+mv output/*_pathabundance.tsv ${sample_name}_pathabundance.tsv
+mv output/*_pathcoverage.tsv ${sample_name}_pathcoverage.tsv
+    """
+  }
+
+  // Summarize all of the HUMAnN2 results
+  process HUMAnN2summary {
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    publishDir "${params.output_folder}"
+
+    input:
+    file humann_tsv_list from humann_summary.flatten().collect()
+    val output_prefix from params.output_prefix
+
+    output:
+    file "${output_prefix}.HUMAnN2.genefamilies.csv" into humann_genefamilies_csv
+    file "${output_prefix}.HUMAnN2.pathabundance.csv" into humann_pathabundance_csv
+    file "${output_prefix}.HUMAnN2.pathcoverage.csv" into humann_pathcoverage_csv
+
+    """
+#!/usr/bin/env python3
+import logging
+import os
+import pandas as pd
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [HUMAnN2summary] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+def combine_outputs(suffix, header):
+    all_dat = []
+    for fp in os.listdir("."):
+        if fp.endswith(suffix):
+            logging.info("Reading in %s" % (fp))
+            d = pd.read_csv(
+                fp, 
+                sep="\\t", 
+                comment="#",
+                names=header
+            )
+            d["sample"] = fp.replace(suffix, "")
+            all_dat.append(d)
+    logging.info("Concatenating all data")
+    return pd.concat(all_dat)
+
+combine_outputs(
+    "_genefamilies.tsv",
+    ["gene_family", "RPK"]
+).to_csv("${output_prefix}.HUMAnN2.genefamilies.csv")
+logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.genefamilies.csv"))
+
+combine_outputs(
+    "_pathabundance.tsv",
+    ["pathway", "abund"]
+).to_csv("${output_prefix}.HUMAnN2.pathabundance.csv")
+logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.pathabundance.csv"))
+
+combine_outputs(
+    "_pathcoverage.tsv",
+    ["pathway", "cov"]
+).to_csv("${output_prefix}.HUMAnN2.pathcoverage.csv")
+logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.pathcoverage.csv"))
+
+    """
+  }
+>>>>>>> master
 
     // ########################
     // # STATISTICAL ANALYSIS #
@@ -368,6 +616,7 @@ workflow {
         corncob_results = Channel.empty()
     }
 
+<<<<<<< HEAD
     // ###################
     // # GATHER RESULTS #
     // ###################
@@ -384,6 +633,47 @@ workflow {
         countReadsSummary.out,
         manifest_file
     )
+=======
+// Align each sample against the reference database of genes using DIAMOND
+process diamond {
+    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    errorStrategy "retry"
+    
+    input:
+    set val(sample_name), file(input_fastq) from diamond_ch
+    file refdb from file(params.ref_dmnd)
+    val min_id from 90
+    val query_cover from 50
+    val cpu from 32
+    val top from 1
+    val min_score from 20
+    val blocks from 15
+    val query_gencode from 11
+
+    output:
+    set sample_name, file("${sample_name}.aln.gz") into aln_ch
+
+    afterScript "rm *"
+
+    """
+    set -e
+    diamond \
+      blastx \
+      --query ${input_fastq} \
+      --out ${sample_name}.aln.gz \
+      --threads ${cpu} \
+      --db ${refdb} \
+      --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen \
+      --min-score ${min_score} \
+      --query-cover ${query_cover} \
+      --id ${min_id} \
+      --top ${top} \
+      --block-size ${blocks} \
+      --query-gencode ${query_gencode} \
+      --compress 1 \
+      --unal 0
+    """
+>>>>>>> master
 
     // If we performed de novo assembly, add the gene assembly information
     if ( params.gene_fasta ) {
@@ -397,16 +687,45 @@ workflow {
         finalHDF = addGeneAssembly.out
     }
 
+<<<<<<< HEAD
     // If we performed statistical analysis, add the results to the HDF5
     if ( params.formula ) {
         addCorncobResults(
             finalHDF,
             corncob_wf.out
         )
+=======
+// Filter the alignments with the FAMLI algorithm
+process famli {
+    container "quay.io/fhcrc-microbiome/famli@sha256:241a7db60cb735abd59f4829e8ddda0451622b6eb2321f176fd9d76297d8c9e7"
+    errorStrategy "retry"
+    
+    input:
+    set sample_name, file(input_aln) from aln_ch
+    val cpu from 16
+    val batchsize from 50000000
+
+    output:
+    file "${sample_name}.json.gz" into famli_json_for_summary
+
+    afterScript "rm *"
+
+    """
+    set -e
+    famli \
+      filter \
+      --input ${input_aln} \
+      --output ${sample_name}.json \
+      --threads ${cpu} \
+      --batchsize ${batchsize}
+    gzip ${sample_name}.json
+    """
+>>>>>>> master
 
         finalHDF = addCorncobResults.out
     }
 
+<<<<<<< HEAD
     // If we performed functional analysis with eggNOG, add the results to the HDF5
     if ( params.noannot == false ) {
         if ( params.eggnog_db && params.eggnog_dmnd ) {
@@ -420,6 +739,138 @@ workflow {
             }
         }
     }
+=======
+// Summarize all of the results from the experiment
+process summarizeExperiment {
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    publishDir "${params.output_folder}"
+
+    input:
+    file metaphlan_tsv_list from metaphlan_for_summary.toSortedList()
+    file famli_json_list from famli_json_for_summary.toSortedList()
+    file ref_hdf5 from file(params.ref_hdf5)
+    file batchfile from file(params.batchfile)
+    file readcounts_csv
+    val output_prefix from params.output_prefix
+
+    output:
+    file "${output_prefix}.hdf5" into output_hdf
+    file "${output_prefix}.*.csv"
+
+    afterScript "rm *"
+
+"""
+#!/usr/bin/env python3
+import gzip
+import json
+import logging
+import os
+import pandas as pd
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [assembleAbundances] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+# Make sure that all input files are present
+for fp_list in [
+    "${metaphlan_tsv_list}".split(" "),
+    "${famli_json_list}".split(" "),
+    ["${ref_hdf5}", "${batchfile}", "${readcounts_csv}"]
+]:
+    for fp in fp_list:
+        assert os.path.exists(fp), "Expected to find %s" % fp
+
+# Rename the reference HDF5 to use as the output HDF5
+assert os.path.exists("${ref_hdf5}")
+if "${ref_hdf5}" != "${output_prefix}.hdf5":
+    logging.info("Renaming ${ref_hdf5} to ${output_prefix}.hdf5")
+    os.rename("${ref_hdf5}", "${output_prefix}.hdf5")
+assert os.path.exists("${output_prefix}.hdf5")
+# Open a connection to the output HDF5
+store = pd.HDFStore("${output_prefix}.hdf5", mode="a")
+
+# Write the batchfile to "metadata"
+logging.info("Reading in %s" % ("${batchfile}"))
+metadata = pd.read_csv("${batchfile}", sep=",")
+logging.info("Writing metadata to HDF")
+metadata.to_hdf(store, "metadata")
+
+# Parse the list of files passed in as a space-delimited string
+def parse_file_list(file_list_str, suffix):
+    for fp in file_list_str.split(" "):
+        assert os.path.exists(fp), "Could not find file %s" % fp
+        # Yield the file path, with and without the suffix removed
+        yield fp.replace(suffix, ""), fp
+
+# Read in the KEGG KO labels
+kegg_ko = pd.read_hdf(store, "/groups/KEGG_KO")
+
+# Read in the NCBI taxid labels
+taxid = pd.read_hdf(store, "/groups/NCBI_TAXID").set_index("allele")["taxid"]
+
+# Read in all of the FAMLI results
+def read_famli_json(sample_name, fp):
+    logging.info("Reading in %s" % (fp))
+    df = pd.DataFrame(
+        json.load(gzip.open(fp, "rt"))
+    )
+    # Add the sample name
+    df["sample"] = sample_name
+
+    # Calculate the proportional abundance
+    df["prop"] = df["depth"] / df["depth"].sum()
+
+    # Add the taxonomic annotation
+    df["taxid"] = df["id"].apply(taxid.get)
+
+    return df
+
+allele_abund = pd.concat([
+    read_famli_json(sample_name, fp)
+    for sample_name, fp in parse_file_list("${famli_json_list}", ".json.gz")
+])
+
+# Write out the FAMLI results
+allele_abund.to_csv("${output_prefix}.alleles.csv", sep=",", index=None)
+allele_abund.to_hdf(store, "abund/alleles", format="table", data_columns=["sample", "id"], complevel=5)
+
+# Read in all of the MetaPhlAn2 results
+def read_metaphlan(sample_name, fp):
+    logging.info("Reading in %s" % (fp))
+    d = pd.read_csv(
+        fp, 
+        sep="\\t"
+    ).rename(columns=dict([
+        ("Metaphlan2_Analysis", "abund")
+    ]))
+    # Transform into a proportion
+    d["abund"] = d["abund"].apply(float) / 100
+
+    # Add the taxonomic rank
+    tax_code = dict([
+        ("k", "kingdom"),
+        ("p", "phylum"),
+        ("c", "class"),
+        ("o", "order"),
+        ("f", "family"),
+        ("g", "genus"),
+        ("s", "species"),
+        ("t", "strain"),
+        ("u", "unclassified")
+    ])
+
+    d["rank"] = d["#SampleID"].apply(
+        lambda s: tax_code[s.split("|")[-1][0]]
+    )
+>>>>>>> master
 
     // If we performed taxonomic analysis with DIAMOND, add the results to the HDF5
     if ( params.noannot == false ) {
@@ -444,6 +895,7 @@ workflow {
     repackFullHDF(
         finalHDF
     )
+<<<<<<< HEAD
 
     // Make a smaller summary HDF5 with a subset of the total data
     makeSummaryHDF(
@@ -462,3 +914,162 @@ workflow {
         repackSummaryHDF.out to: "${output_folder}", mode: "copy", overwrite: true
 
 }
+=======
+    del d["#SampleID"]
+
+    # Add the sample name
+    d["sample"] = sample_name
+    return d
+
+metaphlan_abund = pd.concat([
+    read_metaphlan(sample_name, fp)
+    for sample_name, fp in parse_file_list("${metaphlan_tsv_list}", ".metaphlan.tsv")
+])
+
+# Write out the MetaPhlAn2 results
+metaphlan_abund.to_csv("${output_prefix}.metaphlan.csv", sep=",", index=None)
+metaphlan_abund.to_hdf(store, "abund/metaphlan", format="table", data_columns=["sample", "rank", "org_name"], complevel=5)
+
+# Summarize abundance by KEGG KO
+def summarize_ko_depth(sample_name, sample_allele_abund):
+    logging.info("Summarizing KO abundance for %s" % (sample_name))
+    sample_allele_prop = sample_allele_abund.set_index("id")["prop"]
+    sample_allele_nreads = sample_allele_abund.set_index("id")["nreads"]
+    sample_ko = kegg_ko.loc[
+        kegg_ko["allele"].isin(set(sample_allele_abund["id"].tolist()))
+    ].copy()
+    sample_ko["sample"] = sample_name
+    sample_ko["prop"] = sample_ko["allele"].apply(sample_allele_prop.get)
+    sample_ko["nreads"] = sample_ko["allele"].apply(sample_allele_nreads.get)
+    return sample_ko.groupby(["sample", "KO"])[["prop", "nreads"]].sum().reset_index()
+
+
+ko_abund = pd.concat([
+    summarize_ko_depth(sample_name, sample_allele_abund)
+    for sample_name, sample_allele_abund in allele_abund.groupby("sample")
+])
+
+# Write out the proportional abundance by KEGG KO
+ko_abund.to_csv("${output_prefix}.KEGG_KO.csv", sep=",", index=None)
+ko_abund.to_hdf(store, "abund/KEGG_KO", format="table", data_columns=["sample", "ko"], complevel=5)
+
+# Function to summarize abundances by arbitrary groups (e.g. CAGs)
+def summarize_alleles_by_group(group_key, prefix="/groups/"):
+    assert group_key.startswith(prefix)
+    group_name = group_key.replace(prefix, "")
+    logging.info("Summarizing abundance by %s" % (group_name))
+
+    # Read in the groupings
+    group_df = pd.read_hdf(store, group_key)
+    # The columns are 'allele', 'gene', and 'group'
+    for k in ["allele", "gene", "group"]:
+        assert k in group_df.columns.values
+    group_df.set_index("allele", inplace=True)
+
+    # Assign the group keys to the allele abundance data
+    group_abund = allele_abund.copy()
+    for k in ["gene", "group"]:
+        group_abund[k] = group_abund["id"].apply(group_df[k].get)
+
+    # Add up the alleles to make genes
+    group_abund = group_abund.groupby(["sample", "gene", "group"])["prop"].sum().reset_index()
+    # Average the genes to make groups
+    group_abund = group_abund.groupby(["sample", "group"])["prop"].mean().reset_index()
+
+    # Write out the abundance table
+    group_abund.to_csv("${output_prefix}.%s.csv" % (group_name), sep=",", index=None)
+    group_abund.to_hdf(store, "abund/%s" % (group_name), format="table", data_columns=["sample", "group"], complevel=5)
+
+
+# Get the summary of read counts
+readcounts = pd.read_csv("${readcounts_csv}")
+assert "name" in readcounts.columns.values
+readcounts["name"] = readcounts["name"].apply(str)
+assert "n_reads" in readcounts.columns.values
+
+# Calculate the number of aligned reads
+aligned_reads = allele_abund.groupby("sample")["nreads"].sum()
+
+# Add the column
+readcounts["aligned_reads"] = readcounts["name"].apply(aligned_reads.get)
+assert readcounts["aligned_reads"].isnull().sum() == 0, (readcounts.loc[readcounts["aligned_reads"].isnull()])
+
+# Write to HDF and CSV
+readcounts.to_hdf(store, "readcounts", format="table")
+readcounts.to_csv("${output_prefix}.readcounts.csv", sep=",", index=None)
+
+for key in store.keys():
+    if key.startswith("/groups/") and key != "/groups/KEGG_KO" and key != "/groups/NCBI_TAXID":
+        summarize_alleles_by_group(key)
+
+"""
+
+}
+
+// Add the HUMAnN2 results to the summary of the experiment, if specified
+if (params.humann) {
+  process addHUMAnN2toHDF {
+      container "quay.io/fhcrc-microbiome/python-pandas:latest"
+      publishDir "${params.output_folder}"
+
+      input:
+      file humann_genefamilies_csv
+      file humann_pathabundance_csv
+      file humann_pathcoverage_csv
+      file output_hdf
+
+      output:
+      file "${output_hdf}"
+
+      afterScript "rm *"
+
+"""
+#!/usr/bin/env python3
+import gzip
+import json
+import logging
+import os
+import pandas as pd
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [addHUMAnN2toHDF] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+# Open a connection to the output HDF5
+store = pd.HDFStore("${output_hdf}", mode="a")
+
+for fp, key, dtype_dict in [
+    (
+      "${humann_genefamilies_csv}", 
+      "/abund/humann_genefamilies", 
+      dict([("gene_family", str), ("RPK", float), ("sample", str)]),
+    ),
+    (
+      "${humann_pathabundance_csv}", 
+      "/abund/humann_pathabundance", 
+      dict([("pathway", str), ("abund", float), ("sample", str)]),
+    ),
+    (
+      "${humann_pathcoverage_csv}", 
+      "/abund/humann_pathcoverage", 
+      dict([("pathway", str), ("cov", float), ("sample", str)],
+    ))
+]:
+    print("Reading in %s" % fp)
+    df = pd.read_csv(fp, sep=",", dtype=dtype_dict, usecols=list(dtype_dict.keys()))
+    print(df.head())
+    df.to_hdf(store, key, complevel=5, format="table")
+
+store.close()
+"""
+  }
+}
+>>>>>>> master
