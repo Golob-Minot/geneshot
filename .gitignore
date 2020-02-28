@@ -1,3 +1,10 @@
+# Nextflow temp files and logs
+.nextflow*
+work/
+output*/
+report.html*
+trace.txt*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

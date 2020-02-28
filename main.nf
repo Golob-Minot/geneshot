@@ -1,177 +1,244 @@
 #!/usr/bin/env nextflow
 
+/*
+  Geneshot: A pipeline to robustly identify which alleles (n.e.e peptide coding sequences)
+  are present in a microbial community.
+
+  There is an optional preprocessing submodule, 
+  followed by assembly (spades) + extraction of peptide coding sequences from the contigs
+  The short reads are then aligned against the assembled peptides plus uniref100.
+  We use the FAMLI algorithm to adjuticate these alignments.
+  Annotations can follow. 
+
+  I. (Optional) Geneshot preprocessing submodule:
+    Steps:
+    1) (if index is available): barcodecop to verify demultiplexing
+    2) cutadapt to remove adapters.
+    3) remove human reads via
+      3A) downloading the cached human genome index
+      3B) aligning against the human genome and extracting unpaired reads
+*/
+
+// Using DSL-2
+nextflow.preview.dsl=2
+
 // Default values for boolean flags
 // If these are not set by the user, then they will be set to the values below
 // This is useful for the if/then control syntax below
-params.interleaved = false
-params.paired = false
-params.from_ncbi_sra = false
-params.humann = false
+params.nopreprocess = false
+params.savereads = false
 params.help = false
+params.output = './results'
+params.output_prefix = 'geneshot'
+params.manifest = null
+
+// Preprocessing options
+params.adapter_F = "CTGTCTCTTATACACATCT"
+params.adapter_R = "CTGTCTCTTATACACATCT"
+params.hg_index_url = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
+params.hg_index = false
+params.min_hg_align_score = 30
+
+// Assembly options
+params.gene_fasta = false
+params.phred_offset = 33 // spades
+params.min_identity = 90 // linclust and reference genome alignment
+params.min_coverage = 50 // linclust and reference genome alignment
+params.dmnd_min_identity = 80 // DIAMOND
+params.dmnd_min_coverage = 50 // DIAMOND
+params.dmnd_top_pct = 1 // DIAMOND
+params.dmnd_min_score = 20 // DIAMOND
+params.gencode = 11 //DIAMOND
+params.sd_mean_cutoff = 3.0 // FAMLI
+params.famli_batchsize = 10000000 // FAMLI
+
+// Annotation options
+params.noannot = false
+params.taxonomic_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd"
+params.ncbi_taxdump = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
+params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db"
+params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
+
+// CAG options
+params.distance_threshold = 0.25
+params.distance_metric = "cosine"
+params.linkage_type = "average"
+
+// Statistical analysis options
+params.formula = false
 
 // Function which prints help message text
 def helpMessage() {
     log.info"""
     Usage:
 
-    nextflow run jgolob/geneshot <ARGUMENTS>
+    nextflow run Golob-Minot/geneshot <ARGUMENTS>
     
-    Arguments:
-      --batchfile        CSV file listing samples to analyze (see below)
-      --ref_dmnd         Path to reference database in DIAMOND (.dmnd) format
-      --ref_hdf5         Path to HDF5 file containing reference database metadata
-      --output_folder    Folder to place outputs
-      --output_prefix    Name for output files
+    Required Arguments:
+      --manifest            CSV file listing samples (see below)
 
     Options:
-      --paired           Input data is paired-end FASTQ in two files (otherwise treat as single-ended)
-      --interleaved      Input data is interleaved paired-end FASTQ in one file (otherwise treat as single-ended)
-      --from_ncbi_sra    Input data is specified as NCBI SRA accessions (*RR*) in the `run` column
-      --humann           Run the HUMAnN2 pipeline on all samples.
+      --output              Folder to place analysis outputs (default ./results)
+      --output_prefix       Text used as a prefix for summary HDF5 output files (default: geneshot)
+      --nopreprocess        If specified, omit the preprocessing steps (removing adapters and human sequences)
+      --savereads           If specified, save the preprocessed reads to the output folder (inside qc/)
+      -w                    Working directory. Defaults to `./work`
+
+    For preprocessing:
+      --hg_index_url        URL for human genome index, defaults to current HG
+      --hg_index            Cached copy of the bwa indexed human genome, TGZ format
+      --adapter_F           Forward sequencing adapter sequence (to be removed)
+      --adapter_R           Reverse sequencing adapter sequence (to be removed)
+                              (Adapter sequences default to nextera adapters)
+      --min_hg_align_score  Minimum alignment score for human genome (default 30)
+
+    For Assembly:
+      --gene_fasta          (optional) Compressed FASTA with pre-generated catalog of microbial genes.
+                            If provided, then the entire de novo assembly process will be skipped entirely.
+      --phred_offset        for spades. Default 33.
+      --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90)
+      --min_coverage        Length cutoff used to combine similar genes (default: 50) (linclust)
+
+    For Annotation:
+      --noannot             If specified, disable annotation for taxonomy or function.
+                            Individual annotations can also be disabled by, e.g., setting --eggnog_db false
+      --taxonomic_dmnd      Database used for taxonomic annotation 
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
+      --ncbi_taxdump        Reference describing the NCBI Taxonomy
+                            (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+      --eggnog_dmnd         One of two databases used for functional annotation with eggNOG 
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
+      --eggnog_db           One of two databases used for functional annotation with eggNOG 
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
+    
+    For Alignment:
+      --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
+      --dmnd_min_coverage   Query coverage cutoff used to align short reads (default: 50) (DIAMOND)
+      --dmnd_top_pct        Keep top X% of alignments for each short read (default: 1) (DIAMOND)
+      --dmnd_min_score      Minimum score for short read alignment (default: 20) (DIAMOND)
+      --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
+      --sd_mean_cutoff      Ratio of standard deviation / mean depth of sequencing used to filter genes (default: 3.0) (FAMLI)
+      --famli_batchsize     Number of alignments to deduplicate in batches (default: 10000000) (FAMLI)
+
+    For CAGs:
+      --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
+      --distance_threshold  Distance threshold used to group genes by co-abundance (default: 0.5)
+      --linkage_type        Linkage type used to group genes by co-abundance (default: average)
+      
 
     Batchfile:
-      The batchfile is a CSV with a header indicating which samples correspond to which files.
-      The file must contain a column `name`. 
-      Default is to expect a single column `fastq` pointing to a single-ended or interleaved FASTQ.
-      If data is --paired, reads are specified by two columns, `fastq1` and `fastq2`.
-      If data is --from_ncbi_sra, accessions are specified in the `run` column.
+      The manifest is a CSV with a header indicating which samples correspond to which files.
+      The file must contain a column `specimen`. This can be repeated. 
+      Data is only accepted as paired reads.
+      Reads are specified by columns, `R1` and `R2`.
+      If index reads are provided, the column titles should be 'I1' and 'I2'
 
     """.stripIndent()
 }
 
-/*
- * SET UP CONFIGURATION VARIABLES
- */
-
 // Show help message if the user specifies the --help flag at runtime
-if (params.help){
+if (params.help || params.manifest == null){
     // Invoke the function above which prints the help message
     helpMessage()
     // Exit out and do not run anything else
     exit 0
 }
-// --output_folder is the folder in which to place the results
-// By default, we use the current working directory, but this will be replaced 
-// with whatever value the user specifies at runtime with --output_folder
-params.output_folder = "./"
 
-// --output_prefix is the name to prepend to all output files
-// Again, below is the default value, which will be replaced with whatever the user specifies
-params.output_prefix = "geneshot_output"
-
-// Logic to handle different types of input data
-// Only execute the following block if the user specifies --from_ncbi_sra
-if ( params.from_ncbi_sra ){
-
-  // Create a channel from the --batchfile which contains a tuple with the values 
-  // from the 'name' and 'run' column for each row.
-  // This channel will be named `accession_ch` and is consumed by the process downloadSraFastq
-  Channel.from(file(params.batchfile))
-        .splitCsv(header: true, sep: ",")
-        .map { sample ->
-          tuple(sample["name"], sample["run"])}
-        .set{ accession_ch }
-
-  // Download the FASTQ files
-  process downloadSraFastq {
-      // Docker container used to execude the command below
-      container "quay.io/fhcrc-microbiome/get_sra:v0.4"
-      // If the process fails, automatically restart it
-      errorStrategy "retry"
-
-      // This block defines the set of inputs that are provided to the task
-      // The variables 'sample_name' and 'accession' are automatically filled into the script below
-      input:
-      set val(sample_name), val(accession) from accession_ch
-
-      // At the end of execution, the file ${accession}.fastq.gz will be retrieved as the output
-      // The value sample_name and the file ${accession}.fastq.gz will be placed into the 
-      // concatenate_ch Channel, which will be consumed by another process downstream
-      output:
-      set val(sample_name), file("${accession}.fastq.gz") into concatenate_ch
-
-      // After the output files are retrieved, everything in the working folder will be deleted
-      afterScript "rm -rf *"
-
-"""
-# Cache to the local folder
-mkdir -p ~/.ncbi
-mkdir cache
-echo '/repository/user/main/public/root = "\$PWD/cache"' > ~/.ncbi/user-settings.mkfg
-
-# Get each read
-echo "Get the FASTQ files"
-fastq-dump --split-files --defline-seq '@\$ac.\$si.\$sg/\$ri' --defline-qual + --outdir \$PWD ${accession}
-
-r1=_1.fastq
-r2=_2.fastq
-
-# If there is a second read, interleave them
-if [[ -s ${accession}\$r2 ]]; then
-    echo "Making paired reads"
-    fastq_pair ${accession}\$r1 ${accession}\$r2
-    
-    echo "Interleave"
-    paste ${accession}\$r1.paired.fq ${accession}\$r2.paired.fq | paste - - - - | awk -v OFS="\\n" -v FS="\\t" '{print(\$1,\$3,\$5,\$7,\$2,\$4,\$6,\$8)}' | gzip -c > "${accession}.fastq.gz"
-else
-    echo "Compressing"
-    mv ${accession}\$r1 ${accession}.fastq
-    gzip ${accession}.fastq
-fi
-
-rm -f ${accession}\$r1 ${accession}\$r2 ${accession}\$r1.paired.fq ${accession}\$r2.paired.fq
-
-"""
-  }
-}
-else {
-  if ( params.paired ){
-    assert !params.interleaved: "--paired cannot be specified together with --interleaved"
-
-    Channel.from(file(params.batchfile))
-          .splitCsv(header: true, sep: ",")
-          .map { sample ->
-          [sample.name, file(sample.fastq1), file(sample.fastq2)]}
-          .set{ interleave_ch }
-
-    process interleave {
-      container "ubuntu:16.04"
-      errorStrategy "retry"
-
-      input:
-      set sample_name, file(fastq1), file(fastq2) from interleave_ch
-
-      output:
-      set sample_name, file("${fastq1}.interleaved.fastq.gz") into concatenate_ch
-
-      afterScript "rm *"
-
-      """
-      set -e
-
-      # Some basic checks that the files exist and the line numbers match
-      [[ -s "${fastq1}" ]]
-      [[ -s "${fastq2}" ]]
-      (( \$(gunzip -c ${fastq1} | wc -l) == \$(gunzip -c ${fastq2} | wc -l) ))
-
-      # Now interleave the files
-      paste <(gunzip -c ${fastq1}) <(gunzip -c ${fastq2}) | paste - - - - | awk -v OFS="\\n" -v FS="\\t" '{print(\$1,\$3,\$5,\$7,\$2,\$4,\$6,\$8)}' | gzip -c > "${fastq1}.interleaved.fastq.gz"
-      """
-        
-    }
-
-  }
-  else {
-      // For either `interleaved` or `single` (no flags), just put the FASTQ into the same analysis queue
-      Channel.from(file(params.batchfile))
-          .splitCsv(header: true, sep: ",")
-          .map { sample ->
-          [sample.name, file(sample.fastq)]}
-          .set{ concatenate_ch }
-
-  }
+// Make sure that --output ends with trailing "/" characters
+if (!params.output.endsWith("/")){
+    output_folder = params.output.concat("/")
+} else {
+    output_folder = params.output
 }
 
+// Import the preprocess_wf module
+include read_manifest from './modules/preprocess'
+include preprocess_wf from './modules/preprocess' params(
+    manifest: params.manifest,
+    adapter_F: params.adapter_F,
+    adapter_R: params.adapter_R,
+    hg_index: params.hg_index,
+    hg_index_url: params.hg_index_url,
+    min_hg_align_score: params.min_hg_align_score,
+)
+// Import some general tasks, such as combineReads and writeManifest
+include countReads from './modules/general'
+include countReadsSummary from './modules/general' params(
+    output_folder: output_folder
+)
+include collectAbundances from './modules/general' params(
+    output_prefix: params.output_prefix,
+    formula: params.formula,
+    distance_metric: params.distance_metric,
+    distance_threshold: params.distance_threshold,
+    linkage_type: params.linkage_type,
+    sd_mean_cutoff: params.sd_mean_cutoff,
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage,
+    dmnd_min_identity: params.dmnd_min_identity,
+    dmnd_min_coverage: params.dmnd_min_coverage
+)
+include writeManifest from './modules/general' params(
+    savereads: params.savereads,
+    output_folder: output_folder
+)
+include combineReads from './modules/general' params(
+    savereads: params.savereads,
+    output_folder: output_folder
+)
+include addGeneAssembly from './modules/general'
+include readTaxonomy from './modules/general'
+include addEggnogResults from './modules/general'
+include addCorncobResults from './modules/general'
+include addTaxResults from './modules/general'
+include makeSummaryHDF from './modules/general' params(
+    output_prefix: params.output_prefix
+)
+include repackHDF as repackFullHDF from './modules/general'
+include repackHDF as repackSummaryHDF from './modules/general'
+
+// Import the workflows used for assembly
+include assembly_wf from './modules/assembly' params(
+    output_folder: output_folder,
+    phred_offset: params.phred_offset,
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage,
+    noannot: params.noannot,
+    eggnog_db: params.eggnog_db,
+    eggnog_dmnd: params.eggnog_dmnd,
+    taxonomic_dmnd: params.taxonomic_dmnd,
+    gencode: params.gencode,
+)
+
+// Import the workflows used for annotation
+include annotation_wf from './modules/assembly' params(
+    output_folder: output_folder,
+    phred_offset: params.phred_offset,
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage,
+    noannot: params.noannot,
+    eggnog_db: params.eggnog_db,
+    eggnog_dmnd: params.eggnog_dmnd,
+    taxonomic_dmnd: params.taxonomic_dmnd,
+    gencode: params.gencode,
+)
+
+<<<<<<< HEAD
+// Import the workflows used for alignment-based analysis
+include alignment_wf from './modules/alignment' params(
+    output_folder: output_folder,
+    dmnd_min_identity: params.dmnd_min_identity,
+    dmnd_min_coverage: params.dmnd_min_coverage,
+    dmnd_top_pct: params.dmnd_top_pct,
+    dmnd_min_score: params.dmnd_min_score,
+    gencode: params.gencode,
+    distance_metric: params.distance_metric,
+    distance_threshold: params.distance_threshold,
+    linkage_type: params.linkage_type,
+    sd_mean_cutoff: params.sd_mean_cutoff,
+    famli_batchsize: params.famli_batchsize
+)
+=======
 // Concatenate reads by sample name
 process concatenate {
   container "ubuntu:16.04"
@@ -195,9 +262,36 @@ done
 
 cat ${fastq_list} > TEMP && mv TEMP ${sample_name}.fastq.gz
   """
+>>>>>>> master
 
-}
+// Import the workflows used for statistical analysis
+include validation_wf from './modules/statistics' params(
+    output_folder: output_folder,
+    formula: params.formula
+)
+include corncob_wf from './modules/statistics' params(
+    output_folder: output_folder,
+    formula: params.formula
+)
 
+<<<<<<< HEAD
+workflow {
+    main:
+
+    // Phase 0: Validation of input data
+
+    // If the user specifies a `--formula`, the first step in the process
+    // will be to ensure that the formula is written correctly, and is
+    // compatible with the data provided in the manifest
+    if ( params.formula ) {
+        validation_wf(
+            file(params.manifest)
+        )
+        manifest_file = validation_wf.out
+    } else {
+        manifest_file = Channel.from(file(params.manifest))
+    }
+=======
 // Make sure that every read has a unique name
 process correctHeaders {
   container "ubuntu:16.04"
@@ -219,9 +313,42 @@ awk '{if(NR % 4 == 1){print("@" 1 + ((NR - 1) / 4))}else{print}}' | \
 gzip -c > \
 ${sample_name}.unique.headers.fastq.gz
   """
+>>>>>>> master
 
-}
+    // Phase I: Preprocessing
+    if (!params.nopreprocess) {
 
+        // Run the entire preprocessing workflow
+        preprocess_wf(
+            manifest_file
+        )
+
+        // Combine the reads by specimen name
+        combineReads(preprocess_wf.out.groupTuple())
+
+    } else {
+        // If the user specified --nopreprocess, then just 
+        // read the manifest and combine by specimen
+        combineReads(
+            read_manifest(
+                manifest_file
+            ).filter { r ->
+                (r.specimen != null) &&
+                (r.R1 != null) &&
+                (r.R2 != null) &&
+                (r.specimen != "") &&
+                (r.R1 != "") &&
+                (r.R2 != "")
+            }.filter {
+                r -> (!file(r.R1).isEmpty() && !file(r.R2).isEmpty())
+            }.map { 
+                r -> [r.specimen, file(r.R1), file(r.R2)]
+            }.groupTuple()
+        )
+
+<<<<<<< HEAD
+    }
+=======
 // Count the number of input reads
 process countReads {
   container "ubuntu:16.04"
@@ -232,20 +359,38 @@ process countReads {
   
   output:
   file "${sample_name}.countReads.csv" into total_counts
+>>>>>>> master
 
-  afterScript "rm *"
+    // If the user specified --savereads, write out the manifest
+    if (params.savereads) {
+        writeManifest(
+            combineReads.out
+        )
+    }
 
-  """
-set -e
+    // Count the reads for every sample individually (just take the first of the pair of reads)
+    countReads(
+        combineReads.out.map {
+            r -> [r[0], r[1], r[2]]
+        }
+    )
 
-[[ -s ${fastq} ]]
+    // Make a summary of every sample and write it out to --output
+    countReadsSummary(
+        countReads.out.collect()
+    )
 
-n=\$(gunzip -c "${fastq}" | awk 'NR % 4 == 1' | wc -l)
-echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
-  """
+    // ###################################
+    // # DE NOVO ASSEMBLY AND ANNOTATION #
+    // ###################################
 
-}
+    // A gene catalog was provided, so skip de novo assembly
+    if ( params.gene_fasta ) {
 
+<<<<<<< HEAD
+        // Point to the file provided
+        gene_fasta = file(params.gene_fasta)
+=======
 // Make a single file which summarizes the number of reads across all samples
 // This is only run after all of the samples are done processing through the
 // 'total_counts' channel, which is transformed by the .toSortedList() command
@@ -280,27 +425,40 @@ done
 
 cat ${readcount_csv_list} >> TEMP && mv TEMP ${output_prefix}.readcounts.csv
   """
+>>>>>>> master
 
-}
+    } else {
 
+<<<<<<< HEAD
+        // Run the assembly and annotation workflow (in modules/assembly.nf)
+        assembly_wf(
+            combineReads.out
+        )
+=======
 // Process to quantify the microbial species present using the metaphlan2 tool
 process metaphlan2 {
     container "quay.io/fhcrc-microbiome/metaphlan@sha256:51b416458088e83d0bd8d840a5a74fb75066b2435d189c5e9036277d2409d7ea"
+>>>>>>> master
 
-    input:
-    set val(sample_name), file(input_fastq) from metaphlan_ch
-    
-    output:
-    file "${sample_name}.metaphlan.tsv" into metaphlan_for_summary, metaphlan_for_humann
+        gene_fasta = assembly_wf.out.gene_fasta
+    }
 
-    afterScript "rm *"
+    // Run the annotation steps on the gene catalog
+    annotation_wf(
+        gene_fasta
+    )
 
-    """
-    set -e
-    metaphlan2.py --input_type fastq --tmp_dir ./ -o ${sample_name}.metaphlan.tsv ${input_fastq}
-    """
-}
+    // ############################
+    // # ALIGNMENT-BASED ANALYSIS #
+    // ############################
 
+<<<<<<< HEAD
+    // Run the alignment-based analysis steps (in modules/alignment.nf)
+    alignment_wf(
+        gene_fasta,
+        combineReads.out
+    )
+=======
 // If the user specifies --humann, run the tasks below
 if (params.humann) {
 
@@ -440,9 +598,42 @@ logging.info("Wrote out %s" % ("${output_prefix}.HUMAnN2.pathcoverage.csv"))
 
     """
   }
+>>>>>>> master
 
-}
+    // ########################
+    // # STATISTICAL ANALYSIS #
+    // ########################
 
+    // Calculate the association of individual CAGs with user-provided features
+    if ( params.formula ) {
+        corncob_wf(
+            alignment_wf.out.famli_json_list,
+            alignment_wf.out.cag_csv,
+            file(params.manifest)
+        )
+        corncob_results = corncob_wf.out
+    } else {
+        corncob_results = Channel.empty()
+    }
+
+<<<<<<< HEAD
+    // ###################
+    // # GATHER RESULTS #
+    // ###################
+
+    // Start by gathering all of the results which are generated
+    // no matter what options were selected by the user
+    // NOTE: The code used here is imported from ./modules/general.nf
+
+    collectAbundances(
+        alignment_wf.out.cag_csv,
+        alignment_wf.out.gene_abund_feather,
+        alignment_wf.out.cag_abund_feather,
+        alignment_wf.out.famli_json_list,
+        countReadsSummary.out,
+        manifest_file
+    )
+=======
 // Align each sample against the reference database of genes using DIAMOND
 process diamond {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
@@ -482,9 +673,28 @@ process diamond {
       --compress 1 \
       --unal 0
     """
+>>>>>>> master
 
-}
+    // If we performed de novo assembly, add the gene assembly information
+    if ( params.gene_fasta ) {
+        finalHDF = collectAbundances.out
+    } else {
+        addGeneAssembly(
+            collectAbundances.out,
+            assembly_wf.out.allele_gene_tsv,
+            assembly_wf.out.allele_assembly_csv
+        )
+        finalHDF = addGeneAssembly.out
+    }
 
+<<<<<<< HEAD
+    // If we performed statistical analysis, add the results to the HDF5
+    if ( params.formula ) {
+        addCorncobResults(
+            finalHDF,
+            corncob_wf.out
+        )
+=======
 // Filter the alignments with the FAMLI algorithm
 process famli {
     container "quay.io/fhcrc-microbiome/famli@sha256:241a7db60cb735abd59f4829e8ddda0451622b6eb2321f176fd9d76297d8c9e7"
@@ -510,9 +720,26 @@ process famli {
       --batchsize ${batchsize}
     gzip ${sample_name}.json
     """
+>>>>>>> master
 
-}
+        finalHDF = addCorncobResults.out
+    }
 
+<<<<<<< HEAD
+    // If we performed functional analysis with eggNOG, add the results to the HDF5
+    if ( params.noannot == false ) {
+        if ( params.eggnog_db && params.eggnog_dmnd ) {
+            if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
+                addEggnogResults(
+                    finalHDF,
+                    annotation_wf.out.eggnog_tsv
+                )
+
+                finalHDF = addEggnogResults.out
+            }
+        }
+    }
+=======
 // Summarize all of the results from the experiment
 process summarizeExperiment {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
@@ -643,11 +870,51 @@ def read_metaphlan(sample_name, fp):
     d["rank"] = d["#SampleID"].apply(
         lambda s: tax_code[s.split("|")[-1][0]]
     )
+>>>>>>> master
 
-    # Parse out the name of the organism
-    d["org_name"] = d["#SampleID"].apply(
-        lambda s: "unclassified" if s == "unclassified" else s.split("|")[-1][3:].replace("_", " ")
+    // If we performed taxonomic analysis with DIAMOND, add the results to the HDF5
+    if ( params.noannot == false ) {
+        if ( params.taxonomic_dmnd ) {
+            if ( !file(params.taxonomic_dmnd).isEmpty() ){
+                readTaxonomy(
+                    file(params.ncbi_taxdump)
+                )
+
+                addTaxResults(
+                    finalHDF,
+                    annotation_wf.out.tax_tsv,
+                    readTaxonomy.out
+                )
+
+                finalHDF = addTaxResults.out
+            }
+        }
+    }
+
+    // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
+    repackFullHDF(
+        finalHDF
     )
+<<<<<<< HEAD
+
+    // Make a smaller summary HDF5 with a subset of the total data
+    makeSummaryHDF(
+        repackFullHDF.out
+    )
+
+    // "Repack" and compress that summary HDF5 as well
+    repackSummaryHDF(
+        makeSummaryHDF.out
+    )
+
+    publish:
+        corncob_results to: "${output_folder}/stats/", enabled: params.formula
+        alignment_wf.out.famli_json_list to: "${output_folder}/abund/details/"
+        repackFullHDF.out to: "${output_folder}", mode: "copy", overwrite: true
+        repackSummaryHDF.out to: "${output_folder}", mode: "copy", overwrite: true
+
+}
+=======
     del d["#SampleID"]
 
     # Add the sample name
@@ -805,3 +1072,4 @@ store.close()
 """
   }
 }
+>>>>>>> master
