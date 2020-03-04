@@ -288,7 +288,7 @@ library(tidyverse)
 library(corncob)
 library(parallel)
 
-Sys.setenv("VROOM_CONNECTION_SIZE" = 131072 * 20)
+Sys.setenv("VROOM_CONNECTION_SIZE" = 13107200 * ${task.attempt})
 
 numCores = ${task.cpus}
 
