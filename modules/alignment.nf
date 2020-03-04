@@ -9,32 +9,32 @@ params.linkage_type = "average"
 params.famli_batchsize = 10000000
 
 include makeInitialCAGs from "./make_cags" params(
-    distance_threshold: params.distance_threshold,
+    distance_threshold: params.distance_threshold / 2,
     distance_metric: params.distance_metric,
     linkage_type: params.linkage_type
 )
 include refineCAGs as refineCAGs_round1 from "./make_cags" params(
-    distance_threshold: params.distance_threshold,
+    distance_threshold: params.distance_threshold / 2,
     distance_metric: params.distance_metric,
     linkage_type: params.linkage_type
 )
 include refineCAGs as refineCAGs_round2 from "./make_cags" params(
-    distance_threshold: params.distance_threshold,
+    distance_threshold: params.distance_threshold / 2,
     distance_metric: params.distance_metric,
     linkage_type: params.linkage_type
 )
 include refineCAGs as refineCAGs_round3 from "./make_cags" params(
-    distance_threshold: params.distance_threshold,
+    distance_threshold: params.distance_threshold / 2,
     distance_metric: params.distance_metric,
     linkage_type: params.linkage_type
 )
 include refineCAGs as refineCAGs_round4 from "./make_cags" params(
-    distance_threshold: params.distance_threshold,
+    distance_threshold: params.distance_threshold / 2,
     distance_metric: params.distance_metric,
     linkage_type: params.linkage_type
 )
 include refineCAGs as refineCAGs_round5 from "./make_cags" params(
-    distance_threshold: params.distance_threshold,
+    distance_threshold: params.distance_threshold / 2,
     distance_metric: params.distance_metric,
     linkage_type: params.linkage_type
 )
