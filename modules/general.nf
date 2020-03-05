@@ -283,6 +283,9 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     # Keep track of the total number of aligned reads for each sample
     aligned_reads_dict = dict()
 
+    # Keep track of the length of each gene
+    gene_length_dict = {}
+
     # Read in the complete set of FAMLI results
     for fp in famli_json_list:
 
@@ -298,6 +301,10 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
         df.to_hdf(
             store, "/abund/gene/long/%s" % sample_name
         )
+
+        # Add the gene lengths
+        for _, r in df.iterrows():
+            gene_length_dict[r["id"]] = r["length"]
 
         # Record the total number of aligned reads for this sample
         aligned_reads_dict[sample_name] = df["nreads"].sum()
@@ -381,7 +388,8 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     # Add that information on the gene abundance and prevalence to this gene summary table
     cag_df = cag_df.assign(
         prevalence = cag_df["gene"].apply(gene_prevalence.get),
-        abundance = cag_df["gene"].apply(gene_abundance.get)
+        abundance = cag_df["gene"].apply(gene_abundance.get),
+        length = cag_df["gene"].apply(gene_length_dict.get)
     )
 
     # Now create the `/annot/gene/all` table, which will be added to later
