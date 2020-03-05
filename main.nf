@@ -152,7 +152,6 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include read_manifest from './modules/preprocess'
 include preprocess_wf from './modules/preprocess' params(
     manifest: params.manifest,
     adapter_F: params.adapter_F,
@@ -162,6 +161,7 @@ include preprocess_wf from './modules/preprocess' params(
     min_hg_align_score: params.min_hg_align_score,
 )
 // Import some general tasks, such as combineReads and writeManifest
+include read_manifest from './modules/general'
 include countReads from './modules/general'
 include countReadsSummary from './modules/general' params(
     output_folder: output_folder
@@ -265,12 +265,15 @@ workflow {
         manifest_file = Channel.from(file(params.manifest))
     }
 
+    manifest_qced = read_manifest(manifest_file)
+
     // Phase I: Preprocessing
     if (!params.nopreprocess) {
 
         // Run the entire preprocessing workflow
         preprocess_wf(
-            manifest_file
+            manifest_qced.valid_paired_indexed,
+             manifest_qced.valid_paired
         )
 
         // Combine the reads by specimen name
@@ -280,22 +283,11 @@ workflow {
         // If the user specified --nopreprocess, then just 
         // read the manifest and combine by specimen
         combineReads(
-            read_manifest(
-                manifest_file
-            ).filter { r ->
-                (r.specimen != null) &&
-                (r.R1 != null) &&
-                (r.R2 != null) &&
-                (r.specimen != "") &&
-                (r.R1 != "") &&
-                (r.R2 != "")
-            }.filter {
-                r -> (!file(r.R1).isEmpty() && !file(r.R2).isEmpty())
-            }.map { 
+            manifest_qced.valid_paired.mix(manifest_qced.valid_paired_indexed)
+            .map { 
                 r -> [r.specimen, file(r.R1), file(r.R2)]
             }.groupTuple()
         )
-
     }
 
     // If the user specified --savereads, write out the manifest
