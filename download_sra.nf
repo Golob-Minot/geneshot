@@ -23,10 +23,10 @@ def helpMessage() {
     Output Files:
 
     All output files will be written to the --output folder. This includes one or two
-    FASTQ files per Run as well as a `$BIOPROJECT.metadata.csv` file listing all of the files which
+    FASTQ files per Run as well as a `BIOPROJECT.metadata.csv` file listing all of the files which
     were downloaded, as well as the metadata describing those samples within NCBI.
 
-    The `$BIOPROJECT.metadata.csv` file will also include the metadata recorded for this set of Runs
+    The `BIOPROJECT.metadata.csv` file will also include the metadata recorded for this set of Runs
     within the SRA database. The columns for this file may not be formatted nicely,
     but they do match the structure of the data within the SRA API.
 
