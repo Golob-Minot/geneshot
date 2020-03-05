@@ -45,7 +45,7 @@ echo "Done"
 process diamondDedup {
     tag "Deduplicate sequences by alignment with DIAMOND"
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
-    label 'mem_medium'
+    label 'mem_veryhigh'
     errorStrategy 'retry'
     
     input:
