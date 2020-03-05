@@ -361,6 +361,8 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     gene_abund_df.to_hdf(store, "/abund/gene/wide")
 
     # Read in the table describing which genes are grouped into which CAGs
+    # This is being called 'cag_df', but it's really a table of CAG annotations per-gene,
+    # so there is one row per gene.
     cag_df = pd.read_csv(cag_csv)
 
     print(
@@ -371,7 +373,19 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     # Write to HDF5
     cag_df.to_hdf(store, "/annot/gene/cag")
 
-    # Also create the `/annot/gene/all` table, which will be added to later
+    # Calculate prevalence and abundance information for each gene
+    gene_abund_df.set_index("index", inplace=True)
+    gene_abundance = gene_abund_df.mean(axis=1)
+    gene_prevalence = (gene_abund_df > 0).mean(axis=1)
+
+    # Add that information on the gene abundance and prevalence to this gene summary table
+    cag_df = cag_df.assign(
+        prevalence = cag_df["gene"].apply(gene_prevalence.get),
+        abundance = cag_df["gene"].apply(gene_abundance.get)
+    )
+
+    # Now create the `/annot/gene/all` table, which will be added to later
+    # with the taxonomic and functional annotations, if those are performed
     cag_df.to_hdf(store, "/annot/gene/all")
 
     # Make a summary table describing each CAG with size, mean_abundance, and prevalence
