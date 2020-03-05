@@ -876,6 +876,15 @@ with pd.HDFStore("${full_results_hdf}", "r") as store:
         corncob_df = None
         corncob_wide = None
 
+    # Check to see if the taxonomy was included in the outputs
+    if "/ref/taxonomy" in store:
+
+        # Read in the taxonomy
+        taxonomy_df = pd.read_hdf(store, "/ref/taxonomy")
+
+    else:
+        taxonomy_df = None
+
 # Now write to the new HDF store
 with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
 
@@ -940,6 +949,15 @@ with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
             store, 
             "/stats/cag/corncob_wide", 
             format="fixed"
+        )
+
+    if taxonomy_df is not None:
+        print("Writing the taxonomy table")
+
+        taxonomy_df.to_hdf(
+            store,
+            "/ref/taxonomy",
+            format = "fixed"
         )
 
 """
