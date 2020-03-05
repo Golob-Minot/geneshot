@@ -135,37 +135,14 @@ workflow {
 
     }
 
-
-    // ##############################
-    // # Composition via MetaPhlAn2 #
-    // ##############################
+    // ################
+    // # Composition  #
+    // ################
     composition_wf(
         combineReads.out,
         manifest_qced.valid_unpaired.map{ r-> 
             [r.specimen, file(r.R1)]
         }
     )
-        
-
-    // ###################
-    // # GATHER RESULTS #
-    // ###################
-
-    // Start by gathering all of the results which are generated
-    // no matter what options were selected by the user
-    // NOTE: The code used here is imported from ./modules/general.nf
-
-   // collectAbundances(
-   //     countReadsSummary.out,
-   //     manifest_file
-    //)
-
-    // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
-    //repackFullHDF(
-    //    finalHDF
-   // )
-
-   // publish:
-
 
 }
