@@ -16,7 +16,7 @@ jobs:
           sudo mv nextflow /usr/local/bin/
       - name:  Run geneshot
         run: |
-          NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config.sample -profile testing -c  --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.5 -w work/ --eggnog_db false --eggnog_dmnd false --taxonomic_dmnd false -with-docker ubuntu:latest
+          NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.5 -w work/ --eggnog_db false --eggnog_dmnd false --taxonomic_dmnd false -with-docker ubuntu:latest
 
   no_preprocessing:
     runs-on: ubuntu-latest
