@@ -5,13 +5,7 @@ container__bwa = "quay.io/fhcrc-microbiome/bwa:bwa.0.7.17__bcw.0.3.0I"
 
 // Input to this workflow is a manifest CSV 
 
-// Function to read in a CSV and return a Channel
-def read_manifest(manifest_file){
-    manifest_file.splitCsv(
-        header: true, 
-        sep: ","
-    )
-}
+
 
 // Function to filter a manifest to those rows which 
 // have values for specimen, R1, and R2, but are missing any values in I1 or I2
@@ -50,61 +44,19 @@ def filter_valid_index(manifest_ch){
 }
 
 workflow preprocess_wf {
-
-    take:
-    manifest_file
+    take: indexed_ch
+    take: paired_ch
 
     main:
 
-    // Start by checking the manifest for rows which are invalid in any way
-    
-    // Raise an error if there are any rows which are missing any values for specimen, R1, or R2
-    read_manifest(manifest_file).filter { r ->
-        (r.specimen == null) ||
-        (r.R1 == null) ||
-        (r.R2 == null) ||
-        (r.specimen == "") ||
-        (r.R1 == "") ||
-        (r.R2 == "")        
-    }.count(
-    ).map { assert it == 0: "Found lines missing values for specimen, R1, or R2"}
-
-    // Raise an error if there are any rows which point to empty or missing R1 / R2 files
-    filter_no_index(
-        read_manifest(manifest_file)
-    ).filter {
-        r -> (file(r.R1).isEmpty() || file(r.R2).isEmpty())
-    }.count(
-    ).map { assert it == 0: "Found lines pointing to empty files for R1 or R2"}
-
-    // Raise an error if there are any rows which point to empty or missing files for R1, R2, I1, or I2
-    filter_valid_index(
-        read_manifest(manifest_file)
-    ).filter {
-        r -> (file(r.R1).isEmpty() || file(r.R2).isEmpty() || file(r.I1).isEmpty() || file(r.I2).isEmpty())
-    }.count(
-    ).map { assert it == 0: "Found lines pointing to empty files for R1, R2, I1, or I2"}
-
-    // Get rows which have valid R1 and R2, but no values provided for I1 or I2
-    input_no_index_valid_ch = filter_no_index(
-        read_manifest(manifest_file)
-    ).filter {
-        r -> (!file(r.R1).isEmpty() && !file(r.R2).isEmpty())
-    }
-
-    // Get rows which have valid R1, R2, I1, and I2
-    // and make a channel for barcodecop
-    to_bcc_ch = filter_valid_index(
-        read_manifest(manifest_file)
-    ).filter {
-        r -> (!file(r.R1).isEmpty() && !file(r.R2).isEmpty() && !file(r.I1).isEmpty() && !file(r.I2).isEmpty())
-    }.map{ sample -> [
+    // Indexed rows into a channel for barcodecop
+    indexed_ch.map{ sample -> [
         sample.specimen,
         file(sample.R1),
         file(sample.R2),
         file(sample.I1),
         file(sample.I2),
-    ]}
+    ]}.set{ to_bcc_ch }
 
     // Run barcodecop
     barcodecop(to_bcc_ch)
@@ -121,7 +73,7 @@ workflow preprocess_wf {
         }
 
     // Mix together the reads with no index with the reads with verified demultiplex
-    demupltiplexed_ch = input_no_index_valid_ch
+     paired_ch
         .map { sample -> [
             sample.specimen,
             // Actual files
@@ -129,6 +81,7 @@ workflow preprocess_wf {
             file(sample.R2),
         ]}
         .mix(bcc_to_cutadapt_ch)
+        .set{ demupltiplexed_ch}
 
     // Run catadapt
     cutadapt(demupltiplexed_ch)

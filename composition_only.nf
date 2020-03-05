@@ -29,6 +29,8 @@ params.hg_index = false
 params.min_hg_align_score = 30
 
 
+
+
 // Function which prints help message text
 def helpMessage() {
     log.info"""
@@ -60,10 +62,11 @@ def helpMessage() {
     Manifest file:
       The manifest is a CSV with a header indicating which samples correspond to which files.
       The file must contain a column `specimen`. This can be repeated. 
-      Data is only accepted as paired reads.
+      Data for preprocessing is only accepted as paired reads.
       Reads are specified by columns, `R1` and `R2`.
-      If index reads are provided, the column titles should be 'I1' and 'I2'
-
+      If index reads are provided, the column titles should be `I1` and `I2`
+      If you wish to provide already processed data in fasta format, please include it in `R1` alone,
+        with only *one* file specified per specimen.
     """.stripIndent()
 }
 
@@ -83,56 +86,40 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include read_manifest from './modules/preprocess'
+include read_manifest from './modules/general'
 include preprocess_wf from './modules/preprocess' params(
-    manifest: params.manifest,
     adapter_F: params.adapter_F,
     adapter_R: params.adapter_R,
     hg_index: params.hg_index,
     hg_index_url: params.hg_index_url,
     min_hg_align_score: params.min_hg_align_score,
 )
-// Import some general tasks, such as combineReads and writeManifest
-include countReads from './modules/general'
-include countReadsSummary from './modules/general' params(
-    output_folder: output_folder
-)
-
-include writeManifest from './modules/general' params(
-    savereads: params.savereads,
-    output_folder: output_folder
-)
+// Import some general tasks
 include combineReads from './modules/general' params(
     savereads: params.savereads,
     output_folder: output_folder
 )
 
+// Import from composition_wf module
+include composition_wf from './modules/composition' params(
+    output_folder: params.output_folder
+)
 
 workflow {
     main:
 
     // Phase 0: Validation of input data
-
-    // If the user specifies a `--formula`, the first step in the process
-    // will be to ensure that the formula is written correctly, and is
-    // compatible with the data provided in the manifest
-    if ( params.formula ) {
-        validation_wf(
-            file(params.manifest)
-        )
-        manifest_file = validation_wf.out
-    } else {
-        manifest_file = Channel.from(file(params.manifest))
-    }
+    manifest_file = Channel.from(file(params.manifest))
+    // Read manifest splits out our manifest.
+    manifest_qced = read_manifest(manifest_file)
 
     // Phase I: Preprocessing
     if (!params.nopreprocess) {
-
         // Run the entire preprocessing workflow
         preprocess_wf(
-            manifest_file
+            manifest_qced.valid_paired_indexed,
+             manifest_qced.valid_paired
         )
-
         // Combine the reads by specimen name
         combineReads(preprocess_wf.out.groupTuple())
 
@@ -140,48 +127,25 @@ workflow {
         // If the user specified --nopreprocess, then just 
         // read the manifest and combine by specimen
         combineReads(
-            read_manifest(
-                manifest_file
-            ).filter { r ->
-                (r.specimen != null) &&
-                (r.R1 != null) &&
-                (r.R2 != null) &&
-                (r.specimen != "") &&
-                (r.R1 != "") &&
-                (r.R2 != "")
-            }.filter {
-                r -> (!file(r.R1).isEmpty() && !file(r.R2).isEmpty())
-            }.map { 
+            manifest_qced.valid_paired.mix(manifest_qced.valid_paired_indexed)
+            .map { 
                 r -> [r.specimen, file(r.R1), file(r.R2)]
             }.groupTuple()
         )
 
     }
 
-    // If the user specified --savereads, write out the manifest
-    if (params.savereads) {
-        writeManifest(
-            combineReads.out
-        )
-    }
-
-    // Count the reads for every sample individually (just take the first of the pair of reads)
-    countReads(
-        combineReads.out.map {
-            r -> [r[0], r[1], r[2]]
-        }
-    )
-
-    // Make a summary of every sample and write it out to --output
-    countReadsSummary(
-        countReads.out.collect()
-    )
 
     // ##############################
     // # Composition via MetaPhlAn2 #
     // ##############################
-
-
+    composition_wf(
+        combineReads.out,
+        manifest_qced.valid_unpaired.map{ r-> 
+            [r.specimen, file(r.R1)]
+        }
+    )
+        
 
     // ###################
     // # GATHER RESULTS #
@@ -191,20 +155,17 @@ workflow {
     // no matter what options were selected by the user
     // NOTE: The code used here is imported from ./modules/general.nf
 
-    collectAbundances(
-        countReadsSummary.out,
-        manifest_file
-    )
+   // collectAbundances(
+   //     countReadsSummary.out,
+   //     manifest_file
+    //)
 
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
-    repackFullHDF(
-        finalHDF
-    )
+    //repackFullHDF(
+    //    finalHDF
+   // )
 
-    publish:
-        corncob_results to: "${output_folder}/stats/", enabled: params.formula
-        alignment_wf.out.famli_json_list to: "${output_folder}/abund/details/"
-        repackFullHDF.out to: "${output_folder}", mode: "copy", overwrite: true
-        repackSummaryHDF.out to: "${output_folder}", mode: "copy", overwrite: true
+   // publish:
+
 
 }
