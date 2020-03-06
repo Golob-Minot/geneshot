@@ -195,6 +195,7 @@ process famli {
     tag "Deduplicate multi-mapping reads"
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
+    publishDir "${params.output_folder}/abund/details/", mode: "copy"
     errorStrategy 'retry'
     
     input:
