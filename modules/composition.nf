@@ -36,8 +36,8 @@ workflow composition_wf {
 """
 set -e
 
-bowtie2 -x /metaphlan/metaphlan_databases/mpa_v20_m200 -1 ${R1} -2 ${R2} | \
-metaphlan2.py --input_type sam -t rel_ab_w_read_stats -o ${specimen}.metaphlan2.tsv
+bowtie2 --threads ${task.cpus} -x /metaphlan/metaphlan_databases/mpa_v20_m200 -1 ${R1} -2 ${R2} | \
+metaphlan2.py --nproc ${task.cpus} --input_type sam -t rel_ab_w_read_stats -o ${specimen}.metaphlan2.tsv
 
 """
     }
@@ -62,8 +62,8 @@ metaphlan2.py --input_type sam -t rel_ab_w_read_stats -o ${specimen}.metaphlan2.
 """
 set -e
 
-bowtie2 -x /metaphlan/metaphlan_databases/mpa_v20_m200 -f -U ${R1} | \
-metaphlan2.py --input_type sam -t rel_ab_w_read_stats -o ${specimen}.metaphlan2.tsv
+bowtie2 --threads ${task.cpus} -x /metaphlan/metaphlan_databases/mpa_v20_m200 -f -U ${R1} | \
+metaphlan2.py --nproc ${task.cpus} --input_type sam -t rel_ab_w_read_stats -o ${specimen}.metaphlan2.tsv
 
 """
     }
