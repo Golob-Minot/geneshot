@@ -118,7 +118,7 @@ workflow alignment_wf {
         gene_abund_feather = assembleAbundances.out[0]
         cag_abund_feather = calcCAGabund.out
         famli_json_list = famli.out.toSortedList()
-
+        specimen_gene_count_csv = assembleAbundances.out[2]
 }
 
 // Align each sample against the reference database of genes using DIAMOND
@@ -234,6 +234,7 @@ process assembleAbundances {
     output:
     file "gene.abund.feather"
     file "gene_list.*.csv.gz"
+    file "specimen_gene_count.csv"
 
 
     """
@@ -318,6 +319,28 @@ for sample_name, sample_abund in all_abund.items():
     ).apply(
         np.float32
     ).values
+
+# Write out the number of genes detected per sample
+pd.DataFrame(
+    dict(
+        [
+            (
+                "n_genes_aligned", 
+                (df > 0).sum()
+            )
+        ]
+    )
+).reset_index(
+).rename(
+    columns = dict(
+        [
+            ("index", "specimen")
+        ]
+    )
+).to_csv(
+    "specimen_gene_count.csv",
+    index=None
+)
 
 # Write out the abundances to a feather file
 logging.info("Writing to disk")

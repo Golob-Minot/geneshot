@@ -179,6 +179,7 @@ process collectAbundances{
         path famli_json_list
         path readcount_csv
         path manifest_csv
+        path specimen_gene_count_csv
 
     output:
         path "${params.output_prefix}.full.hdf5"
@@ -197,6 +198,7 @@ gene_abund_feather = "${gene_abund_feather}"
 cag_abund_feather = "${cag_abund_feather}"
 famli_json_list = "${famli_json_list}".split(" ")
 readcount_csv = "${readcount_csv}"
+specimen_gene_count_csv = "${specimen_gene_count_csv}"
 manifest_csv = "${manifest_csv}"
 suffix=".json.gz"
 
@@ -337,6 +339,12 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     # Write to HDF5
     readcount_df.to_hdf(store, "/summary/readcount")
 
+    # Read in the summary of the number of genes detected by alignment per sample
+    specimen_gene_count_df = pd.read_csv(specimen_gene_count_csv)
+
+    # Write to HDF5
+    specimen_gene_count_df.to_hdf(store, "/summary/genes_aligned")
+
     # Read in the table with the CAG-level abundances across all samples
     cag_abund_df = pd.read_feather(
         cag_abund_feather
@@ -470,6 +478,25 @@ print(
     (allele_assembly.shape[0], allele_assembly["specimen"].unique().shape[0])
 )
 
+# Count up the number of genes assembled per-specimen
+n_genes_assembled_per_specimen = pd.DataFrame(
+    dict(
+        [
+            (
+                "n_genes_assembled",
+                allele_assembly["specimen"].value_counts()
+            )
+        ]
+    )
+).reset_index(
+).rename(
+    columns = dict(
+        [
+            ("index", "specimen")
+        ]
+    )
+)
+
 # Read in the listing of which alleles were grouped into which genes
 allele_gene = pd.read_csv(
     "${allele_gene_tsv}", 
@@ -492,6 +519,9 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write gene <-> allele table to HDF5
     allele_gene.to_hdf(store, "/annot/allele/gene")
+
+    # Write the summary of the number of genes assembled per sample
+    n_genes_assembled_per_specimen.to_hdf(store, "/summary/genes_assembled")
 
 """
 

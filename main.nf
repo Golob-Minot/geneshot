@@ -374,7 +374,8 @@ workflow {
         alignment_wf.out.cag_abund_feather,
         alignment_wf.out.famli_json_list,
         countReadsSummary.out,
-        manifest_file
+        manifest_file,
+        alignment_wf.out.specimen_gene_count_csv
     )
 
     // If we performed de novo assembly, add the gene assembly information
