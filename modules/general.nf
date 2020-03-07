@@ -891,140 +891,133 @@ process makeSummaryHDF {
 
 import pandas as pd
 
-# Read in all of the tables needed from the full results HDF5
-with pd.HDFStore("${full_results_hdf}", "r") as store:
+# Keep track of data objects in a dict
+# This should include the key, the format to write the HDF, and any data_columns if needed
+# This is the list of things which will be written to the summary HDF5,
+# noting those objects which are optional or required
+data_objects = [
+    dict([
+        ("key", "/manifest"),
+        ("optional", False),
+        ("format", "fixed"),
+        ("comment", "manifest describing experiment design")
+    ]),
+    dict([
+        ("key", "/summary/experiment"),
+        ("optional", False),
+        ("format", "fixed"),
+        ("comment", "informatics parameter summary")
+    ]),
+    dict([
+        ("key", "/summary/readcount"),
+        ("optional", False),
+        ("format", "fixed"),
+        ("comment", "number of read pairs")
+    ]),
+    dict([
+        ("key", "/summary/genes_assembled"),
+        ("optional", True),
+        ("format", "fixed"),
+        ("comment", "number of genes identified by de novo assembly per sample")
+    ]),
+    dict([
+        ("key", "/summary/genes_aligned"),
+        ("optional", False),
+        ("format", "fixed"),
+        ("comment", "number of genes identified by alignment per sample")
+    ]),
+    dict([
+        ("key", "/abund/cag/wide"),
+        ("optional", False),
+        ("format", "table"),
+        ("data_columns", ["CAG"]),
+        ("comment", "abundance of every CAG in every sample")
+    ]),
+    dict([
+        ("key", "/ordination/pca"),
+        ("optional", False),
+        ("format", "fixed"),
+        ("comment", "PCA for every sample, based on CAG abundances")
+    ]),
+    dict([
+        ("key", "/ordination/tsne"),
+        ("optional", False),
+        ("format", "fixed"),
+        ("comment", "t-SNE for every sample, based on CAG abundances")
+    ]),
+    dict([
+        ("key", "/annot/gene/all"),
+        ("optional", False),
+        ("format", "table"),
+        ("data_columns", ["CAG"]),
+        ("comment", "table with gene annotations")
+    ]),
+    dict([
+        ("key", "/annot/cag/all"),
+        ("optional", False),
+        ("format", "fixed"),
+        ("comment", "table with CAG annotations")
+    ]),
+    dict([
+        ("key", "stats/cag/corncob"),
+        ("optional", True),
+        ("format", "fixed"),
+        ("comment", "table of corncob results")
+    ]),
+    dict([
+        ("key", "/stats/cag/corncob_wide"),
+        ("optional", True),
+        ("format", "fixed"),
+        ("comment", "table of corncob results in wide format")
+    ]),
+    dict([
+        ("key", "/ref/taxonomy"),
+        ("optional", True),
+        ("format", "fixed"),
+        ("comment", "taxonomy table")
+    ]),
+]
 
-    # Read in the manifest
-    print("Reading the manifest")
-    manifest_df = pd.read_hdf(store, "/manifest")
+# Open a connection to the input store
+input_store = pd.HDFStore("${full_results_hdf}", "r")
 
-    # Read in the summary of the entire experiment
-    print("Reading the summary")
-    exp_summary_df = pd.read_hdf(store, "/summary/experiment")
+# Open a connection to the output store
+output_store = pd.HDFStore("${params.output_prefix}.summary.hdf5", "w")
 
-    # Table with the abundance of every CAG in every sample
-    print("Reading the CAG abundance")
-    cag_abund_df = pd.read_hdf(store, "/abund/cag/wide")
-
-    # Table with PCA for every sample, based on CAG abundances
-    print("Reading the PCA")
-    pca_df = pd.read_hdf(store, "/ordination/pca")
-
-    # Table with t-SNE for every sample, based on CAG abundances
-    print("Reading the t-SNE")
-    tsne_df = pd.read_hdf(store, "/ordination/tsne")
-
-    # Table with gene annotations (including CAG membership)
-    print("Reading the gene annotations")
-    gene_annot_df = pd.read_hdf(store, "/annot/gene/all")
-
-    # Table summarizing the size, prevalence, and mean abundance of every CAG
-    print("Reading the CAG annotations")
-    cag_summary_df = pd.read_hdf(store, "/annot/cag/all")
-
-    # Number of read pairs
-    print("Reading the readcounts")
-    readcount_df = pd.read_hdf(store, "/summary/readcount")
-
-    # Check to see if we have any corncob results
-    if "/stats/cag/corncob" in store:
-
-        # Read in the table of corncob results
-        print("Reading the statistical analysis results")
-        corncob_df = pd.read_hdf(store, "/stats/cag/corncob")
-
-        # Read in the table of corncob results in wide format
-        print("Reading the statistical analysis results in wide format")
-        corncob_wide = pd.read_hdf(store, "/stats/cag/corncob_wide")
-
+# Iterate over each of the data objects, copying from the input to the output
+for d in data_objects:
+    # Make sure the key is present
+    if d["key"] in input_store:
+        # Copy the table to the output store
+        print("Reading in %s and writing to the summary HDF5" % d["comment"])
+        if d["format"] == "fixed":
+            pd.read_hdf(
+                input_store, 
+                d["key"]
+            ).to_hdf(
+                output_store,
+                d["key"],
+                format = d["format"]
+            )
+        else:
+            assert d["format"] == "table", d
+            assert "data_columns" in d
+            pd.read_hdf(
+                input_store, 
+                d["key"]
+            ).to_hdf(
+                output_store,
+                d["key"],
+                format = d["format"],
+                data_columns = d["data_columns"]
+            )
     else:
-        corncob_df = None
-        corncob_wide = None
+        assert d["optional"], "Could not find expected key %s containing %s" % (d["key"], d["comment"])
+        print("Did not find the key %s in the HDF5" % d["key"])
 
-    # Check to see if the taxonomy was included in the outputs
-    if "/ref/taxonomy" in store:
-
-        # Read in the taxonomy
-        taxonomy_df = pd.read_hdf(store, "/ref/taxonomy")
-
-    else:
-        taxonomy_df = None
-
-# Now write to the new HDF store
-with pd.HDFStore("${params.output_prefix}.summary.hdf5", "w") as store:
-
-    # Write out each table, while indexing the appropriate columns
-    print("Writing the manifest")
-    manifest_df.to_hdf(
-        store,
-        "/manifest"
-    )
-    print("Writing the summary")
-    exp_summary_df.to_hdf(
-        store,
-        "/summary/experiment"
-    )
-    print("Writing the readcounts")
-    readcount_df.to_hdf(
-        store,
-        "/summary/readcount"
-    )
-    print("Writing the CAG abundance")
-    cag_abund_df.to_hdf(
-        store, 
-        "/abund/cag/wide", 
-        format="table",
-        data_columns=["CAG"]
-    )
-    print("Writing the PCA")
-    pca_df.to_hdf(
-        store,
-        "/ordination/pca",
-        format="fixed"
-    )
-    print("Writing the t-SNE")
-    tsne_df.to_hdf(
-        store,
-        "/ordination/tsne",
-        format="fixed"
-    )
-    print("Writing the gene annotations")
-    gene_annot_df.to_hdf(
-        store, 
-        "/annot/gene/all", 
-        format="table",
-        data_columns=["CAG"]
-    )
-    print("Writing the CAG annotations")
-    cag_summary_df.to_hdf(
-        store,
-        "/annot/cag/all",
-        format="fixed"
-    )
-
-    if corncob_df is not None:
-        print("Writing the statistical analysis results")
-        corncob_df.to_hdf(
-            store, 
-            "/stats/cag/corncob", 
-            format="fixed"
-        )
-        print("Writing the statistical analysis results in wide format")
-        corncob_wide.to_hdf(
-            store, 
-            "/stats/cag/corncob_wide", 
-            format="fixed"
-        )
-
-    if taxonomy_df is not None:
-        print("Writing the taxonomy table")
-
-        taxonomy_df.to_hdf(
-            store,
-            "/ref/taxonomy",
-            format = "fixed"
-        )
-
+# Close the stores
+input_store.close()
+output_store.close()
 """
 
 }
