@@ -239,7 +239,7 @@ echo -e "\\nRenaming output files\\n"
 mv OUTPUT/log "${specimen}.megahit.log"
 
 # Add the specimen name to the contig name
-cat OUTPUT/final.contigs.fa | sed 's/>/>${specimen}__/' | sed 's/ /__/g' | gzip -c > "${specimen}.contigs.fasta.gz"
+cat OUTPUT/final.contigs.fa | sed 's/>/>${specimen}__GENE__/' | sed 's/ /__/g' | gzip -c > "${specimen}.contigs.fasta.gz"
 
 date
 echo -e "\\nDone\\n"
@@ -331,7 +331,7 @@ def parse_header(line):
     gene_name, start, stop, strand, details = line.rstrip("\\n").split(" # ")
 
     # The first field in the gene name is the specimen
-    specimen, gene_name = gene_name[1:].split("__", 1)
+    specimen, gene_name = gene_name[1:].split("__GENE__", 1)
 
     # There is more good information to get from the gene name
     output_dat = dict([
