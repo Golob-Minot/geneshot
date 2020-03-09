@@ -46,8 +46,8 @@ combine_fastq_pairs.py \
 -o1 "${sample}.R1.fastq.gz" \
 -o2 "${sample}.R2.fastq.gz"
 
-(( \$(gunzip -c "${sample}.R1.fastq.gz" | wc -l) > 1 ))
-(( \$(gunzip -c "${sample}.R2.fastq.gz" | wc -l) > 1 ))
+(( \$(gunzip -c "${sample}.R1.fastq.gz" | head | wc -l) > 1 ))
+(( \$(gunzip -c "${sample}.R2.fastq.gz" | head | wc -l) > 1 ))
 
 """
 
