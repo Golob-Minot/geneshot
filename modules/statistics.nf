@@ -390,11 +390,14 @@ gene_readcounts <- fromJSON("${famli_json_gz}")\$nreads
 # Run breakaway
 r <- breakaway(gene_readcounts, plot = FALSE, output = FALSE, answers = TRUE)
 
+print(r)
+
 # Save the results to a file
 output_filename <- sub(".json.gz", ".breakaway.json", "${famli_json_gz}")
 write(
     toJSON(
-        r
+        r,
+        force = TRUE
     ),
     file = output_filename
 )
