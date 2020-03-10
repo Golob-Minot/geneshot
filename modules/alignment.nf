@@ -181,7 +181,7 @@ process diamond {
       --query-cover ${params.dmnd_min_coverage} \
       --id ${params.dmnd_min_identity} \
       --top ${params.dmnd_top_pct} \
-      --block-size ${task.memory.toMega() / (1024 * 6)} \
+      --block-size ${task.memory.toMega() / (1024 * 6 * task.attempt)} \
       --query-gencode ${params.gencode} \
       --compress 1 \
       --unal 0
