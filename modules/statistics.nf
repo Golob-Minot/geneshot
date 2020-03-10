@@ -363,3 +363,107 @@ write_csv(corn_tib, "corncob.results.csv")
     """
 
 }
+
+// Run the breakaway algorithm on each sample
+process breakaway {
+    tag "Estimate richness"
+    container "quay.io/fhcrc-microbiome/breakaway"
+    label "io_limited"
+    errorStrategy "retry"
+    
+    input:
+    file famli_json_gz
+
+    output:
+    file "*.breakaway.json"
+
+
+"""
+#!/usr/bin/env Rscript
+
+library(jsonlite)
+library(breakaway)
+
+# Read in the input data
+gene_readcounts <- fromJSON("${famli_json_gz}")\$nreads
+
+# Run breakaway
+r <- breakaway(gene_readcounts, plot = FALSE, output = FALSE, answers = TRUE)
+
+print(r)
+
+# Make a new output object with only the data objects which are strictly needed
+output <- list(
+    estimate = r\$estimate,
+    error = r\$error,
+    interval = r\$interval,
+    reasonable = r\$reasonable,
+    estimand = r\$estimand
+)
+
+# Save the results to a file
+output_filename <- sub(".json.gz", ".breakaway.json", "${famli_json_gz}")
+write(
+    toJSON(
+        output,
+        force = TRUE
+    ),
+    file = output_filename
+)
+
+"""
+
+}
+
+// Collect the breakaway algorithm results for all samples
+process collectBreakaway {
+    tag "Join richness tables"
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    label "io_limited"
+    // errorStrategy "retry"
+    publishDir "${params.output_folder}stats"
+    
+    input:
+    file breakaway_json_list
+
+    output:
+    file "${params.output_prefix}.breakaway.csv.gz"
+
+
+"""
+#!/usr/bin/env python3
+
+import json
+import pandas as pd
+
+# Get the list of files, with the samples encoded in the file names
+samples = dict([
+    (fp.replace(".breakaway.json", ""), fp)
+    for fp in "${breakaway_json_list}".split(" ")
+])
+
+print("Reading in breakaway results for %d samples" % len(samples))
+
+# Function to read in breakaway results
+def read_breakaway(fp):
+    dat = json.load(open(fp, "r"))
+    return dict([
+        ("estimate", dat["estimate"][0]),
+        ("error", dat["error"][0]),
+        ("interval_lower", dat["interval"][0]),
+        ("interval_upper", dat["interval"][1]),
+        ("reasonable", dat["reasonable"][0]),
+        ("estimand", dat["estimand"][0])
+    ])
+
+output = pd.DataFrame(dict([
+    (sample_name, read_breakaway(fp))
+    for sample_name, fp in samples.items()
+])).T.reset_index(
+).rename(columns=dict([("index", "specimen")]))
+
+output.to_csv("${params.output_prefix}.breakaway.csv.gz", index=None)
+
+"""
+
+}

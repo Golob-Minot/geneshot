@@ -247,6 +247,11 @@ include corncob_wf from './modules/statistics' params(
     output_folder: output_folder,
     formula: params.formula
 )
+include breakaway from './modules/statistics'
+include collectBreakaway from './modules/statistics' params(
+    output_folder: output_folder,
+    output_prefix: params.output_prefix
+)
 
 workflow {
     main:
@@ -348,6 +353,14 @@ workflow {
     // # STATISTICAL ANALYSIS #
     // ########################
 
+    // Calculate the richness of each sample using the breakaway algorithm
+    breakaway(
+        alignment_wf.out.famli_json_list.flatten()
+    )
+    collectBreakaway(
+        breakaway.out.toSortedList()
+    )
+
     // Calculate the association of individual CAGs with user-provided features
     if ( params.formula ) {
         corncob_wf(
@@ -374,7 +387,9 @@ workflow {
         alignment_wf.out.cag_abund_feather,
         alignment_wf.out.famli_json_list,
         countReadsSummary.out,
-        manifest_file
+        manifest_file,
+        alignment_wf.out.specimen_gene_count_csv,
+        collectBreakaway.out
     )
 
     // If we performed de novo assembly, add the gene assembly information
