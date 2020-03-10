@@ -392,11 +392,20 @@ r <- breakaway(gene_readcounts, plot = FALSE, output = FALSE, answers = TRUE)
 
 print(r)
 
+# Make a new output object with only the data objects which are strictly needed
+output <- list(
+    estimate = r\$estimate,
+    error = r\$error,
+    interval = r\$interval,
+    reasonable = r\$reasonable,
+    estimand = r\$estimand
+)
+
 # Save the results to a file
 output_filename <- sub(".json.gz", ".breakaway.json", "${famli_json_gz}")
 write(
     toJSON(
-        r,
+        output,
         force = TRUE
     ),
     file = output_filename
