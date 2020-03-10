@@ -180,6 +180,7 @@ process collectAbundances{
         path readcount_csv
         path manifest_csv
         path specimen_gene_count_csv
+        path breakaway_csv
 
     output:
         path "${params.output_prefix}.full.hdf5"
@@ -199,6 +200,7 @@ cag_abund_feather = "${cag_abund_feather}"
 famli_json_list = "${famli_json_list}".split(" ")
 readcount_csv = "${readcount_csv}"
 specimen_gene_count_csv = "${specimen_gene_count_csv}"
+breakaway_csv = "${breakaway_csv}"
 manifest_csv = "${manifest_csv}"
 suffix=".json.gz"
 
@@ -344,6 +346,12 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
 
     # Write to HDF5
     specimen_gene_count_df.to_hdf(store, "/summary/genes_aligned")
+
+    # Read in the gene richness estimate generated with breakaway
+    breakaway_df = pd.read_csv(breakaway_csv)
+
+    # Write to HDF5
+    breakaway_df.to_hdf(store, "/summary/breakaway")
 
     # Read in the table with the CAG-level abundances across all samples
     cag_abund_df = pd.read_feather(
@@ -925,6 +933,12 @@ data_objects = [
         ("optional", False),
         ("format", "fixed"),
         ("comment", "number of genes identified by alignment per sample")
+    ]),
+    dict([
+        ("key", "/summary/breakaway"),
+        ("optional", False),
+        ("format", "fixed"),
+        ("comment", "gene richness estimated by breakaway")
     ]),
     dict([
         ("key", "/abund/cag/wide"),
