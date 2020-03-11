@@ -431,7 +431,8 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     cag_summary_df = pd.DataFrame(dict([
         ("size", cag_df["CAG"].value_counts()),
         ("prevalence", (cag_abund_df > 0).mean(axis=1)),
-        ("mean_abundance", cag_abund_df.mean(axis=1))
+        ("mean_abundance", cag_abund_df.mean(axis=1)),
+        ("std_abundance", cag_abund_df.std(axis=1))
     ])).reset_index(
     ).rename(
         columns=dict([("index", "CAG")])
