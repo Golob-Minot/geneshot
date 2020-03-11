@@ -353,6 +353,25 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     # Write to HDF5
     breakaway_df.to_hdf(store, "/summary/breakaway")
 
+    # Write out a combined table
+    pd.concat(
+        [
+            readcount_df.set_index("specimen"),
+            specimen_gene_count_df.set_index("specimen"),
+            breakaway_df.set_index("specimen")
+        ], 
+        axis = 1, 
+        sort = True
+    ).reset_index(
+    ).rename(
+        columns = dict([
+            ("index", "specimen")
+        ])
+    ).to_hdf(
+        store,
+        "/summary/all"
+    )
+
     # Read in the table with the CAG-level abundances across all samples
     cag_abund_df = pd.read_feather(
         cag_abund_feather
@@ -531,6 +550,32 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write the summary of the number of genes assembled per sample
     n_genes_assembled_per_specimen.to_hdf(store, "/summary/genes_assembled")
+
+    print(pd.read_hdf(
+        store,
+        "/summary/all"
+    ).head())
+
+    # Add the number of genes assembled to the combined summary table
+    pd.concat([
+        pd.read_hdf(
+            store,
+            "/summary/all"
+        ).set_index(
+            "specimen"
+        ),
+        n_genes_assembled_per_specimen.set_index(
+            "specimen"
+        )
+    ], axis = 1, sort = True).reset_index(
+    ).rename(
+        columns = dict([
+            ("index", "specimen")
+        ])
+    ).to_hdf(
+        store,
+        "/summary/all"
+    )
 
 """
 
@@ -940,6 +985,12 @@ data_objects = [
         ("optional", False),
         ("format", "fixed"),
         ("comment", "gene richness estimated by breakaway")
+    ]),
+    dict([
+        ("key", "/summary/all"),
+        ("optional", False),
+        ("format", "fixed"),
+        ("comment", "combined summary metrics for all specimens")
     ]),
     dict([
         ("key", "/abund/cag/wide"),
