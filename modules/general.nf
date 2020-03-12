@@ -18,7 +18,34 @@ def read_manifest(manifest_file){
     }
 }
 
-process combineReads {
+workflow combineReads {
+    take:
+
+        fastq_ch
+
+    main:
+
+        fastq_ch.branch {  // Split up the samples which have multiple FASTQ files
+            single: it[1].size() == 1
+            multiple: it[1].size() > 1
+        }.set {
+            grouped_fastq
+        }
+
+        joinFASTQ(
+            grouped_fastq.multiple
+        )
+
+    emit:
+        grouped_fastq.single.map {
+            r -> [r[0], r[1][0], r[2][0]]
+        }.mix(
+            joinFASTQ.out
+        )
+
+}
+
+process joinFASTQ {
     tag "Join FASTQ files per-specimen"
     container "${container__fastatools}"
     label = 'mem_medium'
