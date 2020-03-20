@@ -145,10 +145,14 @@ workflow annotation_wf {
     )
 
     // Determine whether or not to run the eggNOG annotation based
-    // on --noannot
-    run_eggnog = true
+    // on --noannot and --eggnog_db / --eggnog_dmnd
+    run_eggnog = false
     if ( params.noannot == false ) {
-        run_eggnog = false
+        if ( params.eggnog_db && params.eggnog_dmnd ) {
+            if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
+                run_eggnog = true
+            }
+        }
     }
 
     // Annotate the clustered genes with eggNOG
