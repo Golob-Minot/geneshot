@@ -56,7 +56,8 @@ params.famli_batchsize = 10000000 // FAMLI
 params.noannot = false
 params.taxonomic_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd"
 params.ncbi_taxdump = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
-params.eggnog_db_version = "5.0.0"
+params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db"
+params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
 
 // CAG options
 params.distance_threshold = 0.25
@@ -105,7 +106,10 @@ def helpMessage() {
                             (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
-      --eggnog_db_version   Version of the eggNOG database to download (default: 5.0.0)
+      --eggnog_dmnd         One of two databases used for functional annotation with eggNOG 
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
+      --eggnog_db           One of two databases used for functional annotation with eggNOG 
+                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
     
     For Alignment:
       --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
@@ -200,6 +204,8 @@ include assembly_wf from './modules/assembly' params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,
     noannot: params.noannot,
+    eggnog_db: params.eggnog_db,
+    eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
     gencode: params.gencode,
 )
@@ -211,7 +217,8 @@ include annotation_wf from './modules/assembly' params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,
     noannot: params.noannot,
-    eggnog_db_version: params.eggnog_db_version,
+    eggnog_db: params.eggnog_db,
+    eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
     gencode: params.gencode,
 )

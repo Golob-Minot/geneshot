@@ -157,13 +157,10 @@ workflow annotation_wf {
 
     // Annotate the clustered genes with eggNOG
     if ( run_eggnog ){
-        // Get the eggNOG database
-        downloadEggnogDB()
-
         eggnog(
             shard_genes.out.flatten(),
-            downloadEggnogDB.out[0],
-            downloadEggnogDB.out[1]
+            file(params.eggnog_db),
+            file(params.eggnog_dmnd)
         )
         eggnog_tsv = eggnog.out.collect()
         join_eggnog(
@@ -540,54 +537,6 @@ emapper.py \
     --temp_dir TEMP/ \
 
 gzip genes.emapper.annotations
-    
-    """
-
-}
-
-process downloadEggnogDB {
-    tag "Download reference files needed for eggNOG"
-    container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
-    label 'io_limited'
-
-    output:
-    path "eggnog.db"
-    path "eggnog_proteins.dmnd"
-
-    
-    """
-set -e
-
-echo "Downloading eggnog.db.gz"
-wget \
-    -nH \
-    --user-agent=Mozilla/5.0 \
-    --relative \
-    --no-parent \
-    --reject "index.html*" \
-    --cut-dirs=4 \
-    -e robots=off \
-    -O eggnog.db.gz \
-    http://eggnogdb.embl.de/download/emapperdb-${params.eggnog_db_version}/eggnog.db.gz
-
-echo "Decompressing... "
-gunzip eggnog.db.gz
-
-wget \
-    -nH \
-    --user-agent=Mozilla/5.0 \
-    --relative \
-    --no-parent \
-    --reject "index.html*" \
-    --cut-dirs=4 \
-    -e robots=off \
-    -O eggnog_proteins.dmnd.gz \
-    http://eggnogdb.embl.de/download/emapperdb-${params.eggnog_db_version}/eggnog_proteins.dmnd.gz
-
-echo "Decompressing..."
-gunzip eggnog_proteins.dmnd.gz
-
-echo Done
     
     """
 
