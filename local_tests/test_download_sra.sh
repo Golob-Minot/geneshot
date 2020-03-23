@@ -10,9 +10,10 @@
 # 3. Run this script
 
 # Test with a whole BioProject of paired-end reads
-NXF_VER=19.10.0 nextflow run download_sra.nf \
-    -c nextflow.config \
+NXF_VER=20.01.0 nextflow run download_sra.nf \
+    -c nextflow.config.sample \
     -profile testing \
+    -with-docker ubuntu:20.04 \
     --accession PRJNA541981 \
     --output output_download_1 \
     --metadata \

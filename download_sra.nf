@@ -226,40 +226,63 @@ with open("accession_list.txt", "wt") as fo:
 """
 }
 
-// Make a channel with the files needed for every Run
+// Download the .sra file for each SRR accession
 process downloadSRA {
-    container "quay.io/fhcrc-microbiome/get_sra@sha256:16b7988e435da5d21bb1fbd7c83e97db769f1c95c9d32823fde49c729a64774a"
-    label "mem_medium"
+    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    label "io_limited"
     errorStrategy 'retry'
-    publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
     val accession from accession_list.splitText().map { r -> r.replaceAll(/\n/, "")}
 
     output:
-    tuple val("${accession}"), file("*fastq.gz") into reads_ch
+    file("${accession}") into sra_ch
+
+
+"""
+set -e
+
+echo "Getting the URL for the SRA file"
+ACC=$accession
+curl -o \${ACC}.json -s -X POST "https://www.ncbi.nlm.nih.gov/Traces/sdl/1/retrieve?acc=\${ACC}&location=s3.us-west-2"
+
+sra_url="\$(cat \${ACC}.json | jq '.[0] | .files | .[0] | .link' | tr -d '"')"
+echo "Download URL is \$sra_url"
+
+echo "Downloading"
+wget -O \${ACC} \${sra_url}
+
+echo "Done"
+"""
+
+}
+
+// Extract the FASTQ files from the SRA file
+process extractSRA {
+    container "quay.io/fhcrc-microbiome/get_sra@sha256:16b7988e435da5d21bb1fbd7c83e97db769f1c95c9d32823fde49c729a64774a"
+    label "io_limited"
+    errorStrategy 'retry'
+    publishDir "${output_folder}", mode: "copy", overwrite: "true"
+    
+    input:
+    file accession from sra_ch
+
+    output:
+    tuple val("${accession.name}"), file("*fastq.gz") into reads_ch
 
 
     """
     set -e
 
-    echo "Setting up the cache folder"
-    mkdir cache
-    vdb-config --root -s /repository/user/main/public/root=\$PWD/cache || echo Setting up the download cache
-
-    accession=${accession}
-    echo "Downloading \$accession"
-
     fastq-dump \
         --split-files \
         --outdir ./ \
-        \$accession
+        ${accession}
+
+    rm ${accession}
 
     echo "Compressing downloaded FASTQ files"
-    gzip \$accession*
-
-    echo "Removing the cache"
-    rm -rf cache
+    gzip ${accession.name}*
 
     echo "Done"
     """
