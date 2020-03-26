@@ -569,8 +569,14 @@ print(
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
-    # Write assembly summary to HDF5
-    allele_assembly.to_hdf(store, "/abund/allele/assembly")
+    # Write assembly summary to HDF5 for each specimen
+    for specimen_name, specimen_allele_assembly in allele_assembly.groupby("specimen"):
+        specimen_allele_assembly.drop(
+            columns = "specimen"
+        ).to_hdf(
+            store, 
+            "/abund/allele/assembly/%s" % specimen_name
+        )
 
     # Write gene <-> allele table to HDF5
     allele_gene.to_hdf(store, "/annot/allele/gene")
