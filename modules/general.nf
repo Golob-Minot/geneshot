@@ -566,6 +566,15 @@ print(
     )
 )
 
+# Add the allele -> gene label to the assembly information
+allele_assembly = allele_assembly.assign(
+    centroid = allele_assembly["gene_name"].apply(
+        allele_gene.set_index(
+            "allele"
+        )["gene"].get
+    )
+)
+
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
@@ -577,9 +586,6 @@ with pd.HDFStore("${results_hdf}", "a") as store:
             store, 
             "/abund/allele/assembly/%s" % specimen_name
         )
-
-    # Write gene <-> allele table to HDF5
-    allele_gene.to_hdf(store, "/annot/allele/gene")
 
     # Write the summary of the number of genes assembled per sample
     n_genes_assembled_per_specimen.to_hdf(store, "/summary/genes_assembled")
