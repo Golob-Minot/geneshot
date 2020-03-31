@@ -302,7 +302,7 @@ import pandas as pd
 # Parse the list of FASTA files to read in
 faa_list = "${faa_list}".split(" ")
 
-# Function to parse a FASTA file with information encoded by Prodigal and metaSPAdes in the header
+# Function to parse a FASTA file with information encoded by Prodigal and Megahit in the header
 def parse_prodigal_faa(fp):
 
     # Keep track of all of the information for each assembled gene
@@ -326,35 +326,59 @@ def parse_prodigal_faa(fp):
 # Function to parse a single header
 def parse_header(line):
 
-    # Keep track of the gene name
-    # The next two fields after the gene name are the start and the stop positions
-    gene_name, start, stop, strand, details = line.rstrip("\\n").split(" # ")
+    # The header line follows a format somewhat like this:
+    # >Mock__15__GENE__k21_0__flag=1__multi=20.5919__len=48411_1 # 510 # 716 # -1 # ID=1_1;partial=00;start_type=ATG;rbs_motif=GGAG/GAGG;rbs_spacer=5-10bp;gc_cont=0.386
+    #  ------------------------GENE_NAME------------------------   START STOP  STRAND
+    #  SPECIMEN        CONTIG -----------NAME_DETAILS-----------                    -----------------------------------HEADER_DETAILS-----------------------------------
 
-    # The first field in the gene name is the specimen
-    specimen, gene_name = gene_name[1:].split("__GENE__", 1)
+    # First let's just get the gene name
+    gene_name, header = line[1:].rstrip("\\n").lstrip(">").split(" ", 1)
 
-    # There is more good information to get from the gene name
+    # The "__GENE__" separator is used to preserve the specimen name within the gene name
+    specimen, gene_remainder = gene_name.split("__GENE__", 1)
+
+    # The contig name is the next field encoded in the gene name
+    contig, gene_remainder = gene_remainder.split("__", 1)
+
+    # The rest of the gene details are encoded in the gene_remainder (delimited by __)
+    # as well as the final string in the header (delimited by ;)
+
+    # We can parse the gene_remainder details with the __ delimiter and the =
+    # We have to make sure to strip off the gene index number
+
     output_dat = dict([
-        (field.split("=",1)[0], field.split("=",1)[1])
-        for field in gene_name.split("__")
-        if "=" in field
+        (field.split("=",1)[0], field.split("=",1)[1].split("_", 1)[0])
+        for field in gene_remainder.split("__")
     ])
 
-    # The final piece we want to get is the GC content, from the `details`
-    gc = None
-    for f in details.split(";"):
-        if f.startswith("gc_cont="):
-            gc = f[len("gc_cont="):]
-    assert gc is not None
+    # Now let's add in the details from the header
+    start, stop, strand, header = header.strip(" ").strip("#").split(" # ")
+
+    # Iterate over each of the elements provided
+    for f in header.split(";"):
+        if "=" in f:
+            k, v = f.split("=", 1)
+            output_dat[k] = v
+    assert "gc_cont" in output_dat, (output_dat, line)
 
     # Add the other metrics to the output
     output_dat["gene_name"] = gene_name
     output_dat["start"] = int(start)
     output_dat["stop"] = int(stop)
     output_dat["strand"] = strand
-    output_dat["details"] = details
     output_dat["specimen"] = specimen
-    output_dat["gc"] = float(gc)
+    output_dat["contig"] = contig
+
+    # Make some customizations to the data types
+    del output_dat["ID"]
+    for k, t in [
+        ("strand", int), 
+        ("len", int), 
+        ("multi", float), 
+        ("gc_cont", float)
+    ]:
+        assert k in output_dat, (output_dat, line)
+        output_dat[k] = t(output_dat[k])
 
     return output_dat
 
