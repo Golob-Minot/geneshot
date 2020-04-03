@@ -558,7 +558,7 @@ emapper.py \
     --cpu ${task.cpus} \
     --data_dir data/ \
     --scratch_dir SCRATCH/ \
-    --temp_dir TEMP/ \
+    --temp_dir TEMP/
 
 gzip genes.emapper.annotations
     
