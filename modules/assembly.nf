@@ -392,6 +392,8 @@ process annotateAssemblies {
     container "${container__pandas}"
     label 'mem_medium'
     errorStrategy 'retry'
+
+    publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
     
     input:
     tuple val(specimen), file(assembly_csv), file(alignment_tsv)
