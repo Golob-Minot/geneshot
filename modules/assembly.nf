@@ -59,14 +59,9 @@ workflow assembly_wf {
         assembly.out
     )
 
-    // Calculate summary metrics for every assembled gene in batches of 10 samples
-    geneAssemblyMetrics(
-        prodigal.out[0].toSortedList().flatten().collate(10)
-    )
-
-    // Join together each batch of assembly summaries
-    joinAssemblyMetrics(
-        geneAssemblyMetrics.out.toSortedList()
+    // Calculate summary metrics for every assembled gene in each sample
+    parseGeneAnnotations(
+        prodigal.out[0]
     )
 
     // Combine genes by amino acid identity in five rounds
@@ -74,7 +69,7 @@ workflow assembly_wf {
     // linclust provides fast symmetrical overlap search, while
     // DIAMOND performs slower, asymmetrical overlap search
     linclustRound1(
-        prodigal.out[0].toSortedList().flatten().collate(4)
+        prodigal.out[0].map{ r -> r[1]}.toSortedList().flatten().collate(4)
     )
     dedupRound1(
         linclustRound1.out
@@ -120,15 +115,16 @@ workflow assembly_wf {
         diamondDB.out
     )
 
-    // Make a single table with all of the allele - gene pairings
-    makeAlleleTable(
-        alignAlleles.out.toSortedList()
+    // Join the gene annotation tables with the gene assignments
+    annotateAssemblies(
+        parseGeneAnnotations.out.join(
+            alignAlleles.out
+        )
     )
 
     emit:
         gene_fasta = renameGenes.out
-        allele_gene_tsv = makeAlleleTable.out
-        allele_assembly_csv = joinAssemblyMetrics.out
+        allele_assembly_csv_list = annotateAssemblies.out.toSortedList()
 
 }
 
@@ -259,7 +255,7 @@ process prodigal {
         tuple val(specimen), file(contigs), file(spades_log)
     
     output:
-        file "${specimen}.faa.gz"
+        tuple val(specimen), file("${specimen}.faa.gz")
         file "${specimen}.gff.gz"
     
 """
@@ -282,25 +278,22 @@ gzip ${specimen}.faa
 
 
 // Summarize the depth of sequencing and GC content for every assembled gene
-process geneAssemblyMetrics {
+process parseGeneAnnotations {
     tag "Summarize every assembled gene"
     container "${container__pandas}"
     label 'mem_medium'
     errorStrategy 'retry'
     
     input:
-    file faa_list
+    tuple val(specimen), file(faa)
     
     output:
-    file "allele.assembly.metrics.csv.gz"
+    tuple val(specimen), file("${specimen}.gene_annotations.csv.gz")
 
 """
 #!/usr/bin/env python3
 import gzip
 import pandas as pd
-
-# Parse the list of FASTA files to read in
-faa_list = "${faa_list}".split(" ")
 
 # Function to parse a FASTA file with information encoded by Prodigal and Megahit in the header
 def parse_prodigal_faa(fp):
@@ -321,7 +314,7 @@ def parse_prodigal_faa(fp):
             # Add the information for this header
             dat.append(parse_header(line))
 
-    return dat
+    return pd.DataFrame(dat)
 
 # Function to parse a single header
 def parse_header(line):
@@ -382,16 +375,9 @@ def parse_header(line):
 
     return output_dat
 
-# Read in all of the files
-df = pd.DataFrame([
-    gene_details
-    for fp in faa_list
-    for gene_details in parse_prodigal_faa(fp)
-])
-
-# Write out to a file
-df.to_csv(
-    "allele.assembly.metrics.csv.gz",
+# Parse and write out to a file
+parse_prodigal_faa("${faa}").to_csv(
+    "${specimen}.gene_annotations.csv.gz",
     index = None,
     compression = "gzip"
 )
@@ -400,44 +386,55 @@ df.to_csv(
 """
 }
 
-// Join together the assembly summaries from each batch of 10 samples processed earlier
-process joinAssemblyMetrics {
+// Combine the assembly table with the assignment of catalog genes
+process annotateAssemblies {
     tag "Summarize every assembled gene"
     container "${container__pandas}"
     label 'mem_medium'
     errorStrategy 'retry'
-    publishDir "${params.output_folder}/assembly/", mode: "copy"
     
     input:
-    file "allele.assembly.metrics.*.csv.gz"
+    tuple val(specimen), file(assembly_csv), file(alignment_tsv)
     
     output:
-    file "allele.assembly.metrics.csv.gz"
+    file "${specimen}.csv.gz"
 
 """
 #!/usr/bin/env python3
-import gzip
-import os
 import pandas as pd
 
-# Parse the list of CSV files to read in
-csv_list = [fp for fp in os.listdir(".") if fp.startswith("allele.assembly.metrics.") and fp.endswith(".csv.gz")]
+print("Reading in assembly information for ${specimen}")
+assembly_df = pd.read_csv("${assembly_csv}")
+print("Read in %d assembled genes" % assembly_df.shape[0])
 
-print("Preparing to read in %d CSV files" % len(csv_list))
-
-# Read in all of the CSV files
-df = pd.concat([
-    pd.read_csv(fp, sep=",", compression="gzip")
-    for fp in csv_list
-])
-
-# Write out to a file
-df.to_csv(
-    "allele.assembly.metrics.csv.gz",
-    index = None,
+# Read in the table linking each allele to the gene catalog
+gene_alignments = pd.read_csv(
+    "${alignment_tsv}",
+    sep = "\\t",
+    header = None,
+    names = [
+        "allele",
+        "gene",
+        "pct_iden",
+        "alignment_len",
+        "allele_len",
+        "gene_len"
+    ],
     compression = "gzip"
 )
 
+# Add the gene name to the gene annotation table
+assembly_df["catalog_gene"] = assembly_df["gene_name"].apply(
+    gene_alignments.set_index("allele")["gene"].get
+)
+print("%d / %d genes have an annotation in the gene catalog" % (assembly_df["catalog_gene"].dropna().shape[0], assembly_df.shape[0]))
+
+# Save and exit
+assembly_df.to_csv(
+    "${specimen}.csv.gz",
+    index = None,
+    compression = "gzip"
+)
 
 """
 }
@@ -638,19 +635,25 @@ process alignAlleles {
     errorStrategy 'retry'
     
     input:
-    file alleles_fasta
+    tuple val(specimen), file(alleles_fasta)
     file refdb
     
     output:
-    file "${alleles_fasta}.tsv.gz"
+    tuple val(specimen), file("${specimen}.gene_alignments.tsv.gz")
 
     """
     set -e
 
+    echo "Aligning ${alleles_fasta}"
+
+    # Make the output filepath
+    fo="${specimen}.gene_alignments.tsv.gz"
+    echo "Writing out to \$fo"
+
     diamond \
       blastp \
       --query ${alleles_fasta} \
-      --out ${alleles_fasta}.tsv.gz \
+      --out \$fo \
       --threads ${task.cpus} \
       --db ${refdb} \
       --outfmt 6 qseqid sseqid pident length qlen slen \
@@ -664,57 +667,57 @@ process alignAlleles {
 
 }
 
-// Make a single table linking every assembledallele to every gene centroid
-process makeAlleleTable {
-    tag "Combine allele tables across samples"
-    container "${container__pandas}"
-    label 'mem_veryhigh'
-    errorStrategy 'retry'
+// // Make a single table linking every assembledallele to every gene centroid
+// process makeAlleleTable {
+//     tag "Combine allele tables across samples"
+//     container "${container__pandas}"
+//     label 'mem_veryhigh'
+//     errorStrategy 'retry'
     
-    input:
-    file tsv_list
+//     input:
+//     file tsv_list
     
-    output:
-    file "alleles.genes.tsv.gz"
+//     output:
+//     file "alleles.genes.tsv.gz"
 
-"""
-#!/usr/bin/env python3
+// """
+// #!/usr/bin/env python3
 
-import pandas as pd
-import os
+// import pandas as pd
+// import os
 
-# Function to read in the allele tables
-def read_allele_table(fp):
+// # Function to read in the allele tables
+// def read_allele_table(fp):
 
-    assert os.path.exists(fp)
+//     assert os.path.exists(fp)
 
-    print("Reading in %s" % fp)
+//     print("Reading in %s" % fp)
 
-    return pd.read_csv(
-        fp,
-        sep = "\\t",
-        header = None,
-        names = [
-            "allele",
-            "gene",
-            "pct_iden",
-            "alignment_len",
-            "allele_len",
-            "gene_len"
-        ],
-        compression = "gzip"
-    )
+//     return pd.read_csv(
+//         fp,
+//         sep = "\\t",
+//         header = None,
+//         names = [
+//             "allele",
+//             "gene",
+//             "pct_iden",
+//             "alignment_len",
+//             "allele_len",
+//             "gene_len"
+//         ],
+//         compression = "gzip"
+//     )
 
-# Make a single table and write it out
-pd.concat([
-    read_allele_table(fp)
-    for fp in "${tsv_list}".split(" ")
-]).to_csv(
-    "alleles.genes.tsv.gz",
-    sep = "\\t",
-    compression = "gzip",
-    index = None
-)
-"""
+// # Make a single table and write it out
+// pd.concat([
+//     read_allele_table(fp)
+//     for fp in "${tsv_list}".split(" ")
+// ]).to_csv(
+//     "alleles.genes.tsv.gz",
+//     sep = "\\t",
+//     compression = "gzip",
+//     index = None
+// )
+// """
 
-}
+// }

@@ -203,14 +203,14 @@ process collectAbundances{
         path cag_csv
         path gene_abund_feather
         path cag_abund_feather
-        path famli_json_list
         path readcount_csv
         path manifest_csv
         path specimen_gene_count_csv
+        path gene_length_csv
         path breakaway_csv
 
     output:
-        path "${params.output_prefix}.full.hdf5"
+        path "${params.output_prefix}.results.hdf5"
 
 """
 #!/usr/bin/env python3
@@ -224,9 +224,9 @@ from sklearn.manifold import TSNE
 cag_csv = "${cag_csv}"
 gene_abund_feather = "${gene_abund_feather}"
 cag_abund_feather = "${cag_abund_feather}"
-famli_json_list = "${famli_json_list}".split(" ")
 readcount_csv = "${readcount_csv}"
 specimen_gene_count_csv = "${specimen_gene_count_csv}"
+gene_length_csv = "${gene_length_csv}"
 breakaway_csv = "${breakaway_csv}"
 manifest_csv = "${manifest_csv}"
 suffix=".json.gz"
@@ -321,37 +321,14 @@ def run_tsne(abund_df, n_components=2):
     ).reset_index(
     ).rename(columns=dict([('index', 'specimen')]))
 
+# Read in the table with gene lengths
+gene_length_df = pd.read_csv(gene_length_csv).set_index("gene")["length"]
+
 # Open a connection to the HDF5
-with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
+with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
 
     # Keep track of the total number of aligned reads for each sample
     aligned_reads_dict = dict()
-
-    # Keep track of the length of each gene
-    gene_length_dict = {}
-
-    # Read in the complete set of FAMLI results
-    for fp in famli_json_list:
-
-        # Get the sample name from the file name
-        assert fp.endswith(suffix)
-        sample_name = fp[:-len(suffix)]
-
-        # Read from JSON for this sample
-        print("Reading gene information for %s from %s" % (sample_name, fp))
-        df = read_famli_json(fp)
-        
-        print("Saving to HDF")
-        df.to_hdf(
-            store, "/abund/gene/long/%s" % sample_name
-        )
-
-        # Add the gene lengths
-        for _, r in df.iterrows():
-            gene_length_dict[r["id"]] = r["length"]
-
-        # Record the total number of aligned reads for this sample
-        aligned_reads_dict[sample_name] = df["nreads"].sum()
     
     # Read in the summary of the number of reads across all samples
     readcount_df = pd.read_csv(readcount_csv)
@@ -464,7 +441,7 @@ with pd.HDFStore("${params.output_prefix}.full.hdf5", "w") as store:
     cag_df = cag_df.assign(
         prevalence = cag_df["gene"].apply(gene_prevalence.get),
         abundance = cag_df["gene"].apply(gene_abundance.get),
-        length = cag_df["gene"].apply(gene_length_dict.get)
+        length = cag_df["gene"].apply(gene_length_df.get)
     )
 
     # Now create the `/annot/gene/all` table, which will be added to later
@@ -514,32 +491,52 @@ process addGeneAssembly{
 
     input:
         path results_hdf
-        path allele_gene_tsv
-        path allele_assembly_csv
+        path detailed_hdf
+        path allele_assembly_csv_list
 
     output:
         path "${results_hdf}"
+        path "${detailed_hdf}"
 
 """
 #!/usr/bin/env python3
 
 import pandas as pd
-
-# Read in the summary of allele assembly
-allele_assembly = pd.read_csv("${allele_assembly_csv}")
-
-print(
-    "Read in %d gene assemblies over %d specimens" % 
-    (allele_assembly.shape[0], allele_assembly["specimen"].unique().shape[0])
-)
+import os
 
 # Count up the number of genes assembled per-specimen
+n_genes_assembled_per_specimen = dict()
+
+# Open a connection to the detailed HDF5 output store
+detailed_store = pd.HDFStore("${detailed_hdf}", "a")
+
+# Read in the summary of allele assembly for each sample
+for fp in "${allele_assembly_csv_list}".split(" "):
+
+    # Make sure that the file path has the expected pattern
+    assert fp.endswith(".csv.gz"), fp
+    sample_name = fp.replace(".csv.gz", "")
+    print("Reading in assembly information for %s" % sample_name)
+    assembly_df = pd.read_csv(fp)
+    print("Read in %d assembled genes" % assembly_df.shape[0])
+
+    # Save the information on how many genes were assembled in each sample
+    n_genes_assembled_per_specimen[sample_name] = assembly_df.shape[0]
+
+    # Write out to the detailed HDF
+    assembly_df.to_hdf(
+        detailed_store,
+        "/abund/allele/assembly/%s" % sample_name
+    )
+
+detailed_store.close()
+
 n_genes_assembled_per_specimen = pd.DataFrame(
     dict(
         [
             (
                 "n_genes_assembled",
-                allele_assembly["specimen"].value_counts()
+                pd.Series(n_genes_assembled_per_specimen)
             )
         ]
     )
@@ -552,48 +549,11 @@ n_genes_assembled_per_specimen = pd.DataFrame(
     )
 )
 
-# Read in the listing of which alleles were grouped into which genes
-allele_gene = pd.read_csv(
-    "${allele_gene_tsv}", 
-    sep = "\\t",
-    compression = "gzip"
-)
-print(
-    "Read in a table matching %d alleles against %d genes" % 
-    (
-        allele_gene["allele"].unique().shape[0],
-        allele_gene["gene"].unique().shape[0]
-    )
-)
-
-# Add the allele -> gene label to the assembly information
-allele_assembly = allele_assembly.assign(
-    centroid = allele_assembly["gene_name"].apply(
-        allele_gene.set_index(
-            "allele"
-        )["gene"].get
-    )
-)
-
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
-    # Write assembly summary to HDF5 for each specimen
-    for specimen_name, specimen_allele_assembly in allele_assembly.groupby("specimen"):
-        specimen_allele_assembly.drop(
-            columns = "specimen"
-        ).to_hdf(
-            store, 
-            "/abund/allele/assembly/%s" % specimen_name
-        )
-
     # Write the summary of the number of genes assembled per sample
     n_genes_assembled_per_specimen.to_hdf(store, "/summary/genes_assembled")
-
-    print(pd.read_hdf(
-        store,
-        "/summary/all"
-    ).head())
 
     # Add the number of genes assembled to the combined summary table
     pd.concat([
@@ -962,167 +922,6 @@ with pd.HDFStore("${results_hdf}", "a") as store:
         "/ref/taxonomy"
     )
 
-"""
-
-}
-
-
-process makeSummaryHDF {
-    tag "Make a summary HDF store"
-    container "${container__experiment_collection}"
-    label 'mem_veryhigh'
-    errorStrategy 'retry'
-
-    input:
-        path full_results_hdf
-
-    output:
-        path "${params.output_prefix}.summary.hdf5"
-
-"""
-#!/usr/bin/env python3
-
-import pandas as pd
-
-# Keep track of data objects in a dict
-# This should include the key, the format to write the HDF, and any data_columns if needed
-# This is the list of things which will be written to the summary HDF5,
-# noting those objects which are optional or required
-data_objects = [
-    dict([
-        ("key", "/manifest"),
-        ("optional", False),
-        ("format", "fixed"),
-        ("comment", "manifest describing experiment design")
-    ]),
-    dict([
-        ("key", "/summary/experiment"),
-        ("optional", False),
-        ("format", "fixed"),
-        ("comment", "informatics parameter summary")
-    ]),
-    dict([
-        ("key", "/summary/readcount"),
-        ("optional", False),
-        ("format", "fixed"),
-        ("comment", "number of read pairs")
-    ]),
-    dict([
-        ("key", "/summary/genes_assembled"),
-        ("optional", True),
-        ("format", "fixed"),
-        ("comment", "number of genes identified by de novo assembly per sample")
-    ]),
-    dict([
-        ("key", "/summary/genes_aligned"),
-        ("optional", False),
-        ("format", "fixed"),
-        ("comment", "number of genes identified by alignment per sample")
-    ]),
-    dict([
-        ("key", "/summary/breakaway"),
-        ("optional", False),
-        ("format", "fixed"),
-        ("comment", "gene richness estimated by breakaway")
-    ]),
-    dict([
-        ("key", "/summary/all"),
-        ("optional", False),
-        ("format", "fixed"),
-        ("comment", "combined summary metrics for all specimens")
-    ]),
-    dict([
-        ("key", "/abund/cag/wide"),
-        ("optional", False),
-        ("format", "table"),
-        ("data_columns", ["CAG"]),
-        ("comment", "abundance of every CAG in every sample")
-    ]),
-    dict([
-        ("key", "/ordination/pca"),
-        ("optional", False),
-        ("format", "fixed"),
-        ("comment", "PCA for every sample, based on CAG abundances")
-    ]),
-    dict([
-        ("key", "/ordination/tsne"),
-        ("optional", False),
-        ("format", "fixed"),
-        ("comment", "t-SNE for every sample, based on CAG abundances")
-    ]),
-    dict([
-        ("key", "/annot/gene/all"),
-        ("optional", False),
-        ("format", "table"),
-        ("data_columns", ["CAG"]),
-        ("comment", "table with gene annotations")
-    ]),
-    dict([
-        ("key", "/annot/cag/all"),
-        ("optional", False),
-        ("format", "fixed"),
-        ("comment", "table with CAG annotations")
-    ]),
-    dict([
-        ("key", "stats/cag/corncob"),
-        ("optional", True),
-        ("format", "fixed"),
-        ("comment", "table of corncob results")
-    ]),
-    dict([
-        ("key", "/stats/cag/corncob_wide"),
-        ("optional", True),
-        ("format", "fixed"),
-        ("comment", "table of corncob results in wide format")
-    ]),
-    dict([
-        ("key", "/ref/taxonomy"),
-        ("optional", True),
-        ("format", "fixed"),
-        ("comment", "taxonomy table")
-    ]),
-]
-
-# Open a connection to the input store
-input_store = pd.HDFStore("${full_results_hdf}", "r")
-
-# Open a connection to the output store
-output_store = pd.HDFStore("${params.output_prefix}.summary.hdf5", "w")
-
-# Iterate over each of the data objects, copying from the input to the output
-for d in data_objects:
-    # Make sure the key is present
-    if d["key"] in input_store:
-        # Copy the table to the output store
-        print("Reading in %s and writing to the summary HDF5" % d["comment"])
-        if d["format"] == "fixed":
-            pd.read_hdf(
-                input_store, 
-                d["key"]
-            ).to_hdf(
-                output_store,
-                d["key"],
-                format = d["format"]
-            )
-        else:
-            assert d["format"] == "table", d
-            assert "data_columns" in d
-            pd.read_hdf(
-                input_store, 
-                d["key"]
-            ).to_hdf(
-                output_store,
-                d["key"],
-                format = d["format"],
-                data_columns = d["data_columns"]
-            )
-    else:
-        assert d["optional"], "Could not find expected key %s containing %s" % (d["key"], d["comment"])
-        print("Did not find the key %s in the HDF5" % d["key"])
-
-# Close the stores
-input_store.close()
-output_store.close()
 """
 
 }

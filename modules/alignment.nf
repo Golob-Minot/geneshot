@@ -119,6 +119,8 @@ workflow alignment_wf {
         cag_abund_feather = calcCAGabund.out
         famli_json_list = famli.out.toSortedList()
         specimen_gene_count_csv = assembleAbundances.out[2]
+        detailed_hdf = assembleAbundances.out[3]
+        gene_length_csv = assembleAbundances.out[4]
 }
 
 // Align each sample against the reference database of genes using DIAMOND
@@ -234,7 +236,9 @@ process assembleAbundances {
     output:
     file "gene.abund.feather"
     file "gene_list.*.csv.gz"
-    file "specimen_gene_count.csv"
+    file "specimen_gene_count.csv.gz"
+    file "${params.output_prefix}.details.hdf5"
+    path "gene_length.csv.gz"
 
 
     """
@@ -260,10 +264,11 @@ consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 
 def read_json(fp):
-    return {
-        r["id"]: r["depth"]
-        for r in json.load(gzip.open(fp, "rt"))
-    }
+    return pd.DataFrame(
+        json.load(
+            gzip.open(fp, "rt")
+        )
+    )
 
 # Parse the file list
 sample_jsons = "${sample_jsons}".split(" ")
@@ -274,6 +279,12 @@ all_abund = dict()
 # Also keep track of the complete set of gene names observed in these samples
 all_gene_names = set([])
 
+# All abundance tables will be written out to HDF5
+store = pd.HDFStore("${params.output_prefix}.details.hdf5", "w")
+
+# Keep track of the length of each gene
+gene_length_dict = dict()
+
 # Iterate over the list of files
 for fp in sample_jsons:
     # Get the sample name from the file name
@@ -282,11 +293,23 @@ for fp in sample_jsons:
     sample_name = fp[:-len(".json.gz")]
 
     logging.info("Reading in %s from %s" % (sample_name, fp))
-    all_abund[sample_name] = read_json(fp)
+    df = read_json(fp)
+
+    logging.info("Saving to HDF5")
+    df.to_hdf(store, "/abund/gene/long/%s" % sample_name)
+    
+    logging.info("Saving depth in memory")
+    all_abund[sample_name] = df.set_index("id")["depth"].to_dict()
 
     # Add the gene names to the total list
     for gene_name in all_abund[sample_name]:
         all_gene_names.add(gene_name)
+
+    # Add the gene lengths
+    for _, r in df.iterrows():
+        gene_length_dict[r["id"]] = r["length"]
+
+store.close()
 
 # Serialize sample and gene names
 sample_names = list(all_abund.keys())
@@ -338,8 +361,19 @@ pd.DataFrame(
         ]
     )
 ).to_csv(
-    "specimen_gene_count.csv",
-    index=None
+    "specimen_gene_count.csv.gz",
+    index=None,
+    compression = "gzip"
+)
+
+# Write out the CSV table with the length of each gene
+pd.DataFrame([
+    dict([("gene", gene), ("length", length)])
+    for gene, length in gene_length_dict.items()
+]).to_csv(
+    "gene_length.csv.gz",
+    index = None,
+    compression = "gzip"
 )
 
 # Write out the abundances to a feather file
