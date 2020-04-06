@@ -246,22 +246,6 @@ summary_dict = dict([
     ("dmnd_min_coverage", ${params.dmnd_min_coverage})
 ])
 
-# Function to read in the FAMLI output
-def read_famli_json(fp):
-
-    # Read in the JSON as a DataFrame
-    df = pd.DataFrame(
-        json.load(
-            gzip.open(
-                fp, "rt"
-            )
-        )
-    )
-
-    assert df.shape[0] == df.dropna().shape[0], "Missing values for %s" % (sample_name)
-
-    return df
-
 # Perform different types of ordination and include them in the output HDF
 def run_ordination(abund_df, ordination_type):
 
