@@ -344,7 +344,8 @@ workflow {
     // Run the alignment-based analysis steps (in modules/alignment.nf)
     alignment_wf(
         gene_fasta,
-        combineReads.out
+        combineReads.out,
+        params.output_prefix
     )
 
     // ########################

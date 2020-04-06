@@ -1,5 +1,8 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 
+// Default parameters
+params.output_prefix = "geneshot"
+
 // Containers
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"

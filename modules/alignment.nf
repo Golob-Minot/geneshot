@@ -48,6 +48,7 @@ workflow alignment_wf {
     take:
         gene_fasta
         reads_ch
+        output_prefix
 
     main:
 
@@ -70,7 +71,8 @@ workflow alignment_wf {
     // Make a single table with the abundance of every gene across every sample
     assembleAbundances(
         famli.out.toSortedList(),
-        params.cag_batchsize
+        params.cag_batchsize,
+        output_prefix
     )
 
     // Group shards of genes into Co-Abundant Gene Groups (CAGs)
@@ -232,12 +234,13 @@ process assembleAbundances {
     input:
     file sample_jsons
     val cag_batchsize
+    val output_prefix
 
     output:
     file "gene.abund.feather"
     file "gene_list.*.csv.gz"
     file "specimen_gene_count.csv.gz"
-    file "${params.output_prefix}.details.hdf5"
+    file "${output_prefix}.details.hdf5"
     path "gene_length.csv.gz"
 
 
@@ -280,7 +283,7 @@ all_abund = dict()
 all_gene_names = set([])
 
 # All abundance tables will be written out to HDF5
-store = pd.HDFStore("${params.output_prefix}.details.hdf5", "w")
+store = pd.HDFStore("${output_prefix}.details.hdf5", "w")
 
 # Keep track of the length of each gene
 gene_length_dict = dict()
