@@ -121,6 +121,7 @@ workflow alignment_wf {
         cag_abund_feather = calcCAGabund.out
         famli_json_list = famli.out.toSortedList()
         specimen_gene_count_csv = assembleAbundances.out[2]
+        specimen_reads_aligned_csv = assembleAbundances.out[5]
         detailed_hdf = assembleAbundances.out[3]
         gene_length_csv = assembleAbundances.out[4]
 }
@@ -242,6 +243,7 @@ process assembleAbundances {
     file "specimen_gene_count.csv.gz"
     file "${output_prefix}.details.hdf5"
     path "gene_length.csv.gz"
+    path "specimen_reads_aligned.csv.gz"
 
 
     """
@@ -288,6 +290,9 @@ store = pd.HDFStore("${output_prefix}.details.hdf5", "w")
 # Keep track of the length of each gene
 gene_length_dict = dict()
 
+# Keep track of the number of reads aligned per sample
+specimen_reads_aligned = dict()
+
 # Iterate over the list of files
 for fp in sample_jsons:
     # Get the sample name from the file name
@@ -311,6 +316,9 @@ for fp in sample_jsons:
     # Add the gene lengths
     for _, r in df.iterrows():
         gene_length_dict[r["id"]] = r["length"]
+
+    # Add in the number of reads aligned
+    specimen_reads_aligned[sample_name] = df["nreads"].sum()
 
 store.close()
 
@@ -365,6 +373,29 @@ pd.DataFrame(
     )
 ).to_csv(
     "specimen_gene_count.csv.gz",
+    index=None,
+    compression = "gzip"
+)
+
+# Write out the number of reads aligned per sample
+pd.DataFrame(
+    dict(
+        [
+            (
+                "n_reads_aligned", 
+                specimen_reads_aligned
+            )
+        ]
+    )
+).reset_index(
+).rename(
+    columns = dict(
+        [
+            ("index", "specimen")
+        ]
+    )
+).to_csv(
+    "specimen_reads_aligned.csv.gz",
     index=None,
     compression = "gzip"
 )

@@ -206,6 +206,7 @@ process collectAbundances{
         path readcount_csv
         path manifest_csv
         path specimen_gene_count_csv
+        path specimen_reads_aligned_csv
         path gene_length_csv
         path breakaway_csv
 
@@ -226,6 +227,7 @@ gene_abund_feather = "${gene_abund_feather}"
 cag_abund_feather = "${cag_abund_feather}"
 readcount_csv = "${readcount_csv}"
 specimen_gene_count_csv = "${specimen_gene_count_csv}"
+specimen_reads_aligned_csv = "${specimen_reads_aligned_csv}"
 gene_length_csv = "${gene_length_csv}"
 breakaway_csv = "${breakaway_csv}"
 manifest_csv = "${manifest_csv}"
@@ -327,15 +329,20 @@ gene_length_df = pd.read_csv(gene_length_csv).set_index("gene")["length"]
 # Open a connection to the HDF5
 with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
 
-    # Keep track of the total number of aligned reads for each sample
-    aligned_reads_dict = dict()
-    
     # Read in the summary of the number of reads across all samples
     readcount_df = pd.read_csv(readcount_csv)
+
+    # Read in the number of aligned reads per sample
+    aligned_reads_dict = pd.read_csv(
+        specimen_reads_aligned_csv
+    ).set_index(
+        "specimen"
+    )["n_reads_aligned"]
 
     # Add some descriptive statistics
     summary_dict["num_samples"] = readcount_df.shape[0]
     summary_dict["total_reads"] = readcount_df["n_reads"].sum()
+    summary_dict["aligned_reads"] = aligned_reads_dict.sum()
 
     # Add the number of aligned reads per sample
     readcount_df["aligned_reads"] = readcount_df["specimen"].apply(

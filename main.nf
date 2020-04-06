@@ -387,6 +387,7 @@ workflow {
         countReadsSummary.out,
         manifest_file,
         alignment_wf.out.specimen_gene_count_csv,
+        alignment_wf.out.specimen_reads_aligned_csv,
         alignment_wf.out.gene_length_csv,
         collectBreakaway.out,
     )
