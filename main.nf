@@ -191,15 +191,13 @@ include readTaxonomy from './modules/general'
 include addEggnogResults from './modules/general'
 include addCorncobResults from './modules/general'
 include addTaxResults from './modules/general'
-include makeSummaryHDF from './modules/general' params(
-    output_prefix: params.output_prefix
-)
 include repackHDF as repackFullHDF from './modules/general'
-include repackHDF as repackSummaryHDF from './modules/general'
+include repackHDF as repackDetailedHDF from './modules/general'
 
 // Import the workflows used for assembly
 include assembly_wf from './modules/assembly' params(
     output_folder: output_folder,
+    output_prefix: params.output_prefix,
     phred_offset: params.phred_offset,
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,
@@ -346,7 +344,8 @@ workflow {
     // Run the alignment-based analysis steps (in modules/alignment.nf)
     alignment_wf(
         gene_fasta,
-        combineReads.out
+        combineReads.out,
+        params.output_prefix
     )
 
     // ########################
@@ -385,33 +384,35 @@ workflow {
         alignment_wf.out.cag_csv,
         alignment_wf.out.gene_abund_feather,
         alignment_wf.out.cag_abund_feather,
-        alignment_wf.out.famli_json_list,
         countReadsSummary.out,
         manifest_file,
         alignment_wf.out.specimen_gene_count_csv,
-        collectBreakaway.out
+        alignment_wf.out.gene_length_csv,
+        collectBreakaway.out,
     )
 
     // If we performed de novo assembly, add the gene assembly information
     if ( params.gene_fasta ) {
-        finalHDF = collectAbundances.out
+        resultsHDF = collectAbundances.out
+        detailedHDF = alignment_wf.out.detailed_hdf
     } else {
         addGeneAssembly(
             collectAbundances.out,
-            assembly_wf.out.allele_gene_tsv,
-            assembly_wf.out.allele_assembly_csv
+            alignment_wf.out.detailed_hdf,
+            assembly_wf.out.allele_assembly_csv_list
         )
-        finalHDF = addGeneAssembly.out
+        resultsHDF = addGeneAssembly.out[0]
+        detailedHDF = addGeneAssembly.out[1]
     }
 
     // If we performed statistical analysis, add the results to the HDF5
     if ( params.formula ) {
         addCorncobResults(
-            finalHDF,
+            resultsHDF,
             corncob_wf.out
         )
 
-        finalHDF = addCorncobResults.out
+        resultsHDF = addCorncobResults.out
     }
 
     // If we performed functional analysis with eggNOG, add the results to the HDF5
@@ -419,11 +420,11 @@ workflow {
         if ( params.eggnog_db && params.eggnog_dmnd ) {
             if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
                 addEggnogResults(
-                    finalHDF,
+                    resultsHDF,
                     annotation_wf.out.eggnog_tsv
                 )
 
-                finalHDF = addEggnogResults.out
+                resultsHDF = addEggnogResults.out
             }
         }
     }
@@ -437,34 +438,29 @@ workflow {
                 )
 
                 addTaxResults(
-                    finalHDF,
+                    resultsHDF,
                     annotation_wf.out.tax_tsv,
                     readTaxonomy.out
                 )
 
-                finalHDF = addTaxResults.out
+                resultsHDF = addTaxResults.out
             }
         }
     }
 
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
     repackFullHDF(
-        finalHDF
+        resultsHDF
     )
 
-    // Make a smaller summary HDF5 with a subset of the total data
-    makeSummaryHDF(
-        repackFullHDF.out
-    )
-
-    // "Repack" and compress that summary HDF5 as well
-    repackSummaryHDF(
-        makeSummaryHDF.out
+    // "Repack" and compress the detailed results HDF5 as well
+    repackDetailedHDF(
+        detailedHDF
     )
 
     publish:
         corncob_results to: "${output_folder}/stats/", enabled: params.formula, mode: "copy"
         repackFullHDF.out to: "${output_folder}", mode: "copy", overwrite: true
-        repackSummaryHDF.out to: "${output_folder}", mode: "copy", overwrite: true
+        repackDetailedHDF.out to: "${output_folder}", mode: "copy", overwrite: true
 
 }

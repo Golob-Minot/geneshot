@@ -14,6 +14,13 @@ jobs:
         run: |
           wget -qO- get.nextflow.io | bash
           sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
       - name:  Run geneshot
         run: |
           NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.5 -w work/ --eggnog_db false --eggnog_dmnd false --taxonomic_dmnd false -with-docker ubuntu:latest
@@ -28,6 +35,13 @@ jobs:
         run: |
           wget -qO- get.nextflow.io | bash
           sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
       - name:  Run geneshot
         run: |
           NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.5 -w work/ --noannot -with-docker ubuntu:latest --nopreprocess
@@ -42,6 +56,13 @@ jobs:
         run: |
           wget -qO- get.nextflow.io | bash
           sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
       - name:  Run geneshot
         run: |
           NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --distance_threshold 0.5 -w work/ --noannot -with-docker ubuntu:latest
@@ -56,6 +77,13 @@ jobs:
         run: |
           wget -qO- get.nextflow.io | bash
           sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
       - name:  Run geneshot
         run: |
           NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.5 -w work/ --noannot -with-docker ubuntu:latest --gene_fasta data/genes.fasta.2.gz
@@ -70,6 +98,13 @@ jobs:
         run: |
           wget -qO- get.nextflow.io | bash
           sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
       - name:  Run geneshot
         run: |
           NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.5 -w work/ -with-docker ubuntu:latest --gene_fasta data/genes.fasta.2.gz --eggnog_dmnd https://github.com/eggnogdb/eggnog-mapper/raw/master/test/test_db.dmnd --eggnog_db https://github.com/eggnogdb/eggnog-mapper/raw/master/test/test_eggnog.db --taxonomic_dmnd false
