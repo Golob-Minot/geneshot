@@ -463,5 +463,7 @@ workflow {
         corncob_results to: "${output_folder}/stats/", enabled: params.formula, mode: "copy"
         repackFullHDF.out to: "${output_folder}", mode: "copy", overwrite: true
         repackDetailedHDF.out to: "${output_folder}", mode: "copy", overwrite: true
+        alignment_wf.out.gene_abund_feather to: "${output_folder}/abund/", mode: "copy", overwrite: true
+
 
 }

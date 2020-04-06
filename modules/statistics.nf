@@ -420,8 +420,8 @@ process collectBreakaway {
     tag "Join richness tables"
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label "io_limited"
-    // errorStrategy "retry"
-    publishDir "${params.output_folder}stats"
+    errorStrategy "retry"
+    publishDir "${params.output_folder}stats", mode: "copy", overwrite: true
     
     input:
     file breakaway_json_list
