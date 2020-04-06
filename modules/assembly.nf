@@ -427,7 +427,15 @@ gene_alignments = pd.read_csv(
 
 # Add the gene name to the gene annotation table
 assembly_df["catalog_gene"] = assembly_df["gene_name"].apply(
-    gene_alignments.set_index("allele")["gene"].get
+    gene_alignments.groupby(
+        "allele"
+    ).head(
+        1
+    ).set_index(
+        "allele"
+    )[
+        "gene"
+    ].get
 )
 print("%d / %d genes have an annotation in the gene catalog" % (assembly_df["catalog_gene"].dropna().shape[0], assembly_df.shape[0]))
 
