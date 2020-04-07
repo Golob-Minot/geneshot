@@ -110,7 +110,7 @@ workflow preprocess_wf {
 process barcodecop {
     tag "Validate barcode demultiplexing for WGS reads"
     container "${container__barcodecop}"
-    label 'io_limited'
+    label 'mem_medium'
     errorStrategy 'retry'
     maxRetries 10
 
