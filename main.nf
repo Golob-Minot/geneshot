@@ -122,7 +122,7 @@ def helpMessage() {
 
     For CAGs:
       --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
-      --distance_threshold  Distance threshold used to group genes by co-abundance (default: 0.5)
+      --distance_threshold  Distance threshold used to group genes by co-abundance (default: 0.25)
       --linkage_type        Linkage type used to group genes by co-abundance (default: average)
       
 
