@@ -104,10 +104,18 @@ def entrez(mode, **kwargs):
 
 
 # First, get the ID for the BioProject from the accession
-bioproject_result = entrez('efetch', db="bioproject", id=accession)
+bioproject_result = entrez(
+    'esearch', 
+    db="bioproject", 
+    term=accession
+)
 
 # Get the ID of the BioProject result
-bioproject_id = bioproject_result.find("DocumentSummary").attrib["uid"]
+bioproject_id = bioproject_result.find(
+    "IdList"
+).find(
+    "Id"
+).text
 
 print("Getting BioProject %s = %s" % (accession, bioproject_id))
 
