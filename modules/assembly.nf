@@ -609,6 +609,7 @@ process renameGenes {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label 'io_limited'
     errorStrategy 'retry'
+    publishDir "${params.output_folder}/ref/", mode: "copy"
 
     input:
     file "input.genes.fasta.gz"
