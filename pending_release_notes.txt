@@ -1,0 +1,3 @@
+Items to be included in the next release:
+
+- The assembled gene catalog is now published in FASTA format (777b6e8)
