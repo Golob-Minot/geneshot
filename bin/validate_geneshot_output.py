@@ -49,7 +49,7 @@ def validate_results_hdf(results_hdf):
         assert df.shape[0] > 0, msg
 
 
-def validate_details_hdf(details_hdf, manifest_df):
+def validate_details_hdf(details_hdf, manifest_df, skip_assembly=False):
     """Validate that the details HDF has all expected data."""
 
     # Iterate over every sample from the manifest
@@ -59,6 +59,10 @@ def validate_details_hdf(details_hdf, manifest_df):
             "/abund/allele/assembly/",
             "/abund/gene/long/",
         ]:
+            if key_name == "/abund/allele/assembly/" and skip_assembly:
+                logging.info("Skipping assembly information (--skip-assembly was set)")
+                continue
+
             # Try to read the table
             df = read_table_from_hdf(details_hdf, key_name + sample_name)
 
@@ -78,7 +82,7 @@ def read_table_from_hdf(hdf_fp, key_name, **kwargs):
         return pd.read_hdf(store, key_name, **kwargs)
 
 
-def validate_geneshot_output(results_hdf, details_hdf):
+def validate_geneshot_output(results_hdf, details_hdf, skip_assembly = False):
     """Validate that the geneshot outputs have all expected data."""
     assert os.path.exists(results_hdf)
     assert os.path.exists(details_hdf)
@@ -91,7 +95,7 @@ def validate_geneshot_output(results_hdf, details_hdf):
     manifest_df = read_table_from_hdf(results_hdf, "/manifest")
 
     # Validate the details HDF
-    validate_details_hdf(details_hdf, manifest_df)
+    validate_details_hdf(details_hdf, manifest_df, skip_assembly=skip_assembly)
 
 
 if __name__ == '__main__':
@@ -106,10 +110,16 @@ if __name__ == '__main__':
         help = "Geneshot details output file (*.details.hdf5)",
         required = True
     )
+    parser.add_argument(
+        "--skip-assembly", 
+        help = "If specified, skip the detailed assembly information",
+        action = "store_true"
+    )
 
     args = parser.parse_args()
 
     validate_geneshot_output(
         args.results_hdf,
-        args.details_hdf
+        args.details_hdf,
+        skip_assembly = args.skip_assembly
     )
