@@ -380,7 +380,13 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
 
 
     # Write to HDF5
-    cag_abund_df.to_hdf(store, "/abund/cag/wide")
+    cag_abund_df.to_hdf(
+        store, 
+        "/abund/cag/wide",
+        format = "table",
+        data_columns = ["CAG"],
+        complevel = 5
+    )
 
     # Perform ordination, both PCA and t-SNE and write to store
     for ordination_type in ["pca", "tsne"]:
@@ -437,7 +443,12 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
 
     # Now create the `/annot/gene/all` table, which will be added to later
     # with the taxonomic and functional annotations, if those are performed
-    cag_df.to_hdf(store, "/annot/gene/all")
+    cag_df.to_hdf(
+        store, 
+        "/annot/gene/all",
+        format = "table",
+        data_columns = True
+    )
 
     # Make a summary table describing each CAG with size, mean_abundance, and prevalence
     # Save it in the HDF5 as "/annot/cag/all"
@@ -700,7 +711,9 @@ with pd.HDFStore("${results_hdf}", "a") as store:
     # Write summary annotation table to HDF5
     gene_annot.to_hdf(
         store, 
-        "/annot/gene/all"
+        "/annot/gene/all",
+        format = "table",
+        data_columns = ["gene", "CAG"]
     )
 
 """
