@@ -66,6 +66,7 @@ params.linkage_type = "average"
 
 // Statistical analysis options
 params.formula = false
+params.fdr_method = "fdr_bh"
 
 // Function which prints help message text
 def helpMessage() {
@@ -125,6 +126,9 @@ def helpMessage() {
       --distance_threshold  Distance threshold used to group genes by co-abundance (default: 0.25)
       --linkage_type        Linkage type used to group genes by co-abundance (default: average)
       
+    For Statistical Analysis:
+      --formula             Optional formula used to estimate associations with CAG relative abundance
+      --fdr_method          FDR method used to calculate q-values for associations (default: 'fdr_bh')
 
     Batchfile:
       The manifest is a CSV with a header indicating which samples correspond to which files.
@@ -189,7 +193,9 @@ include combineReads from './modules/general' params(
 include addGeneAssembly from './modules/general'
 include readTaxonomy from './modules/general'
 include addEggnogResults from './modules/general'
-include addCorncobResults from './modules/general'
+include addCorncobResults from './modules/general' params(
+    fdr_method: params.fdr_method
+)
 include addTaxResults from './modules/general'
 include repackHDF as repackFullHDF from './modules/general'
 include repackHDF as repackDetailedHDF from './modules/general'

@@ -5,6 +5,9 @@ container__ubuntu = "ubuntu:18.04"
 container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
 
+// Default parameters
+params.fdr_method = "fdr_bh"
+
 // Function to read in a CSV and return a Channel
 def read_manifest(manifest_file){
     manifest_file.splitCsv(
@@ -584,7 +587,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
 process addCorncobResults{
     tag "Add statistical analysis to HDF"
-    container "${container__experiment_collection}"
+    container "${container__pandas}"
     label 'mem_medium'
     errorStrategy 'retry'
 
@@ -599,6 +602,7 @@ process addCorncobResults{
 #!/usr/bin/env python3
 
 import pandas as pd
+from statsmodels.stats.multitest import multipletests
 
 # Read in the corncob results
 corncob_df = pd.read_csv("${corncob_csv}")
@@ -622,6 +626,10 @@ corncob_wide = corncob_df.loc[
     lambda v: v.apply(lambda s: s.replace("mu.", "")) if v.name == "parameter" else v
 )
 
+# Add the q-value (FDR-BH)
+corncob_wide = corncob_wide.assign(
+    q_value = multipletests(corncob_wide["p_value"], 0.2, "${params.fdr_method}")[1]
+)
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
