@@ -627,10 +627,7 @@ corncob_wide = corncob_df.loc[
 with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write corncob results to HDF5
-    corncob_df.to_hdf(store, "/stats/cag/corncob")
-
-    # Write corncob results to HDF5 in wide format
-    corncob_wide.to_hdf(store, "/stats/cag/corncob_wide")
+    corncob_wide.to_hdf(store, "/stats/cag/corncob")
 
 """
 
