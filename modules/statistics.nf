@@ -51,7 +51,7 @@ workflow corncob_wf {
 
 process mockData {
     tag "Simulate dataset for validation"
-    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
     label 'io_limited'
 
     input:
@@ -106,7 +106,7 @@ df.reset_index(
 
 process validateFormula {
     tag "Validate user-provided formula"
-    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
     label 'io_limited'
 
     input:
@@ -149,7 +149,7 @@ for cag_id, cag_df in df.groupby("CAG"):
 // and so it needs to have access to those integer values
 process extractCounts {
     tag "Make CAG ~ sample read-count matrix"
-    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
     label 'mem_veryhigh'
     publishDir "${params.output_folder}/abund/", mode: "copy"
     
@@ -301,6 +301,11 @@ numCores = ${task.cpus}
 print("Reading in ${metadata_csv}")
 metadata <- vroom::vroom("${metadata_csv}", delim=",")
 
+print("Removing columns with read paths")
+metadata <- metadata %>% 
+    select(-R1, -R2, -I1, -I2) %>%
+    unique
+
 print("Reading in ${readcounts_csv_gz}")
 counts <- vroom::vroom("${readcounts_csv_gz}", delim=",")
 total_counts <- counts[,c("specimen", "total")]
@@ -418,7 +423,7 @@ write(
 // Collect the breakaway algorithm results for all samples
 process collectBreakaway {
     tag "Join richness tables"
-    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
     label "io_limited"
     errorStrategy "retry"
     publishDir "${params.output_folder}stats", mode: "copy", overwrite: true

@@ -3,7 +3,10 @@
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 container__ubuntu = "ubuntu:18.04"
 container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+
+// Default parameters
+params.fdr_method = "fdr_bh"
 
 // Function to read in a CSV and return a Channel
 def read_manifest(manifest_file){
@@ -478,8 +481,18 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         "/summary/experiment"
     )
 
+    # Read in the manifest provided by the user
+    manifest_df = pd.read_csv(
+        "${manifest_csv}"
+    )
+    # Drop the columns with paths to reads
+    manifest_df = manifest_df.drop(columns=["R1", "R2", "I1", "I2"])
+
+    # Drop duplicated rows (multiple read pairs from the same set of samples)
+    manifest_df = manifest_df.drop_duplicates()
+
     # Write out the manifest provided by the user
-    pd.read_csv("${manifest_csv}").to_hdf(store, "/manifest")
+    manifest_df.to_hdf(store, "/manifest")
 
 """
 
@@ -584,7 +597,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
 process addCorncobResults{
     tag "Add statistical analysis to HDF"
-    container "${container__experiment_collection}"
+    container "${container__pandas}"
     label 'mem_medium'
     errorStrategy 'retry'
 
@@ -599,6 +612,7 @@ process addCorncobResults{
 #!/usr/bin/env python3
 
 import pandas as pd
+from statsmodels.stats.multitest import multipletests
 
 # Read in the corncob results
 corncob_df = pd.read_csv("${corncob_csv}")
@@ -622,15 +636,55 @@ corncob_wide = corncob_df.loc[
     lambda v: v.apply(lambda s: s.replace("mu.", "")) if v.name == "parameter" else v
 )
 
+# Adding the q-value is conditional on p-values being present
+if "p_value" in corncob_wide.columns.values:
+
+    # Add the q-value (FDR-BH)
+    corncob_wide = corncob_wide.assign(
+        q_value = multipletests(corncob_wide.p_value.fillna(1), 0.2, "${params.fdr_method}")[1]
+    )
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write corncob results to HDF5
-    corncob_df.to_hdf(store, "/stats/cag/corncob")
+    corncob_wide.to_hdf(store, "/stats/cag/corncob")
 
-    # Write corncob results to HDF5 in wide format
-    corncob_wide.to_hdf(store, "/stats/cag/corncob_wide")
+"""
+
+}
+
+process addMetaPhlAn2Results{
+    tag "Add composition analysis to HDF"
+    container "${container__pandas}"
+    label 'mem_medium'
+    errorStrategy 'retry'
+
+    input:
+        path results_hdf
+        path metaphlan_csv
+
+    output:
+        path "${results_hdf}"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in the metaphlan results
+metaphlan_df = pd.read_csv("${metaphlan_csv}")
+
+print(
+    "Read in metaphlan results for %d taxa" % 
+    metaphlan_df.shape[0]
+)
+
+# Open a connection to the HDF5
+with pd.HDFStore("${results_hdf}", "a") as store:
+
+    # Write metaphlan results to HDF5
+    metaphlan_df.to_hdf(store, "/composition/metaphlan")
 
 """
 
@@ -674,10 +728,12 @@ eggnog_df = pd.concat([
     pd.read_csv(
         fp, 
         header=3, 
-        sep="\\t"
-    ).rename(columns=dict([("#query_name", "query_name")]))
+        sep="\\t",
+        comment="#"
+    )
     for fp in eggnog_csv_list
 ])
+assert 'query_name' in eggnog_df.columns.values
 
 print(
     "Read in eggnog results for %d genes" % 
@@ -740,6 +796,7 @@ from io import BytesIO
 import pandas as pd
 import tarfile
 
+print("Opening taxdump tar file")
 tar = tarfile.open(
     "${taxdump_tar_gz}", 
     "r:gz", 
@@ -747,6 +804,7 @@ tar = tarfile.open(
 )
 
 # Read in the table of merged taxids
+print("Reading in merged taxids")
 merged_df = pd.read_csv(
     BytesIO(
         tar.extractfile(
@@ -764,6 +822,7 @@ merged_df = pd.read_csv(
 )
 
 # Get the name of each taxon
+print("Reading in names")
 names_df = pd.read_csv(
     BytesIO(
         tar.extractfile(
@@ -783,6 +842,7 @@ names_df = pd.read_csv(
 )
 
 # Get the rank and parent of every taxon
+print("Reading in nodes")
 nodes_df = pd.read_csv(
     BytesIO(
         tar.extractfile(
@@ -800,20 +860,27 @@ nodes_df = pd.read_csv(
 )
 
 # Join the names and the nodes
+print("Joining names and nodes")
 tax_df = pd.concat([
     names_df.set_index("tax_id"),
     nodes_df.set_index("tax_id")
-], axis=1).reset_index()
+], axis=1, sort=True)
 
 # Add in the merged taxids
+print("Adding in merged tax IDs")
 tax_df = pd.concat([
     tax_df,
-    tax_df.apply(
-        lambda v: v.apply(merged_df.set_index("new")["old"].get) if v.name == "tax_id" else v
-    ).dropna()
-])
+    tax_df.reindex(
+        index=merged_df["old"].values
+    ).dropna(
+    ).apply(
+        lambda v: v.apply(merged_df.set_index("old")["new"].get) if v.name == "tax_id" else v
+    )
+]).reset_index()
+assert tax_df["tax_id"].apply(lambda n: "\n" not in str(n)).all()
 
 # Write to CSV
+print("Writing out final CSV")
 tax_df.to_csv(
     "ncbi_taxonomy.csv.gz",
     compression="gzip",
