@@ -636,12 +636,13 @@ corncob_wide = corncob_df.loc[
     lambda v: v.apply(lambda s: s.replace("mu.", "")) if v.name == "parameter" else v
 )
 
-assert "p_value" in corncob_wide.columns.values, corncob_wide.head()
+# Adding the q-value is conditional on p-values being present
+if "p_value" in corncob_wide.columns.values:
 
-# Add the q-value (FDR-BH)
-corncob_wide = corncob_wide.assign(
-    q_value = multipletests(corncob_wide.p_value, 0.2, "${params.fdr_method}")[1]
-)
+    # Add the q-value (FDR-BH)
+    corncob_wide = corncob_wide.assign(
+        q_value = multipletests(corncob_wide.p_value.fillna(1), 0.2, "${params.fdr_method}")[1]
+    )
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
