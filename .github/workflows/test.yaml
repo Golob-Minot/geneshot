@@ -50,7 +50,7 @@ jobs:
           NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.5 -w work/ --noannot -with-docker ubuntu:latest --nopreprocess
       - name:  Validate results
         run: |
-          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5
+          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas@sha256:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5
 
   no_formula:
     runs-on: ubuntu-latest
@@ -74,7 +74,7 @@ jobs:
           NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --distance_threshold 0.5 -w work/ --noannot -with-docker ubuntu:latest
       - name:  Validate results
         run: |
-          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5
+          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas@sha256:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5
   
   no_assembly:
     runs-on: ubuntu-latest
@@ -98,7 +98,7 @@ jobs:
           NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.5 -w work/ --noannot -with-docker ubuntu:latest --gene_fasta data/genes.fasta.2.gz
       - name:  Validate results
         run: |
-          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --skip-assembly
+          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas@sha256:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --skip-assembly
 
   eggnog:
     runs-on: ubuntu-latest
@@ -122,4 +122,4 @@ jobs:
           NXF_VER=20.01.0 nextflow run main.nf -c nextflow.config -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.5 -w work/ -with-docker ubuntu:latest --gene_fasta data/genes.fasta.2.gz --eggnog_dmnd https://github.com/eggnogdb/eggnog-mapper/raw/master/test/test_db.dmnd --eggnog_db https://github.com/eggnogdb/eggnog-mapper/raw/master/test/test_eggnog.db --taxonomic_dmnd false
       - name:  Validate results
         run: |
-          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --skip-assembly
+          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas@sha256:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --skip-assembly
