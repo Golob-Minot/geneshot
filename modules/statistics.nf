@@ -305,10 +305,10 @@ print("Removing columns with read paths")
 metadata <- metadata %>% 
     select(-R1, -R2) %>%
     unique
-if("I1" in names(metadata)){
+if("I1" %in% names(metadata)){
     metadata <- metadata %>% select(-I1)
 }
-if("I2" in names(metadata)){
+if("I2" %in% names(metadata)){
     metadata <- metadata %>% select(-I2)
 }
 metadata <- metadata %>% unique
