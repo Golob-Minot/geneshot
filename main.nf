@@ -54,10 +54,10 @@ params.famli_batchsize = 10000000 // FAMLI
 
 // Annotation options
 params.noannot = false
-params.taxonomic_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd"
+params.taxonomic_dmnd = false
 params.ncbi_taxdump = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
-params.eggnog_db = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db"
-params.eggnog_dmnd = "s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd"
+params.eggnog_db = false
+params.eggnog_dmnd = false
 
 // CAG options
 params.distance_threshold = 0.25
@@ -106,14 +106,14 @@ def helpMessage() {
     For Annotation:
       --noannot             If specified, disable annotation for taxonomy or function.
                             Individual annotations can also be disabled by, e.g., setting --eggnog_db false
-      --taxonomic_dmnd      Database used for taxonomic annotation 
-                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
+      --taxonomic_dmnd      Database used for taxonomic annotation (default: false)
+                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
-      --eggnog_dmnd         One of two databases used for functional annotation with eggNOG 
-                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
-      --eggnog_db           One of two databases used for functional annotation with eggNOG 
-                            (default: s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
+      --eggnog_dmnd         One of two databases used for functional annotation with eggNOG (default: false)
+                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
+      --eggnog_db           One of two databases used for functional annotation with eggNOG (default: false)
+                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
     
     For Alignment:
       --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
