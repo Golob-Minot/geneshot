@@ -1,4 +1,4 @@
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 
 process linclust {
     tag "Cluster genes with similar sequences"

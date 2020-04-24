@@ -5,7 +5,7 @@ params.output_prefix = "geneshot"
 
 // Containers
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 
 include diamondDB from "./alignment" params(
     output_folder: params.output_folder
