@@ -303,8 +303,16 @@ metadata <- vroom::vroom("${metadata_csv}", delim=",")
 
 print("Removing columns with read paths")
 metadata <- metadata %>% 
-    select(-R1, -R2, -I1, -I2) %>%
+    select(-R1, -R2) %>%
     unique
+if("I1" in names(metadata)){
+    metadata <- metadata %>% select(-I1)
+}
+if("I2" in names(metadata)){
+    metadata <- metadata %>% select(-I2)
+}
+metadata <- metadata %>% unique
+    
 
 print("Reading in ${readcounts_csv_gz}")
 counts <- vroom::vroom("${readcounts_csv_gz}", delim=",")
