@@ -481,8 +481,18 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         "/summary/experiment"
     )
 
+    # Read in the manifest provided by the user
+    manifest_df = pd.read_csv(
+        "${manifest_csv}"
+    )
+    # Drop the columns with paths to reads
+    manifest_df = manifest_df.drop(columns=["R1", "R2", "I1", "I2"])
+
+    # Drop duplicated rows (multiple read pairs from the same set of samples)
+    manifest_df = manifest_df.drop_duplicates()
+
     # Write out the manifest provided by the user
-    pd.read_csv("${manifest_csv}").to_hdf(store, "/manifest")
+    manifest_df.to_hdf(store, "/manifest")
 
 """
 

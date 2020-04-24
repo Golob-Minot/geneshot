@@ -301,6 +301,11 @@ numCores = ${task.cpus}
 print("Reading in ${metadata_csv}")
 metadata <- vroom::vroom("${metadata_csv}", delim=",")
 
+print("Removing columns with read paths")
+metadata <- metadata %>% 
+    select(-R1, -R2, -I1, -I2) %>%
+    unique
+
 print("Reading in ${readcounts_csv_gz}")
 counts <- vroom::vroom("${readcounts_csv_gz}", delim=",")
 total_counts <- counts[,c("specimen", "total")]
