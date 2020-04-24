@@ -268,6 +268,7 @@ include metaphlan2_fastq from './modules/composition' params(
     output_folder: output_folder
 )
 include join_metaphlan2 from './modules/composition'
+include addMetaPhlAn2Results from './modules/general'
 
 
 workflow {
