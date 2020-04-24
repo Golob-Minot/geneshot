@@ -692,10 +692,12 @@ eggnog_df = pd.concat([
     pd.read_csv(
         fp, 
         header=3, 
-        sep="\\t"
-    ).rename(columns=dict([("#query_name", "query_name")]))
+        sep="\\t",
+        comment="#"
+    )
     for fp in eggnog_csv_list
 ])
+assert 'query_name' in eggnog_df.columns.values
 
 print(
     "Read in eggnog results for %d genes" % 

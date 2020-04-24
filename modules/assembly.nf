@@ -594,7 +594,7 @@ set -e
 
 for fp in genes.emapper.annotations.*.gz; do
 
-    cat \$fp
+    cat \$fp | sed 's/#query_name/query_name/'
     rm \$fp
 
 done > genes.emapper.annotations.gz
