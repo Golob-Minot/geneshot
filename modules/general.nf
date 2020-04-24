@@ -758,6 +758,7 @@ from io import BytesIO
 import pandas as pd
 import tarfile
 
+print("Opening taxdump tar file")
 tar = tarfile.open(
     "${taxdump_tar_gz}", 
     "r:gz", 
@@ -765,6 +766,7 @@ tar = tarfile.open(
 )
 
 # Read in the table of merged taxids
+print("Reading in merged taxids")
 merged_df = pd.read_csv(
     BytesIO(
         tar.extractfile(
@@ -782,6 +784,7 @@ merged_df = pd.read_csv(
 )
 
 # Get the name of each taxon
+print("Reading in names")
 names_df = pd.read_csv(
     BytesIO(
         tar.extractfile(
@@ -801,6 +804,7 @@ names_df = pd.read_csv(
 )
 
 # Get the rank and parent of every taxon
+print("Reading in nodes")
 nodes_df = pd.read_csv(
     BytesIO(
         tar.extractfile(
@@ -818,20 +822,27 @@ nodes_df = pd.read_csv(
 )
 
 # Join the names and the nodes
+print("Joining names and nodes")
 tax_df = pd.concat([
     names_df.set_index("tax_id"),
     nodes_df.set_index("tax_id")
-], axis=1).reset_index()
+], axis=1, sort=True)
 
 # Add in the merged taxids
+print("Adding in merged tax IDs")
 tax_df = pd.concat([
     tax_df,
-    tax_df.apply(
-        lambda v: v.apply(merged_df.set_index("new")["old"].get) if v.name == "tax_id" else v
-    ).dropna()
-])
+    tax_df.reindex(
+        index=merged_df["old"].values
+    ).dropna(
+    ).apply(
+        lambda v: v.apply(merged_df.set_index("old")["new"].get) if v.name == "tax_id" else v
+    )
+]).reset_index()
+assert tax_df["tax_id"].apply(lambda n: "\n" not in str(n)).all()
 
 # Write to CSV
+print("Writing out final CSV")
 tax_df.to_csv(
     "ncbi_taxonomy.csv.gz",
     compression="gzip",
