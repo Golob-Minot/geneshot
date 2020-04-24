@@ -654,6 +654,42 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
 }
 
+process addMetaPhlAn2Results{
+    tag "Add composition analysis to HDF"
+    container "${container__pandas}"
+    label 'mem_medium'
+    errorStrategy 'retry'
+
+    input:
+        path results_hdf
+        path metaphlan_csv
+
+    output:
+        path "${results_hdf}"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in the metaphlan results
+metaphlan_df = pd.read_csv("${metaphlan_csv}")
+
+print(
+    "Read in metaphlan results for %d taxa" % 
+    metaphlan_df.shape[0]
+)
+
+# Open a connection to the HDF5
+with pd.HDFStore("${results_hdf}", "a") as store:
+
+    # Write metaphlan results to HDF5
+    metaphlan_df.to_hdf(store, "/composition/metaphlan")
+
+"""
+
+}
+
 process addEggnogResults {
     tag "Add functional predictions to HDF"
     container "${container__experiment_collection}"

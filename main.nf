@@ -68,6 +68,9 @@ params.linkage_type = "average"
 params.formula = false
 params.fdr_method = "fdr_bh"
 
+// Compositional analysis options
+params.composition = false
+
 // Function which prints help message text
 def helpMessage() {
     log.info"""
@@ -129,6 +132,9 @@ def helpMessage() {
     For Statistical Analysis:
       --formula             Optional formula used to estimate associations with CAG relative abundance
       --fdr_method          FDR method used to calculate q-values for associations (default: 'fdr_bh')
+
+    For Compositional Analysis:
+      --composition         When included, metaPhlAn2 will be run on all specimens
 
     Batchfile:
       The manifest is a CSV with a header indicating which samples correspond to which files.
@@ -257,6 +263,13 @@ include collectBreakaway from './modules/statistics' params(
     output_prefix: params.output_prefix
 )
 
+// Import the workflow used for composition analysis
+include metaphlan2_fastq from './modules/composition' params(
+    output_folder: output_folder
+)
+include join_metaphlan2 from './modules/composition'
+
+
 workflow {
     main:
 
@@ -317,6 +330,23 @@ workflow {
     countReadsSummary(
         countReads.out.collect()
     )
+
+    // ##########################
+    // # COMPOSITIONAL ANALYSIS #
+    // ##########################
+    if (params.composition) {
+        metaphlan2_fastq(
+            combineReads.out.map {
+                r -> [r[0], r[1], r[2]]
+            }
+        )
+        // Make a single table with all of the metaPhlAn2 results
+        join_metaphlan2(
+            metaphlan2_fastq.out.map {
+                r -> r[1]
+            }.toSortedList()
+        )
+    }
 
     // ###################################
     // # DE NOVO ASSEMBLY AND ANNOTATION #
@@ -410,6 +440,16 @@ workflow {
         )
         resultsHDF = addGeneAssembly.out[0]
         detailedHDF = addGeneAssembly.out[1]
+    }
+
+    // If we performed compositional analysis, add the results ot the HDF5
+    if (params.composition) {
+        addMetaPhlAn2Results(
+            resultsHDF,
+            join_metaphlan2.out
+        )
+
+        resultsHDF = addMetaPhlAn2Results.out
     }
 
     // If we performed statistical analysis, add the results to the HDF5
