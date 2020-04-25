@@ -877,7 +877,7 @@ tax_df = pd.concat([
         lambda v: v.apply(merged_df.set_index("old")["new"].get) if v.name == "tax_id" else v
     )
 ]).reset_index()
-assert tax_df["tax_id"].apply(lambda n: "\n" not in str(n)).all()
+assert tax_df["tax_id"].apply(lambda n: "\\n" not in str(n)).all()
 
 # Write to CSV
 print("Writing out final CSV")
