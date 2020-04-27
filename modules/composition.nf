@@ -99,11 +99,12 @@ for fp in "${metaphlan_tsv_list}".split(" "):
 
     df[specimen_name] = pd.read_csv(
         fp,
+        skiprows=1,
         sep="\\t"
     ).set_index(
-        "#SampleID"
+        "#clade_name"
     )[
-        "Metaphlan2_Analysis"
+        "relative_abundance"
     ]
 
 # Format all results as a DataFrame
