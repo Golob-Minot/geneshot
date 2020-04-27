@@ -341,12 +341,12 @@ workflow {
                 r -> [r[0], r[1], r[2]]
             }
         )
-        // Make a single table with all of the metaPhlAn2 results
-        join_metaphlan2(
-            metaphlan2_fastq.out.map {
-                r -> r[1]
-            }.toSortedList()
-        )
+        // // Make a single table with all of the metaPhlAn2 results
+        // join_metaphlan2(
+        //     metaphlan2_fastq.out.map {
+        //         r -> r[1]
+        //     }.toSortedList()
+        // )
     }
 
     // ###################################
@@ -443,15 +443,15 @@ workflow {
         detailedHDF = addGeneAssembly.out[1]
     }
 
-    // If we performed compositional analysis, add the results ot the HDF5
-    if (params.composition) {
-        addMetaPhlAn2Results(
-            resultsHDF,
-            join_metaphlan2.out
-        )
+    // // If we performed compositional analysis, add the results ot the HDF5
+    // if (params.composition) {
+    //     addMetaPhlAn2Results(
+    //         resultsHDF,
+    //         join_metaphlan2.out
+    //     )
 
-        resultsHDF = addMetaPhlAn2Results.out
-    }
+    //     resultsHDF = addMetaPhlAn2Results.out
+    // }
 
     // If we performed statistical analysis, add the results to the HDF5
     if ( params.formula ) {
