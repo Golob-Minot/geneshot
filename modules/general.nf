@@ -486,7 +486,9 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         "${manifest_csv}"
     )
     # Drop the columns with paths to reads
-    manifest_df = manifest_df.drop(columns=["R1", "R2", "I1", "I2"])
+    for col_name in ["R1", "R2", "I1", "I2"]:
+        if col_name in manifest_df.columns.values:
+            manifest_df = manifest_df.drop(columns=col_name)
 
     # Drop duplicated rows (multiple read pairs from the same set of samples)
     manifest_df = manifest_df.drop_duplicates()
