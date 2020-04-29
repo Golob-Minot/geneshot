@@ -21,7 +21,7 @@ workflow composition_wf {
     process metaphlan2_fastq {
     tag "MetaPhlAn2 composition for paired end fastq reads"
     container "${container__metaphlan2}"
-    label = 'mem_veryhigh'
+    label = 'mem_medium'
     errorStrategy 'retry'
 
     // If the user sets --preprocess_output, write out the combined reads to that folder

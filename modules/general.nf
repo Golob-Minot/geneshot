@@ -664,7 +664,7 @@ process addMetaPhlAn2Results{
 
     input:
         path results_hdf
-        path metaphlan_csv
+        path metaphlan_tsv_list
 
     output:
         path "${results_hdf}"
@@ -674,19 +674,35 @@ process addMetaPhlAn2Results{
 
 import pandas as pd
 
-# Read in the metaphlan results
-metaphlan_df = pd.read_csv("${metaphlan_csv}")
-
-print(
-    "Read in metaphlan results for %d taxa" % 
-    metaphlan_df.shape[0]
-)
-
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
-    # Write metaphlan results to HDF5
-    metaphlan_df.to_hdf(store, "/composition/metaphlan")
+    # Iterate over each input file
+    for fp in "${metaphlan_tsv_list}".split(" "):
+
+        # Make sure that the file has the expected suffix
+        assert fp.endswith(".metaphlan2.tsv"), fp
+
+        # Get the specimen name from the file name
+        specimen_name = fp.replace(".metaphlan2.tsv", "")
+
+        # Read in from the flat file
+        metaphlan_df = pd.read_csv(
+            fp,
+            skiprows=1,
+            sep="\\t"
+        )
+
+        print("Read in %d taxa from %s" % (metaphlan_df.shape[0], specimen_name))
+
+        # Write metaphlan results to HDF5
+        key = "/composition/metaphlan/%s" % specimen_name
+        print("Writing to %s" % key)
+        metaphlan_df.to_hdf(store, key)
+
+    print("Closing store")
+
+print("Done")
 
 """
 
