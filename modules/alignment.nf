@@ -169,27 +169,31 @@ process diamond {
     """
     set -e
 
-    cat ${R1} ${R2} | \
-    gunzip -c | \
-    awk "{if(NR % 4 == 1){print \\"@\\" NR }else{if(NR % 4 == 3){print \\"+\\"}else{print}}}" | \
-    gzip -c \
-     > query.fastq.gz
+    for fp in ${R1} ${R2}; do
+        cat \$fp | \
+        gunzip -c | \
+        awk "{if(NR % 4 == 1){print \\"@\$fp\\" NR }else{if(NR % 4 == 3){print \\"+\\"}else{print}}}" | \
+        gzip -c \
+        > query.fastq.gz
 
-    diamond \
-      blastx \
-      --query query.fastq.gz \
-      --out ${sample_name}.aln.gz \
-      --threads ${task.cpus} \
-      --db ${refdb} \
-      --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen \
-      --min-score ${params.dmnd_min_score} \
-      --query-cover ${params.dmnd_min_coverage} \
-      --id ${params.dmnd_min_identity} \
-      --top ${params.dmnd_top_pct} \
-      --block-size ${task.memory.toMega() / (1024 * 6 * task.attempt)} \
-      --query-gencode ${params.gencode} \
-      --compress 1 \
-      --unal 0
+        diamond \
+        blastx \
+        --query query.fastq.gz \
+        --out \$fp.aln.gz \
+        --threads ${task.cpus} \
+        --db ${refdb} \
+        --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen \
+        --min-score ${params.dmnd_min_score} \
+        --query-cover ${params.dmnd_min_coverage} \
+        --id ${params.dmnd_min_identity} \
+        --top ${params.dmnd_top_pct} \
+        --block-size ${task.memory.toMega() / (1024 * 6 * task.attempt)} \
+        --query-gencode ${params.gencode} \
+        --compress 1 \
+        --unal 0
+    done
+
+    cat *aln.gz > ${sample_name}.aln.gz
     """
 
 }
