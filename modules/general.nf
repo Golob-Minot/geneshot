@@ -751,16 +751,36 @@ eggnog_df = pd.concat([
     for fp in eggnog_csv_list
 ]).rename(
     columns = dict([("#query_name", "query_name")])
+).reset_index(
+    drop=True
 )
+
+def head_and_tail(df):
+    print("HEAD:")
+    print(df.head())
+    print("")
+    print("TAIL:")
+    print(df.tail())
+    print("")
+
+head_and_tail(eggnog_df)
+
 assert 'query_name' in eggnog_df.columns.values
+print("Read in %d lines of annotations" % eggnog_df.shape[0])
 
 # Remove those rows with no "seed_eggNOG_ortholog" (which are internal runtime metrics)
 eggnog_df = eggnog_df.reindex(
     index=eggnog_df["seed_eggNOG_ortholog"].dropna().index
 )
+print("Read in annotations for %d genes" % eggnog_df.shape[0])
+
+head_and_tail(eggnog_df)
 
 # Set the index to be the gene name
 eggnog_df.set_index("query_name", inplace=True)
+print("Set the index on 'query_name'")
+
+head_and_tail(eggnog_df)
 
 print(
     "Read in eggnog results for %d genes" % 
