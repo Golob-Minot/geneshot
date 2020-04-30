@@ -746,12 +746,21 @@ eggnog_df = pd.concat([
     pd.read_csv(
         fp, 
         header=3, 
-        sep="\\t",
-        comment="#"
+        sep="\\t"
     )
     for fp in eggnog_csv_list
-])
+]).rename(
+    columns = dict([("#query_name", "query_name")])
+)
 assert 'query_name' in eggnog_df.columns.values
+
+# Remove those rows with no "seed_eggNOG_ortholog" (which are internal runtime metrics)
+eggnog_df = eggnog_df.reindex(
+    index=eggnog_df["seed_eggNOG_ortholog"].dropna().index
+)
+
+# Set the index to be the gene name
+eggnog_df.set_index("query_name", inplace=True)
 
 print(
     "Read in eggnog results for %d genes" % 
@@ -769,18 +778,18 @@ with pd.HDFStore("${results_hdf}", "r") as store:
 
 # Add in a subset of the eggnog results
 gene_annot = gene_annot.assign(
-    eggNOG_ortholog = eggnog_df.set_index("query_name")["seed_eggNOG_ortholog"]
+    eggNOG_ortholog = eggnog_df["seed_eggNOG_ortholog"]
 ).assign(
-    eggNOG_tax = eggnog_df.set_index("query_name")["best_tax_level"]
+    eggNOG_tax = eggnog_df["best_tax_level"]
 ).assign(
-    eggNOG_desc = eggnog_df.set_index("query_name")["eggNOG free text desc."]
+    eggNOG_desc = eggnog_df["eggNOG free text desc."]
 ).reset_index()
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write eggnog results to HDF5
-    eggnog_df.to_hdf(store, "/annot/gene/eggnog")
+    eggnog_df.reset_index().to_hdf(store, "/annot/gene/eggnog")
     
     # Write summary annotation table to HDF5
     gene_annot.to_hdf(

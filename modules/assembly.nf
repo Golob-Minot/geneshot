@@ -162,9 +162,6 @@ workflow annotation_wf {
             file(params.eggnog_dmnd)
         )
         eggnog_tsv = eggnog.out.collect()
-        join_eggnog(
-            eggnog_tsv
-        )
     } else {
         eggnog_tsv = false
     }
@@ -576,32 +573,6 @@ gzip genes.emapper.annotations
 
 }
 
-process join_eggnog {
-    tag "Concatenate eggNOG annotation files"
-    container "ubuntu:18.04"
-    label 'mem_medium'
-    publishDir "${params.output_folder}/annot/", mode: "copy"
-
-    input:
-    file "genes.emapper.annotations.*.gz"
-    
-    output:
-    file "genes.emapper.annotations.gz"
-
-    
-"""
-set -e
-
-for fp in genes.emapper.annotations.*.gz; do
-
-    cat \$fp | sed 's/#query_name/query_name/'
-    rm \$fp
-
-done > genes.emapper.annotations.gz
-
-"""
-
-}
 
 // Assign a new, shorter name to a set of genes
 process renameGenes {
