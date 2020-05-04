@@ -8,3 +8,8 @@ private HPC clusters (using singularity), or on public clouds (e.g. AWS batch).
 
 [See the Wiki for help getting started as well as advanced options](https://github.com/jgolob/geneshot/wiki/Getting-Started)
 
+### Funding
+
+This work was supported by funding sources which include:
+
+ - NIH NIGMS R35 GM133420 (PI: Amy Willis, Ph.D.)
