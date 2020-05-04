@@ -430,7 +430,12 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
     )
 
     # Write to HDF5
-    cag_df.to_hdf(store, "/annot/gene/cag")
+    cag_df.to_hdf(
+        store, 
+        "/annot/gene/cag",
+        format = "table",
+        data_columns = ["gene", "CAG"]
+    )
 
     # Calculate prevalence and abundance information for each gene
     gene_abund_df.set_index("index", inplace=True)
@@ -450,7 +455,7 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         store, 
         "/annot/gene/all",
         format = "table",
-        data_columns = True
+        data_columns = ["gene", "CAG"]
     )
 
     # Make a summary table describing each CAG with size, mean_abundance, and prevalence
@@ -1031,7 +1036,9 @@ with pd.HDFStore("${results_hdf}", "a") as store:
     # Write summary gene annotation table to HDF5
     gene_annot.to_hdf(
         store, 
-        "/annot/gene/all"
+        "/annot/gene/all",
+        format = "table",
+        data_columns = ["gene", "CAG"]
     )
 
     # Write the taxonomy table
