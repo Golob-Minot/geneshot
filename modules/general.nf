@@ -315,6 +315,7 @@ def run_tsne(abund_df, n_components=2):
 
 # Calculate pairwise distances (input has specimens in rows)
 def calc_pdist(abund_df, metric="euclidean"):
+    print("Calculating pairwise %s distances over %d samples and %d CAGs" % (metric, abund_df.shape[0], abund_df.shape[1]))
     
     # Make an output DataFrame with the pairwise distances
     return pd.DataFrame(
@@ -329,6 +330,7 @@ def calc_pdist(abund_df, metric="euclidean"):
 
 # Calculate CLR-transformed abundances (input has specimens in rows)
 def clr_transform(abund_df):
+    print("Calculating CLR over %d samples and %d CAGs" % (abund_df.shape[0], abund_df.shape[1]))
 
     # Make the input
     specimen_col_abund_df = abund_df.T
@@ -342,13 +344,19 @@ def clr_transform(abund_df):
     min_abund = specimen_col_abund_df.apply(
         lambda c: c.loc[c > 0].min()
     ).min()
+
+    print("Minimum value is %d" % min_abund)
+
+    # Fill in the minimum value
+    specimen_col_abund_df = specimen_col_abund_df.clip(
+        lower=min_abund
+    )
+
+    # Divide by the geometric mean
+    specimen_col_abund_df = specimen_col_abund_df / specimen_gmean
     
-    # Make an output DataFrame with the CLR abundances (specimens in rows)
-    return (
-        specimen_col_abund_df.clip(
-            lower=min_abund
-        ) / specimen_gmean
-    ).applymap(np.log10).T
+    # Take the log and return
+    return specimen_col_abund_df.applymap(np.log10).T
 
 # Read in the table with gene lengths
 gene_length_df = pd.read_csv(gene_length_csv).set_index("gene")["length"]
