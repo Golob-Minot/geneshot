@@ -225,7 +225,7 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from scipy.spatial.distance import pdist
+from scipy.spatial.distance import pdist, squareform
 from scipy.stats.mstats import gmean
 
 cag_csv = "${cag_csv}"
@@ -319,9 +319,11 @@ def calc_pdist(abund_df, metric="euclidean"):
     
     # Make an output DataFrame with the pairwise distances
     return pd.DataFrame(
-        pdist(
-            abund_df if metric != "aitchison" else clr_transform(abund_df),
-            metric=metric if metric != "aitchison" else "euclidean"
+        squareform(
+            pdist(
+                abund_df if metric != "aitchison" else clr_transform(abund_df),
+                metric=metric if metric != "aitchison" else "euclidean"
+            )
         ),
         index=abund_df.index.values,
         columns=abund_df.index.values
