@@ -221,9 +221,12 @@ process collectAbundances{
 
 import gzip
 import json
+import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from scipy.spatial.distance import pdist
+from scipy.stats.mstats import gmean
 
 cag_csv = "${cag_csv}"
 gene_abund_feather = "${gene_abund_feather}"
@@ -309,6 +312,43 @@ def run_tsne(abund_df, n_components=2):
         ]
     ).reset_index(
     ).rename(columns=dict([('index', 'specimen')]))
+
+# Calculate pairwise distances (input has specimens in rows)
+def calc_pdist(abund_df, metric="euclidean"):
+    
+    # Make an output DataFrame with the pairwise distances
+    return pd.DataFrame(
+        pdist(
+            abund_df if metric != "aitchison" else clr_transform(abund_df),
+            metric=metric if metric != "aitchison" else "euclidean"
+        ),
+        index=abund_df.index.values,
+        columns=abund_df.index.values
+    ).reset_index(
+    ).rename(columns=dict([('index', 'specimen')]))
+
+# Calculate CLR-transformed abundances (input has specimens in rows)
+def clr_transform(abund_df):
+
+    # Make the input
+    specimen_col_abund_df = abund_df.T
+
+    # Calculate the geometric mean for every specimen
+    specimen_gmean = specimen_col_abund_df.apply(
+        lambda c: gmean(c.loc[c > 0])
+    )
+
+    # Find the global minimum value
+    min_abund = specimen_col_abund_df.apply(
+        lambda c: c.loc[c > 0].min()
+    ).min()
+    
+    # Make an output DataFrame with the CLR abundances (specimens in rows)
+    return (
+        specimen_col_abund_df.clip(
+            lower=min_abund
+        ) / specimen_gmean
+    ).applymap(np.log10).T
 
 # Read in the table with gene lengths
 gene_length_df = pd.read_csv(gene_length_csv).set_index("gene")["length"]
@@ -402,6 +442,18 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         ).to_hdf(
             store,
             "/ordination/%s" % ordination_type
+        )
+
+    # Calculate pairwise distances and write to store
+    for metric in ["euclidean", "braycurtis", "jaccard", "aitchison"]:
+
+        # Calculate pairwise distances and write to the store
+        calc_pdist(
+            cag_abund_df.set_index("CAG").T,
+            metric
+        ).to_hdf(
+            store,
+            "/distances/%s" % metric
         )
 
     # Read in the table with the gene-level abundances across all samples
