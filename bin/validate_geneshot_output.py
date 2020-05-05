@@ -29,7 +29,11 @@ def validate_results_hdf(results_hdf):
         "/abund/gene/wide",
         "/abund/cag/wide",
         "/ordination/pca",
-        "/ordination/tsne"
+        "/ordination/tsne",
+        "/distances/euclidean",
+        "/distances/braycurtis",
+        "/distances/jaccard",
+        "/distances/aitchison",
     ]:
         # Try to read the table
         df = read_table_from_hdf(results_hdf, key_name)
