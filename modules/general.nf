@@ -227,6 +227,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats.mstats import gmean
+from scipy.stats import entropy
 
 cag_csv = "${cag_csv}"
 gene_abund_feather = "${gene_abund_feather}"
@@ -527,7 +528,8 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         ("size", cag_df["CAG"].value_counts()),
         ("prevalence", (cag_abund_df > 0).mean(axis=1)),
         ("mean_abundance", cag_abund_df.mean(axis=1)),
-        ("std_abundance", cag_abund_df.std(axis=1))
+        ("std_abundance", cag_abund_df.std(axis=1)),
+        ("entropy", cag_abund_df.apply(entropy, axis=1)),
     ])).reset_index(
     ).rename(
         columns=dict([("index", "CAG")])
