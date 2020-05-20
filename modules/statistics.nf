@@ -288,7 +288,8 @@ library(tidyverse)
 library(corncob)
 library(parallel)
 
-Sys.setenv("VROOM_CONNECTION_SIZE" = 13107200 * ${task.attempt})
+## By default, use 10% of the available memory to read in data
+Sys.setenv("VROOM_CONNECTION_SIZE" = 100000 * ${task.memory.toMega()})
 
 numCores = ${task.cpus}
 
