@@ -89,10 +89,7 @@ def request_url(url, max_retries=10, pause_seconds=0.5):
 def entrez(mode, **kwargs):
     assert mode in ["efetch", "esearch", "elink"]
 
-    kwargs_str = "&".join([
-        "%s=%s" % (k, v)
-        for k, v in kwargs.items()
-    ])
+    kwargs_str = "&".join(["%s=%s" % (k, v) for k, v in kwargs.items()])
     url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/%s.fcgi?%s"
     url = url % (mode, kwargs_str)
 
@@ -102,42 +99,49 @@ def entrez(mode, **kwargs):
     # Parse the XML
     return ET.fromstring(response_text)
 
+# Make a list of SRA records which will be added to
+sra_id_list = []
 
-# First, get the ID for the BioProject from the accession
-bioproject_result = entrez(
-    'esearch', 
-    db="bioproject", 
-    term=accession
-)
+# First, get the ID(s) for the BioProject from the accession
+bioproject_result = entrez('esearch', db="bioproject", term=accession)
 
-# Get the ID of the BioProject result
-bioproject_id = bioproject_result.find(
+# Iterate over each of the IDs linked to the BioProject
+for i in bioproject_result.find(
     "IdList"
-).find(
+).findall(
     "Id"
-).text
+):
+    # Looking at this particular ID
+    bioproject_id = i.text
 
-print("Getting BioProject %s = %s" % (accession, bioproject_id))
+    print("Getting BioProject %s = %s" % (accession, bioproject_id))
 
-# Get all of the SRA Runs for this BioProject
-elink_results = entrez(
-    'elink',
-    dbfrom="bioproject", 
-    id=int(bioproject_id), 
-    linkname="bioproject_sra"
-)
+    # Get all of the SRA Runs for this BioProject
+    elink_results = entrez(
+        'elink',
+        dbfrom="bioproject", 
+        id=int(bioproject_id), 
+        linkname="bioproject_sra"
+    )
 
-# Make sure that there are some links in this set of results
-assert elink_results.find("LinkSet") is not None
-assert elink_results.find("LinkSet").find("LinkSetDb") is not None
+    # Make sure that there are some links in this set of results, or move on
+    if elink_results.find("LinkSet") is None:
+        print("No SRA accessions found for %s = %s" % (accession, bioproject_id))
+        continue
+    if elink_results.find("LinkSet").find("LinkSetDb") is None:
+        print("No SRA accessions found for %s = %s" % (accession, bioproject_id))
+        continue
 
-# Parse all of the SRA records from this BioProject
-sra_id_list = [
-    child.find("Id").text
-    for child in elink_results.find("LinkSet").find("LinkSetDb")
-    if child.find("Id") is not None
-]
+    # Parse all of the SRA records from this BioProject
+    sra_id_list.extend([
+        child.find("Id").text
+        for child in elink_results.find("LinkSet").find("LinkSetDb")
+        if child.find("Id") is not None
+    ])
+
 print("Found %d SRA accessions from this BioProject" % (len(sra_id_list)))
+
+assert len(sra_id_list) > 0
 
 # Function to iteratively parse the XML record
 def parse_record(r, prefix=[]):
