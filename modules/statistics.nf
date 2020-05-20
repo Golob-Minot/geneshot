@@ -302,25 +302,25 @@ numCores = ${task.cpus}
 print("Reading in ${metadata_csv}")
 metadata <- vroom::vroom("${metadata_csv}", delim=",")
 
-print("Removing columns with read paths")
-metadata <- metadata %>% 
-    select(-R1, -R2) %>%
-    unique
-if("I1" %in% names(metadata)){
-    metadata <- metadata %>% select(-I1)
-}
-if("I2" %in% names(metadata)){
-    metadata <- metadata %>% select(-I2)
+print("Removing columns which are not in the formula")
+for(column_name in names(metadata)){
+    if(column_name == "specimen" || grepl(column_name, "${params.formula}", fixed=TRUE) ){
+        print(paste("Keeping column", column_name))
+    } else {
+        print(paste("Removing column", column_name))
+        metadata <- metadata %>% select(-column_name)
+    }
 }
 metadata <- metadata %>% unique
-    
+print("Filtered and deduplicated manifest:")
+print(metadata)
 
 print("Reading in ${readcounts_csv_gz}")
 counts <- vroom::vroom("${readcounts_csv_gz}", delim=",")
 total_counts <- counts[,c("specimen", "total")]
 print("Merging total counts with metadata")
 total_and_meta <- metadata %>% 
-  right_join(total_counts, by = c("specimen" = "specimen"))
+  left_join(total_counts, by = c("specimen" = "specimen"))
 
 
 #### Run the analysis for every individual CAG
