@@ -314,7 +314,7 @@ for(column_name in names(metadata)){
         metadata <- metadata %>% select(-column_name)
     }
 }
-metadata <- metadata %>% unique
+metadata <- metadata %>% unique %>% drop_na
 print("Filtered and deduplicated manifest:")
 print(metadata)
 
