@@ -292,7 +292,7 @@ library(parallel)
 connectionSize = 100000 * ${task.memory.toMega()}
 print("Using VROOM_CONNECTION_SIZE =")
 print(connectionSize)
-Sys.setenv("VROOM_CONNECTION_SIZE" = connectionSize)
+Sys.setenv("VROOM_CONNECTION_SIZE" = format(connectionSize, scientific=F))
 
 numCores = ${task.cpus}
 
