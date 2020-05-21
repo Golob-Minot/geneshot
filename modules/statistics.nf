@@ -321,6 +321,10 @@ print(metadata)
 print("Reading in ${readcounts_csv_gz}")
 counts <- vroom::vroom("${readcounts_csv_gz}", delim=",")
 total_counts <- counts[,c("specimen", "total")]
+
+print("Adding total counts to manifest")
+print(head(total_counts))
+
 print("Merging total counts with metadata")
 total_and_meta <- metadata %>% 
   left_join(total_counts, by = c("specimen" = "specimen"))
