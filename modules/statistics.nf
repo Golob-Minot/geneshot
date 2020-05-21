@@ -289,7 +289,10 @@ library(corncob)
 library(parallel)
 
 ## By default, use 10% of the available memory to read in data
-Sys.setenv("VROOM_CONNECTION_SIZE" = max(c(13107200, 100000 * ${task.memory.toMega()})))
+connectionSize = 100000 * ${task.memory.toMega()}
+print("Using VROOM_CONNECTION_SIZE =")
+print(connectionSize)
+Sys.setenv("VROOM_CONNECTION_SIZE" = connectionSize)
 
 numCores = ${task.cpus}
 
