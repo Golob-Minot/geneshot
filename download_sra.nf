@@ -1,5 +1,8 @@
 #!/usr/bin/env nextflow
 
+// Using DSL-2
+nextflow.preview.dsl=2
+
 // Script to download FASTQ files from SRA
 
 // Set default values for parameters
@@ -48,19 +51,73 @@ if (!params.output.endsWith("/")){
     output_folder = params.output
 }
 
+// Main workflow
+workflow {
+
+    // Get a file listing every SRA ID
+    getSRAlist(
+        params.accession
+    )
+
+    // Make a channel with every individual SRA ID
+    sra_id_ch = getSRAlist.out.splitText().map { r -> r.replaceAll(/\n/, "")}
+
+    // Get the metadata for each accession
+    getMetadata(
+        sra_id_ch
+    )
+
+    // Join together all of the metadata into a single table
+    joinMetadata(
+        getMetadata.out.toSortedList()
+    )
+
+    // Parse the accession from the metadata file names
+    sra_acc_ch = getMetadata.out.map {
+        r -> r.name.replaceAll(/.metadata.json.gz/, "")
+    }
+
+    // Fetch the SRA files for each accession
+    downloadSRA(
+        sra_acc_ch
+    )
+
+    // Extract the FASTQ files for each accession
+    extractSRA(
+        downloadSRA.out
+    )
+
+    // Make a comma-separated string with all of the files which were downloaded
+    manifestStr = extractSRA.out.reduce(
+        'specimen,R1,R2\n'
+    ){ csvStr, row ->
+        return  csvStr += "${row[0]},${output_folder}${row[1][0].name},${output_folder}${row[1][1].name}\n";
+    }
+
+    // Make a single set of readnames joined with the metadata
+    gatherReadnames(
+        manifestStr,
+        joinMetadata.out
+    )
+
+    // Publish output files
+    publish:
+        extractSRA.out to: "${output_folder}", mode: "copy", overwrite: "true"
+        gatherReadnames.out to: "${output_folder}", mode: "copy", overwrite: "true"
+
+}
+
 // Get the accession for each Run in this BioProject
-// Then, get the metadata for each SRA accession, including the name used to download the FASTQ
-process getMetadata {
+process getSRAlist {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "mem_medium"
     errorStrategy 'retry'
     
     input:
-    val accession from params.accession
+    val accession
 
     output:
-    file "${accession}.metadata.csv" into metadata_csv
-    file "accession_list.txt" into accession_list
+    file "accession_list.txt"
 
 """
 #!/usr/bin/env python3
@@ -143,6 +200,63 @@ print("Found %d SRA accessions from this BioProject" % (len(sra_id_list)))
 
 assert len(sra_id_list) > 0
 
+# Save the accession list
+with open("accession_list.txt", "wt") as fo:
+    fo.write("\\n".join(sra_id_list))
+
+"""
+}
+
+// Get the metadata for a single SRA accession
+process getMetadata {
+    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    label "mem_medium"
+    errorStrategy 'retry'
+    
+    input:
+    val sra_id
+
+    output:
+    file "*.metadata.json.gz"
+
+"""
+#!/usr/bin/env python3
+import json
+import gzip
+import requests
+from time import sleep
+import xml.etree.ElementTree as ET
+import pandas as pd
+
+print("Fetching metadata for SRA ID ${sra_id}")
+
+# Make a function to fetch data from the Entrez API
+# while retrying if any errors are encountered
+def request_url(url, max_retries=10, pause_seconds=0.5):
+    # Try the request `max_retries` times, with a `pause_seconds` pause in-between
+    assert isinstance(max_retries, int)
+    assert max_retries > 0
+    for i in range(max_retries):
+        r = requests.get(url)
+        if r.status_code == 200:
+            return r.text
+        print("Caught an error on attempt #%d, retrying" % (i + 1))
+        sleep(pause_seconds)
+
+# Format an Entrez query, execute the request, and return the result
+def entrez(mode, **kwargs):
+    assert mode in ["efetch", "esearch", "elink"]
+
+    kwargs_str = "&".join(["%s=%s" % (k, v) for k, v in kwargs.items()])
+    url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/%s.fcgi?%s"
+    url = url % (mode, kwargs_str)
+
+    # Get the text response
+    response_text = request_url(url)
+
+    # Parse the XML
+    return ET.fromstring(response_text)
+
 # Function to iteratively parse the XML record
 def parse_record(r, prefix=[]):
 
@@ -213,10 +327,55 @@ def fetch_sra_metadata(sra_id):
 
     return dat
 
+# Fetch the metadata
+dat = fetch_sra_metadata("${sra_id}")
+
+# Get the SRR accession from the ID that we used as the input
+sra_accession = dat["RUN_SET_accession"]
+
+# Write out to a file
+with gzip.open("%s.metadata.json.gz" % sra_accession, "wt") as fo:
+    fo.write(
+        json.dumps(
+            dat,
+            indent=4
+        )
+    )
+
+"""
+}
+
+// Collect the metadata from all accessions
+process joinMetadata {
+    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    label "mem_medium"
+    errorStrategy 'retry'
+    
+    input:
+    file metadata_json_list
+
+    output:
+    file "${params.accession}.metadata.csv"
+
+"""
+#!/usr/bin/env python3
+import os
+import json
+import gzip
+import pandas as pd
+
+# Parse the list of files to read in
+fp_list = []
+for fp in os.listdir("."):
+    if ".metadata.json.gz" in fp:
+        assert fp.endswith(".metadata.json.gz")
+        fp_list.append(fp)
+print("Reading in a set of %d metadata files" % len(fp_list))
+
 # Iterate over all of the SRA IDs from this BioProject
 metadata_df = pd.DataFrame([
-    fetch_sra_metadata(sra_id)
-    for sra_id in sra_id_list
+    json.load(gzip.open(fp, "rt"))
+    for fp in fp_list
 ])
 print("Found records for %d SRA accessions" % metadata_df.shape[0])
 
@@ -229,11 +388,7 @@ assert "RUN_SET_accession" in metadata_df.columns.values
 assert metadata_df["RUN_SET_accession"].isnull().sum() == 0
 
 # Save the complete metadata to a file
-metadata_df.to_csv("${accession}.metadata.csv", index=None)
-
-# Also save an accession list
-with open("accession_list.txt", "wt") as fo:
-    fo.write("\\n".join(metadata_df["RUN_SET_accession"].tolist()))
+metadata_df.to_csv("${params.accession}.metadata.csv", index=None)
 
 """
 }
@@ -245,10 +400,10 @@ process downloadSRA {
     errorStrategy 'retry'
     
     input:
-    val accession from accession_list.splitText().map { r -> r.replaceAll(/\n/, "")}
+    val accession
 
     output:
-    file("${accession}") into sra_ch
+    path "${accession}", optional: true
 
 
 """
@@ -261,10 +416,15 @@ curl -o \${ACC}.json -s -X POST "https://www.ncbi.nlm.nih.gov/Traces/sdl/1/retri
 sra_url="\$(cat \${ACC}.json | jq '.[0] | .files | .[0] | .link' | tr -d '"')"
 echo "Download URL is \$sra_url"
 
-echo "Downloading"
-wget -O \${ACC} \${sra_url}
+if [[ \$sra_url == null ]]; then
+    cat \${ACC}.json
+    echo "Stopping"
+else
+    echo "Downloading"
+    wget -O \${ACC} \${sra_url}
 
-echo "Done"
+    echo "Done"
+fi
 """
 
 }
@@ -274,13 +434,12 @@ process extractSRA {
     container "quay.io/fhcrc-microbiome/get_sra@sha256:16b7988e435da5d21bb1fbd7c83e97db769f1c95c9d32823fde49c729a64774a"
     label "io_limited"
     errorStrategy 'retry'
-    publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
-    file accession from sra_ch
+    file accession
 
     output:
-    tuple val("${accession.name}"), file("*fastq.gz") into reads_ch
+    tuple val("${accession.name}"), file("*fastq.gz")
 
 
     """
@@ -301,19 +460,11 @@ process extractSRA {
 
 }
 
-// Make a comma-separated string with all of the files which were downloaded
-manifestStr = reads_ch.reduce(
-    'specimen,R1,R2\n'
-){ csvStr, row ->
-    return  csvStr += "${row[0]},${output_folder}${row[1][0].name},${output_folder}${row[1][1].name}\n";
-}
-
 
 process gatherReadnames {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_limited"
     errorStrategy 'retry'
-    publishDir "${output_folder}", mode: "copy", overwrite: "true"
 
     input:
         val manifestStr
