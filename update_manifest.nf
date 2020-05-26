@@ -96,8 +96,8 @@ with pd.HDFStore(new_file_name, "a") as store:
     new_specimen_set = set(new_manifest["specimen"].tolist())
 
     for s, msg in [
-        (old_specimen_set - new_specimen_list, "Specimens missing from old specimen list"),
-        (new_specimen_set - old_specimen_list, "Specimens missing from new specimen list"),
+        (old_specimen_set - new_specimen_set, "Specimens missing from old specimen list"),
+        (new_specimen_set - old_specimen_set, "Specimens missing from new specimen list"),
     ]:
         assert len(s) == 0, "%s: %s" % (msg, ", ".join(list(s)))
 
