@@ -878,7 +878,11 @@ gene_annot = gene_annot.assign(
 with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write eggnog results to HDF5
-    eggnog_df.reset_index().to_hdf(store, "/annot/gene/eggnog")
+    eggnog_df.reset_index().to_hdf(
+        store,
+        "/annot/gene/eggnog",
+        dtype=str,
+    )
     
     # Write summary annotation table to HDF5
     gene_annot.to_hdf(
