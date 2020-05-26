@@ -114,7 +114,7 @@ workflow {
     // Update the manifest
     replaceManifest(
         file(params.input_hdf),
-        file(params.manifest_csv)
+        file(params.manifest)
     )
 
     // Repack the HDF
