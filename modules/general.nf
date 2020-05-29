@@ -872,6 +872,8 @@ gene_annot = gene_annot.assign(
     eggNOG_tax = eggnog_df["best_tax_level"]
 ).assign(
     eggNOG_desc = eggnog_df["eggNOG free text desc."]
+).sort_values(
+    by="CAG"
 ).reset_index()
 
 # Open a connection to the HDF5
@@ -881,6 +883,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
     eggnog_df.reset_index().to_hdf(
         store,
         "/annot/gene/eggnog",
+        format = "table",
         dtype=str,
     )
     
@@ -889,7 +892,8 @@ with pd.HDFStore("${results_hdf}", "a") as store:
         store, 
         "/annot/gene/all",
         format = "table",
-        data_columns = ["gene", "CAG"]
+        data_columns = ["CAG"],
+        dtype=str,
     )
 
 """
