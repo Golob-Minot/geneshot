@@ -78,6 +78,11 @@ new_manifest = pd.read_csv("${manifest_csv}", sep=",")
 for k in ["specimen", "R1", "R2"]:
     assert k in new_manifest.columns.values, "New manifest must contain a %s column" % k
 
+# Remove the read path columns, if present
+for k in ["R1", "R2", "I1", "I2"]:
+    if k in new_manifest.columns.values:
+        new_manifest = new_manifest.drop(columns=k)
+
 # Assign the new name for the output file
 new_file_name = "${params.output_prefix}.results.hdf5"
 
