@@ -1143,7 +1143,7 @@ process repackHDF {
     tag "Compress HDF store"
     label "mem_veryhigh"
     errorStrategy "retry"
-    publishDir "${output_folder}", mode: "copy", overwrite: true
+    publishDir "${params.output_folder}", mode: "copy", overwrite: true
     
     input:
     file output_hdf5
