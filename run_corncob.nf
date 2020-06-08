@@ -13,6 +13,7 @@ nextflow.preview.dsl=2
 
 // Parameters
 params.input_hdf = false
+params.input_folder = false
 params.output_folder = false
 params.output_prefix = false
 params.formula = false
@@ -35,7 +36,7 @@ def helpMessage() {
     
     Options:
       --input_hdf           Geneshot results HDF5 file to be used for analysis
-      --input_csv           Geneshot results file ("abund/CAG.readcounts.csv.gz") to be used for analysis
+      --input_folder        Folder containing geneshot output to be used for analysis (must contain the subfolder "abund/")
       --output_folder       Folder to place output tile
       --output_prefix       Text used as a prefix for summary HDF5 output files (the .corncob.hdf5 suffix will be attached)
       -w                    Working directory. Defaults to `./work`
@@ -48,7 +49,7 @@ def helpMessage() {
 }
 
 // Show help message if the user specifies the --help flag at runtime
-if (params.help || params.input_hdf == false || params.input_csv == false || params.output_folder == false || params.output_prefix == false || params.formula == false){
+if (params.help || params.input_hdf == false || params.input_folder == false || params.output_folder == false || params.output_prefix == false || params.formula == false){
     // Invoke the function above which prints the help message
     helpMessage()
     // Exit out and do not run anything else
@@ -60,6 +61,13 @@ include runCorncob from './modules/statistics' params(
     formula: params.formula
 )
 
+// Import the process used to aggregate readcounts across all samples
+// This process is only run if `abund/CAG.readcounts.csv.gz` can not be found yet
+// After the process completes, a new `abund/CAG.readcounts.csv.gz` will be added to that input folder
+include extractCounts from './modules/statistics' params(
+    output_folder: params.input_folder
+)
+
 // Import the process used to add corncob results to the output
 include repackHDF from './modules/general'
 include addCorncobResults from './modules/general' params(
@@ -68,7 +76,8 @@ include addCorncobResults from './modules/general' params(
 
 // Process to update the formula listed in the summary table
 // Also extract the manifest to reduce the number of times
-// the file is opened
+// the file is opened, as well as the table listing the genes
+// which make up each CAG.
 process updateFormula{
     container "${container__pandas}"
     label 'mem_medium'
@@ -80,6 +89,7 @@ process updateFormula{
     output:
         path "*corncob.hdf5"
         path "manifest.csv"
+        path "CAG.assignments.csv.gz"
 
 """
 #!/usr/bin/env python3
@@ -130,7 +140,19 @@ with pd.HDFStore(new_file_name, "a") as store:
     df.to_hdf(store, "/summary/experiment")
 
     # Extract the manifest
+    print("Extracting the manifest")
     pd.read_hdf(store, "/manifest").to_csv("manifest.csv")
+
+    # Extract the table of genes making up each CAG
+    print("Extracting the gene~CAG table")
+    pd.read_hdf(
+        store, 
+        "/annot/gene/all",
+        columns=["gene", "CAG"]
+    ).to_csv(
+        "CAG.assignments.csv.gz",
+        index=None
+    )
 
 print("Done")
 """
@@ -145,9 +167,25 @@ workflow {
         file(params.input_hdf)
     )
 
+    // Check to see if `abund/CAG.readcounts.csv.gz` is present in the input folder
+    // For context, this file is only created by geneshot for runs which originally
+    // included a `--formula`. 
+    // If this file cannot be found, then we will run a process to create that file
+    // and also to publish that file back to the input folder.
+    abund_folder = "${params.input_folder.replaceAll(/\/$/, "")}/abund"
+    if(file("${abund_folder}/CAG.readcounts.csv.gz").isEmpty()){
+        extractCounts(
+            Channel.fromPath("${abund_folder}/details/*json.gz"),
+            updateFormula.out[2]
+        )
+        input_csv = extractCounts.out
+    } else {
+        input_csv = file("${abund_folder}/CAG.readcounts.csv.gz")
+    }
+
     // Now run corncob on the extracted manifest, as well as the gene counts table
     runCorncob(
-        file(params.input_csv),
+        input_csv,
         updateFormula.out[1]
     )
 
