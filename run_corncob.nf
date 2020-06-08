@@ -110,6 +110,8 @@ formula_name = "${params.formula}".replace(
 ).replace(
     "+", "_"
 ).replace(
+    ",", "_"
+).replace(
     "*", "_"
 ).replace(
     ":", "_"
