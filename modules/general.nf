@@ -1166,7 +1166,7 @@ h5repack -f GZIP=5 ${output_hdf5} TEMP && mv TEMP ${output_hdf5}
 process publish {
     container "ubuntu:20.04"
     label "io_limited"
-    publishDir "${output_folder}", mode: "copy", overwrite: true
+    publishDir "${params.output_folder}", mode: "copy", overwrite: true
 
     input:
     file input_fp
