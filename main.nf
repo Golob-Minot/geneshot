@@ -280,8 +280,13 @@ workflow {
     // will be to ensure that the formula is written correctly, and is
     // compatible with the data provided in the manifest
     if ( params.formula ) {
+        // Set up a channel with the strings of the formula(s) provided
+        formula_ch = Channel.fromList(
+            params.formula.split(",")
+        )
         validation_wf(
-            file(params.manifest)
+            file(params.manifest),
+            formula_ch
         )
         manifest_file = validation_wf.out
     } else {
@@ -396,7 +401,8 @@ workflow {
         corncob_wf(
             alignment_wf.out.famli_json_list,
             alignment_wf.out.cag_csv,
-            file(params.manifest)
+            file(params.manifest),
+            formula_ch
         )
         corncob_results = corncob_wf.out
     } else {

@@ -4,7 +4,9 @@
 // This is intended to catch the case early on where the provided formula
 // is not formatted correctly, or does not match the manifest (sample sheet)
 workflow validation_wf {
-    take: manifest_csv
+    take: 
+        manifest_csv
+        formula_ch
     main: 
 
     mockData(
@@ -13,11 +15,16 @@ workflow validation_wf {
 
     runCorncob(
         mockData.out,
-        manifest_csv
+        manifest_csv,
+        formula_ch
+    )
+
+    joinCorncob(
+        runCorncob.out.toSortedList()
     )
 
     validateFormula(
-        runCorncob.out,
+        joinCorncob.out,
         manifest_csv
     )
 
@@ -32,6 +39,7 @@ workflow corncob_wf {
     famli_json_list
     cag_csv
     manifest_csv
+    formula_ch
 
     main:
 
@@ -42,11 +50,16 @@ workflow corncob_wf {
 
     runCorncob(
         extractCounts.out,
-        manifest_csv
+        manifest_csv,
+        formula_ch
+    )
+
+    joinCorncob(
+        runCorncob.out.toSortedList()
     )
 
     emit:
-    runCorncob.out
+    joinCorncob.out
 }
 
 process mockData {
@@ -274,6 +287,7 @@ process runCorncob {
     input:
     file readcounts_csv_gz
     file metadata_csv
+    val formula
 
     output:
     file "corncob.results.csv"
@@ -307,7 +321,7 @@ metadata <- vroom::vroom("${metadata_csv}", delim=",")
 
 print("Removing columns which are not in the formula")
 for(column_name in names(metadata)){
-    if(column_name == "specimen" || grepl(column_name, "${params.formula}", fixed=TRUE) ){
+    if(column_name == "specimen" || grepl(column_name, "${formula}", fixed=TRUE) ){
         print(paste("Keeping column", column_name))
     } else {
         print(paste("Removing column", column_name))
@@ -343,7 +357,7 @@ corn_tib <- do.call(rbind, mclapply(
                 by = c("specimen" = "specimen")
             ) %>%
             corncob::bbdml(
-                formula = cbind(W, total - W) ~ ${params.formula},
+                formula = cbind(W, total - W) ~ ${formula},
                 phi.formula = ~ 1,
                 data = .
             )
@@ -379,8 +393,16 @@ corn_tib <- do.call(rbind, mclapply(
     mc.cores = numCores
   ))
 
+print(head(corn_tib))
+
+print("Adding a column with the formula used here")
+corn_tib <- corn_tib %>% add_column(formula = "${formula}")
+
+print(head(corn_tib))
+
 print(sprintf("Writing out %s rows to corncob.results.csv", nrow(corn_tib)))
 write_csv(corn_tib, "corncob.results.csv")
+print("Done")
     """
 
 }
@@ -485,6 +507,46 @@ output = pd.DataFrame(dict([
 
 output.to_csv("${params.output_prefix}.breakaway.csv.gz", index=None)
 
+"""
+
+}
+
+// Join together a set of corncob results CSVs
+process joinCorncob {
+    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+    label "io_limited"
+    errorStrategy "retry"
+    
+    input:
+    file "corncob.results.*.csv"
+
+    output:
+    file "corncob.results.csv"
+
+
+"""
+#!/usr/bin/env python3
+
+import os
+import pandas as pd
+
+# Get the list of files to join
+fp_list = [
+    fp
+    for fp in os.listdir(".")
+    if fp.startswith("corncob.results.") and fp.endswith(".csv")
+]
+
+print("Reading in corncob results for %d formula(s)" % len(fp_list))
+
+df = pd.concat([
+    pd.read_csv(fp)
+    for fp in fp_list
+])
+
+print("Writing out to corncob.results.csv")
+df.to_csv("corncob.results.csv", index=None)
+print("Done")
 """
 
 }
