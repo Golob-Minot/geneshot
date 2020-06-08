@@ -61,6 +61,11 @@ include runCorncob from './modules/statistics' params(
     formula: params.formula
 )
 
+// Import the process used to join the results for multiple formulae
+include joinCorncob from './modules/statistics' params(
+    output_folder: params.output_folder
+)
+
 // Import the process used to aggregate readcounts across all samples
 // This process is only run if `abund/CAG.readcounts.csv.gz` can not be found yet
 // After the process completes, a new `abund/CAG.readcounts.csv.gz` will be added to that input folder
@@ -185,10 +190,20 @@ workflow {
         input_csv = file("${abund_folder}/CAG.readcounts.csv.gz")
     }
 
+    // Set up a channel with the strings of the formula(s) provided
+    formula_ch = Channel.of(
+        params.formula.split(",")
+    )
+
     // Now run corncob on the extracted manifest, as well as the gene counts table
     runCorncob(
         input_csv,
-        updateFormula.out[1]
+        updateFormula.out[1],
+        formula_ch
+    )
+
+    joinCorncob(
+        runCorncob.out.toSortedList()
     )
 
     // Add those results to the output file
