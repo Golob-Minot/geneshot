@@ -170,6 +170,12 @@ print("Done")
 
 workflow {
 
+    // Make sure we can find the input file
+    if(file(params.input_hdf).isEmpty()){
+        log.info"""Cannot find input file ${params.input_hdf}""".stripIndent()
+        exit 0
+    }
+
     // First update the formula listed in the geneshot results file,
     // a process which will also extract the manifest CSV
     updateFormula(
