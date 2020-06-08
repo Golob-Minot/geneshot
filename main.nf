@@ -285,7 +285,7 @@ workflow {
     // compatible with the data provided in the manifest
     if ( params.formula ) {
         // Set up a channel with the strings of the formula(s) provided
-        formula_ch = Channel.fromList(
+        formula_ch = Channel.of(
             params.formula.split(",")
         )
         validation_wf(
