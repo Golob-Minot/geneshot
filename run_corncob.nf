@@ -69,7 +69,9 @@ include extractCounts from './modules/statistics' params(
 )
 
 // Import the process used to add corncob results to the output
-include repackHDF from './modules/general'
+include repackHDF from './modules/general' params(
+    output_folder: params.output_folder
+)
 include addCorncobResults from './modules/general' params(
     fdr_method: params.fdr_method
 )
@@ -199,9 +201,5 @@ workflow {
     repackHDF(
         addCorncobResults.out
     )
-
-    // Publish output files
-    publish:
-        repackHDF.out to: "${params.output_folder}", mode: "copy", overwrite: true
 
 }

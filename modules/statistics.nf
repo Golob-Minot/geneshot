@@ -516,6 +516,7 @@ process joinCorncob {
     container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
     label "io_limited"
     errorStrategy "retry"
+    publishDir "${output_folder}/stats/", mode: "copy"
     
     input:
     file "corncob.results.*.csv"

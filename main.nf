@@ -270,6 +270,10 @@ include metaphlan2_fastq from './modules/composition' params(
 // include join_metaphlan2 from './modules/composition'
 include addMetaPhlAn2Results from './modules/general'
 
+// Process to publish specific output files
+include publish as publishGeneAbundances from '.modules/general' params(
+    output_folder: "${output_folder}/abund/"
+)
 
 workflow {
     main:
@@ -382,6 +386,10 @@ workflow {
         gene_fasta,
         combineReads.out,
         params.output_prefix
+    )
+    // Publish the gene abundance feather file
+    publishGeneAbundances(
+        alignment_wf.out.gene_abund_feather
     )
 
     // ########################
@@ -507,12 +515,5 @@ workflow {
     repackDetailedHDF(
         detailedHDF
     )
-
-    publish:
-        corncob_results to: "${output_folder}/stats/", enabled: params.formula, mode: "copy"
-        repackFullHDF.out to: "${output_folder}", mode: "copy", overwrite: true
-        repackDetailedHDF.out to: "${output_folder}", mode: "copy", overwrite: true
-        alignment_wf.out.gene_abund_feather to: "${output_folder}/abund/", mode: "copy", overwrite: true
-
 
 }

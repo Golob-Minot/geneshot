@@ -1143,6 +1143,7 @@ process repackHDF {
     tag "Compress HDF store"
     label "mem_veryhigh"
     errorStrategy "retry"
+    publishDir "${output_folder}", mode: "copy", overwrite: true
     
     input:
     file output_hdf5
@@ -1160,3 +1161,23 @@ set -e
 h5repack -f GZIP=5 ${output_hdf5} TEMP && mv TEMP ${output_hdf5}
     """
 }
+
+// Publish an output file
+process publish {
+    container "ubuntu:20.04"
+    label "io_limited"
+    publishDir "${output_folder}", mode: "copy", overwrite: true
+
+    input:
+    file input_fp
+
+    output:
+    file "${input_fp}"
+
+    """#!/bin/bash
+set -e
+echo "Publishing ${input_fp}"
+    """
+
+}
+

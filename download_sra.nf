@@ -100,11 +100,6 @@ workflow {
         joinMetadata.out
     )
 
-    // Publish output files
-    publish:
-        extractSRA.out to: "${output_folder}", mode: "copy", overwrite: "true"
-        gatherReadnames.out to: "${output_folder}", mode: "copy", overwrite: "true"
-
 }
 
 // Get the accession for each Run in this BioProject
@@ -434,6 +429,7 @@ process extractSRA {
     container "quay.io/fhcrc-microbiome/get_sra@sha256:16b7988e435da5d21bb1fbd7c83e97db769f1c95c9d32823fde49c729a64774a"
     label "io_limited"
     errorStrategy 'retry'
+    publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
     file accession
@@ -465,6 +461,7 @@ process gatherReadnames {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_limited"
     errorStrategy 'retry'
+    publishDir "${output_folder}", mode: "copy", overwrite: "true"
 
     input:
         val manifestStr
