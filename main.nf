@@ -204,10 +204,10 @@ include addCorncobResults from './modules/general' params(
 )
 include addTaxResults from './modules/general'
 include repackHDF as repackFullHDF from './modules/general' params(
-    output_folder: params.output_folder
+    output_folder: output_folder
 )
 include repackHDF as repackDetailedHDF from './modules/general' params(
-    output_folder: params.output_folder
+    output_folder: output_folder
 )
 
 // Import the workflows used for assembly
