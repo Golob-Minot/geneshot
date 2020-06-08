@@ -203,8 +203,12 @@ include addCorncobResults from './modules/general' params(
     fdr_method: params.fdr_method
 )
 include addTaxResults from './modules/general'
-include repackHDF as repackFullHDF from './modules/general'
-include repackHDF as repackDetailedHDF from './modules/general'
+include repackHDF as repackFullHDF from './modules/general' params(
+    output_folder: params.output_folder
+)
+include repackHDF as repackDetailedHDF from './modules/general' params(
+    output_folder: params.output_folder
+)
 
 // Import the workflows used for assembly
 include assembly_wf from './modules/assembly' params(
