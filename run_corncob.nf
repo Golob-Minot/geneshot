@@ -190,7 +190,9 @@ workflow {
     abund_folder = "${params.input_folder.replaceAll(/\/$/, "")}/abund"
     if(file("${abund_folder}/CAG.readcounts.csv.gz").isEmpty()){
         extractCounts(
-            Channel.fromPath("${abund_folder}/details/*json.gz"),
+            Channel.fromPath(
+                "${abund_folder}/details/*json.gz"
+            ).toSortedList(),
             updateFormula.out[2]
         )
         input_csv = extractCounts.out
