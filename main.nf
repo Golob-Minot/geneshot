@@ -271,7 +271,7 @@ include metaphlan2_fastq from './modules/composition' params(
 include addMetaPhlAn2Results from './modules/general'
 
 // Process to publish specific output files
-include publish as publishGeneAbundances from '.modules/general' params(
+include publish as publishGeneAbundances from './modules/general' params(
     output_folder: "${output_folder}/abund/"
 )
 
