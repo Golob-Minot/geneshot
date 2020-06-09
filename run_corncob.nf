@@ -219,7 +219,7 @@ workflow {
     // Add those results to the output file
     addCorncobResults(
         updateFormula.out[0],
-        runCorncob.out
+        joinCorncob.out
     )
 
     // Repack the HDF
