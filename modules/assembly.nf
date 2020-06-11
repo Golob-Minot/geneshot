@@ -633,8 +633,10 @@ process alignAlleles {
 
     # Check to see if there are any reads
     if (( \$( gunzip -c ${alleles_fasta} | wc -l ) <= 1 )); then
+    
         echo "No alleles found in ${alleles_fasta}, skipping"
-    else;
+    
+    else
 
         # Make the output filepath
         fo="${specimen}.gene_alignments.tsv.gz"
