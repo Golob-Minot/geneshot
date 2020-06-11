@@ -624,30 +624,37 @@ process alignAlleles {
     file refdb
     
     output:
-    tuple val(specimen), file("${specimen}.gene_alignments.tsv.gz")
+    tuple val(specimen), file("${specimen}.gene_alignments.tsv.gz") optional true
 
     """
     set -e
 
     echo "Aligning ${alleles_fasta}"
 
-    # Make the output filepath
-    fo="${specimen}.gene_alignments.tsv.gz"
-    echo "Writing out to \$fo"
+    # Check to see if there are any reads
+    if (( \$( gunzip -c ${alleles_fasta} | wc -l ) <= 1 )); then
+        echo "No alleles found in ${alleles_fasta}, skipping"
+    else;
 
-    diamond \
-      blastp \
-      --query ${alleles_fasta} \
-      --out \$fo \
-      --threads ${task.cpus} \
-      --db ${refdb} \
-      --outfmt 6 qseqid sseqid pident length qlen slen \
-      --query-cover ${params.min_coverage} \
-      --id ${params.min_identity} \
-      --top 0 \
-      --block-size ${task.memory.toMega() / (1024 * 6)} \
-      --compress 1 \
-      --unal 0
+        # Make the output filepath
+        fo="${specimen}.gene_alignments.tsv.gz"
+        echo "Writing out to \$fo"
+
+        diamond \
+        blastp \
+        --query ${alleles_fasta} \
+        --out \$fo \
+        --threads ${task.cpus} \
+        --db ${refdb} \
+        --outfmt 6 qseqid sseqid pident length qlen slen \
+        --query-cover ${params.min_coverage} \
+        --id ${params.min_identity} \
+        --top 0 \
+        --block-size ${task.memory.toMega() / (1024 * 6)} \
+        --compress 1 \
+        --unal 0
+
+    fi
     """
 
 }
