@@ -467,16 +467,6 @@ workflow {
         resultsHDF = addMetaPhlAn2Results.out
     }
 
-    // If we performed statistical analysis, add the results to the HDF5
-    if ( params.formula ) {
-        addCorncobResults(
-            resultsHDF,
-            corncob_wf.out
-        )
-
-        resultsHDF = addCorncobResults.out
-    }
-
     // If we performed functional analysis with eggNOG, add the results to the HDF5
     if ( params.noannot == false ) {
         if ( params.eggnog_db && params.eggnog_dmnd ) {
@@ -508,6 +498,16 @@ workflow {
                 resultsHDF = addTaxResults.out
             }
         }
+    }
+
+    // If we performed statistical analysis, add the results to the HDF5
+    if ( params.formula ) {
+        addCorncobResults(
+            resultsHDF,
+            corncob_wf.out
+        )
+
+        resultsHDF = addCorncobResults.out
     }
 
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
