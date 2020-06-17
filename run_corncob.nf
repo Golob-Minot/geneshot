@@ -244,7 +244,7 @@ workflow {
 
     // Repack the HDF
     repackHDF(
-        finalHDF
+        resultsHDF
     )
 
 }
