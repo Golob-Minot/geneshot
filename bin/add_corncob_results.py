@@ -146,6 +146,7 @@ def calc_enrichment(corncob_wide, gene_annot, col_name):
             col_name
         )
         for parameter_name, corncob_parameter_df in corncob_wide.groupby("parameter")
+        if parameter_name != "(Intercept)"
     ])
 
     # Add the FDR corrected p-values
@@ -166,6 +167,9 @@ def calc_enrichment_parameter(parameter_name, cag_pvalues, gene_annot, col_name)
     assert col_name in gene_annot.columns.values, \
         "{} not a valid column name".format(col_name)
 
+    assert gene_annot[col_name].dropna().shape[0] > 0, \
+        "All annotations are null for {}".format(col_name)
+
     # Subset to those genes belonging to CAGs which also have a p-value of any sort
     gene_annot_parameter = gene_annot.loc[
         gene_annot["CAG"].isin(cag_pvalues.index.values)
@@ -182,6 +186,9 @@ def calc_enrichment_parameter(parameter_name, cag_pvalues, gene_annot, col_name)
 
     # Keep track of all of the results
     results = []
+
+    print("Top {} annotations:".format(col_name))
+    print(gene_annot[col_name].value_counts().head())
 
     # For each annotation, pick which CAGs have it and which don't
     for annotation_label, annotated_genes in gene_annot.groupby(col_name):
