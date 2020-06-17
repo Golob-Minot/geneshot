@@ -134,7 +134,7 @@ def calc_enrichment(corncob_wide, gene_annot, col_name):
     """Function to calculate the enrichment of each label with each parameter from the geneshot output."""
 
     # Calculate the enrichment for each parameter individually
-    results = pd.concat([
+    results = [
         calc_enrichment_parameter(
             parameter_name, 
             corncob_parameter_df.set_index(
@@ -147,15 +147,24 @@ def calc_enrichment(corncob_wide, gene_annot, col_name):
         )
         for parameter_name, corncob_parameter_df in corncob_wide.groupby("parameter")
         if parameter_name != "(Intercept)"
-    ])
+    ]
+
+    # Remove any comparisons which returned None
+    results = [r for r in results if r is not None]
+
+    if len(results) > 0:
+        results = pd.concat(results)
 
     # Add the FDR corrected p-values
-    if "pvalue" in results.columns.values:
         results = results.assign(
             qvalue=multipletests(results["pvalue"], 0.2, "fdr_bh")[1]
         )
 
-    return results
+        return results
+
+    else:
+
+        return
 
 
 def calc_enrichment_parameter(parameter_name, cag_pvalues, gene_annot, col_name):
