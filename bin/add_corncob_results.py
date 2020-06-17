@@ -150,9 +150,10 @@ def calc_enrichment(corncob_wide, gene_annot, col_name):
     ])
 
     # Add the FDR corrected p-values
-    results = results.assign(
-        qvalue=multipletests(results["pvalue"], 0.2, "fdr_bh")[1]
-    )
+    if "pvalue" in results.columns.values:
+        results = results.assign(
+            qvalue=multipletests(results["pvalue"], 0.2, "fdr_bh")[1]
+        )
 
     return results
 
@@ -167,8 +168,9 @@ def calc_enrichment_parameter(parameter_name, cag_pvalues, gene_annot, col_name)
     assert col_name in gene_annot.columns.values, \
         "{} not a valid column name".format(col_name)
 
-    assert gene_annot[col_name].dropna().shape[0] > 0, \
-        "All annotations are null for {}".format(col_name)
+    if gene_annot[col_name].dropna().shape[0] == 0:
+        print("All annotations are null for {}".format(col_name))
+        return
 
     # Subset to those genes belonging to CAGs which also have a p-value of any sort
     gene_annot_parameter = gene_annot.loc[
@@ -178,7 +180,8 @@ def calc_enrichment_parameter(parameter_name, cag_pvalues, gene_annot, col_name)
         gene_annot_parameter.shape[0], gene_annot_parameter["CAG"].unique().shape[0], parameter_name
     ))
 
-    assert gene_annot_parameter.shape[0] > 0
+    if gene_annot_parameter.shape[0] == 0:
+        return
 
     # Treat the CAGs separately which have positive and negative estimated coefficients
     pos_coef_pvalues = cag_pvalues.query("estimate > 0")["p_value"]
