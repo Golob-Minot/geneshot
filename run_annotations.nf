@@ -96,7 +96,7 @@ process renameHDF{
     label 'io_limited'
 
     input:
-        path results_hdf
+        path "INPUT.RESULTS.HDF"
         val new_file_name
 
     output:
@@ -104,7 +104,7 @@ process renameHDF{
 
 """#!/bin/bash
 
-mv ${results_hdf} ${new_file_name}
+mv INPUT.RESULTS.HDF ${new_file_name}
 """
 }
 
