@@ -46,9 +46,9 @@ def helpMessage() {
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
       --eggnog_dmnd         One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
+                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
+                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog.db)
     
     """.stripIndent()
 }

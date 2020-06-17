@@ -111,9 +111,9 @@ def helpMessage() {
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
       --eggnog_dmnd         One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
+                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
+                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog.db)
     
     For Alignment:
       --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
@@ -261,6 +261,8 @@ include corncob_wf from './modules/statistics' params(
     output_folder: output_folder,
     formula: params.formula
 )
+include runBetta from './modules/statistics'
+include addBetta from './modules/statistics'
 include breakaway from './modules/statistics'
 include collectBreakaway from './modules/statistics' params(
     output_folder: output_folder,
@@ -507,7 +509,21 @@ workflow {
             corncob_wf.out
         )
 
-        resultsHDF = addCorncobResults.out
+        if (addCorncobResults.out[1].isEmpty()) {
+            resultsHDF = addCorncobResults.out[0]
+        } else {
+            runBetta(
+                addCorncobResults.out[1]
+            )
+
+            addBetta(
+                runBetta.out.toSortedList(),
+                addCorncobResults.out[0]
+            )
+
+            resultsHDF = addBetta.out[0]
+
+        }
     }
 
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression

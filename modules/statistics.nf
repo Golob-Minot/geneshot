@@ -551,3 +551,134 @@ print("Done")
 """
 
 }
+
+
+// Run meta-analysis on corncob results grouped by annotation label
+// Each input will have the results from a single type of annotation:
+// species, genus, family, or eggNOG_desc
+// The column `label` gives the label, and there is a row for every 
+// CAG which has at least one gene with that label
+// Other columns include CAG, parameter, estimate, and std_error
+process runBetta {
+    container "quay.io/fhcrc-microbiome/breakaway:latest"
+    label "mem_medium"
+    errorStrategy "retry"
+    
+    input:
+    path labelled_corncob_csv
+
+    output:
+    file "${labelled_corncob_csv}.betta.csv.gz"
+
+
+"""
+#!/usr/bin/env Rscript
+library(tidyverse)
+library(magrittr)
+library(reshape2)
+library(breakaway)
+
+# Read in all of the data for a single covariate
+print("Reading in $labelled_corncob_csv")
+df <- read_csv("$labelled_corncob_csv")
+df <- as.tibble(df)
+
+print(head(df))
+
+# Make a function which will trim off the trailing digit
+options(scipen=999)
+num_decimal_places <- function(v){nchar(strsplit(as.character(v), "\\\\.")[[1]][2])}
+trim_trailing <- function(v){round(v, num_decimal_places(v) - 1)}
+
+# Make a function to run betta while tolerating faults
+fault_tolerant_betta <- function(df, f){
+    chats <- df\$estimate
+    ses <- df\$std_error
+    r <- NULL
+    for(ix in c(1:10)){
+        r <- tryCatch({
+            breakaway::betta(chats=chats, ses=ses)\$table
+            },
+            error=function(cond) {
+                print("We have encountered an error:")
+                print(cond)
+                print("The input data which caused the error was:")
+                print(chats)
+                print(ses)
+                return(NULL)
+            })
+        if(!is.null(r)){
+            return(r)
+        } else {
+            print("Trimming down the input data")
+            chats <- trim_trailing(chats)
+            ses <- trim_trailing(ses)
+            print(chats)
+            print(ses)
+        }
+    }
+}
+
+# Perform meta-analysis combining the results for each label, and each parameter
+results <- df %>% group_by(label) %>% group_by(parameter) %>% fault_tolerant_betta
+
+# Write out to a CSV
+write.table(results, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
+
+"""
+
+}
+
+
+process addBetta{
+    tag "Add meta-analysis to HDF"
+    container "${container__pandas}"
+    label 'mem_medium'
+    errorStrategy 'retry'
+
+    input:
+        path betta_csv_list
+        path results_hdf
+
+    output:
+        path "${results_hdf}"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Open a connection to the HDF5
+with pd.HDFStore("${results_hdf}", "a") as store:
+
+    # Iterate over each input file
+    for fp in "${betta_csv_list}".split(" "):
+
+        # Each input file should be named corncob.by.{annotation_type}.csv.gz.betta.csv.gz
+
+        # Make sure that the file has the expected prefix and suffix
+        assert fp.endswith(".csv.gz.betta.csv.gz"), fp
+        assert fp.startswith("corncob.by."), fp
+
+        # Get the annotation label from the file name
+        annotation_name = fp.replace(
+            "corncob.by.", ""
+        ).replace(
+            ".csv.gz.betta.csv.gz", ""
+        )
+
+        # Read in from the flat file
+        betta_df = pd.read_csv(fp)
+
+        # Write to HDF5
+        key = "/stats/betta/%s" % annotation_name
+        print("Writing to %s" % key)
+        betta_df.to_hdf(store, key)
+
+    print("Closing store")
+
+print("Done")
+
+"""
+
+}

@@ -130,134 +130,21 @@ def annotate_taxa(gene_annot, hdf_fp, rank_list=["family", "genus", "species"]):
     return gene_annot
 
 
-def calc_enrichment(corncob_wide, gene_annot, col_name):
-    """Function to calculate the enrichment of each label with each parameter from the geneshot output."""
+def write_corncob_by_annot(corncob_wide, gene_annot, col_name, fp_out):
+    
+    assert col_name in gene_annot.columns.values
 
-    # Calculate the enrichment for each parameter individually
-    results = [
-        calc_enrichment_parameter(
-            parameter_name, 
-            corncob_parameter_df.set_index(
-                "CAG"
-            ).reindex(
-                columns=["p_value", "estimate"]
-            ),
-            gene_annot, 
-            col_name
+    pd.concat([
+        corncob_wide.loc[
+            corncob_wide["CAG"].isin(genes_with_label["CAG"].unique())
+        ].assign(
+            label = label
         )
-        for parameter_name, corncob_parameter_df in corncob_wide.groupby("parameter")
-        if parameter_name != "(Intercept)"
-    ]
-
-    # Remove any comparisons which returned None
-    results = [r for r in results if r is not None]
-
-    if len(results) > 0:
-        results = pd.concat(results)
-
-    # Add the FDR corrected p-values
-        results = results.assign(
-            qvalue=multipletests(results["pvalue"], 0.2, "fdr_bh")[1]
-        )
-
-        return results
-
-    else:
-
-        return
-
-
-def calc_enrichment_parameter(parameter_name, cag_pvalues, gene_annot, col_name):
-
-    print("Calculating enrichment for parameter {} by {}".format(
-        parameter_name, col_name
-    ))
-
-    # Make sure that we have access to the indicated annotations
-    assert col_name in gene_annot.columns.values, \
-        "{} not a valid column name".format(col_name)
-
-    if gene_annot[col_name].dropna().shape[0] == 0:
-        print("All annotations are null for {}".format(col_name))
-        return
-
-    # Subset to those genes belonging to CAGs which also have a p-value of any sort
-    gene_annot_parameter = gene_annot.loc[
-        gene_annot["CAG"].isin(cag_pvalues.index.values)
-    ]
-    print("There are {:,} genes from {:,} CAGs with p-values for {}".format(
-        gene_annot_parameter.shape[0], gene_annot_parameter["CAG"].unique().shape[0], parameter_name
-    ))
-
-    if gene_annot_parameter.shape[0] == 0:
-        return
-
-    # Treat the CAGs separately which have positive and negative estimated coefficients
-    pos_coef_pvalues = cag_pvalues.query("estimate > 0")["p_value"]
-    neg_coef_pvalues = cag_pvalues.query("estimate < 0")["p_value"]
-
-    # Keep track of all of the results
-    results = []
-
-    print("Top {} annotations:".format(col_name))
-    print(gene_annot[col_name].value_counts().head())
-
-    # For each annotation, pick which CAGs have it and which don't
-    for annotation_label, annotated_genes in gene_annot.groupby(col_name):
-        # If there is just a single CAG with this annotation, skip it
-        if annotated_genes["CAG"].unique().shape[0] == 1:
-            print("There is only a single CAG with an annotation for {}, skipping".format(
-                annotation_label
-            ))
-            continue
-
-        # Consider separately the CAGs with estimated coefficients > 0 or < 0
-        for subset_label, cag_pvalues_subset in [
-            ("positive", pos_coef_pvalues),
-            ("negative", neg_coef_pvalues),
-        ]:
-
-            # Get the p-values for CAGs with and without this annotation
-            pvalues_with_annot = cag_pvalues_subset.reindex(
-                index=annotated_genes["CAG"].unique()).dropna()
-            pvalues_lacking_annot = cag_pvalues_subset.drop(
-                index=annotated_genes["CAG"].unique(),
-                errors="ignore"
-            ).dropna()
-
-            if pvalues_lacking_annot.shape[0] == 0:
-                print("No CAGs with {} coefficients found which lack the annotation {}, skipping".format(
-                    subset_label,
-                    annotation_label
-                ))
-                continue
-            if pvalues_with_annot.shape[0] == 0:
-                print("No CAGs with {} coefficients found which have the annotation {}, skipping".format(
-                    subset_label,
-                    annotation_label
-                ))
-                continue
-
-            statistic, pvalue = stats.mannwhitneyu(
-                pvalues_with_annot.values,
-                pvalues_lacking_annot.values,
-                alternative="less"
-            )
-
-            results.append({
-                "label": annotation_label,
-                "category": col_name,
-                "n_with_label": pvalues_with_annot.shape[0],
-                "n_lacking_label": pvalues_lacking_annot.shape[0],
-                "statistic": statistic,
-                "pvalue": pvalue,
-                "est_coef": subset_label,
-                "parameter": parameter_name
-            })
-
-    print("Processed {:,} {} labels for {}".format(len(results), col_name, parameter_name))
-
-    return pd.DataFrame(results)
+        for label, genes_with_label in gene_annot.groupby(col_name)
+    ]).to_csv(
+        fp_out,
+        index=None
+    )
 
 
 # Read in the table of corncob results
@@ -266,28 +153,41 @@ corncob_wide = read_corncob_results()
 # Read in the gene annotations
 gene_annot = pd.read_hdf(hdf_fp, "/annot/gene/all")
 
-# If we are able to calculate any label enrichment scores, save them in this dict
-enrichment_dict = dict()
-
 # Check if we have taxonomic assignments annotating the gene catalog
 if "tax_id" in gene_annot.columns.values:
+
+    # Add the names for the species, genus, and family
+    # which will become new columns in `gene_annot` 
     gene_annot = annotate_taxa(gene_annot, hdf_fp)
 
     for rank in ["species", "genus", "family"]:
-        enrichment_dict[rank] = calc_enrichment(corncob_wide, gene_annot, rank)
+
+        # Write out a CSV with corncob results for each
+        # CAG which are grouped according to which CAGS
+        # have a given annotation
+        # This will be used to run betta in a separate step
+        write_corncob_by_annot(
+            corncob_wide,
+            gene_annot,
+            rank,
+            "corncob.by.{}.csv.gz".format(rank)
+        )
 
 # Check if we have eggNOG annotations for each gene
 if "eggNOG_desc" in gene_annot.columns.values:
-    enrichment_dict["eggNOG_desc"] = calc_enrichment(corncob_wide, gene_annot, "eggNOG_desc")
+    # Write out a CSV with corncob results for each
+    # CAG which are grouped according to which CAGS
+    # have a given annotation
+    # This will be used to run betta in a separate step
+    write_corncob_by_annot(
+        corncob_wide,
+        gene_annot,
+        "eggNOG_desc",
+        "corncob.by.{}.csv.gz".format("eggNOG_desc")
+    )
 
 # Open a connection to the HDF5
 with pd.HDFStore(hdf_fp, "a") as store:
 
     # Write corncob results to HDF5
     corncob_wide.to_hdf(store, "/stats/cag/corncob")
-
-    # Write any enrichment results to the HDF
-    if len(enrichment_dict) > 0:
-        for enrichment_label, enrichment_df in enrichment_dict.items():
-            if enrichment_df is not None:
-                enrichment_df.to_hdf(store, "/stats/enrichment/{}".format(enrichment_label))
