@@ -648,32 +648,46 @@ process addBetta{
 
 import pandas as pd
 
+# Keep track of the results for each set of labels
+df = []
+
+# Iterate over each input file
+for fp in "${betta_csv_list}".split(" "):
+
+    # Each input file should be named corncob.by.{annotation_type}.csv.gz.betta.csv.gz
+
+    # Make sure that the file has the expected prefix and suffix
+    assert fp.endswith(".csv.gz.betta.csv.gz"), fp
+    assert fp.startswith("corncob.by."), fp
+
+    # Get the annotation label from the file name
+    annotation_name = fp.replace(
+        "corncob.by.", ""
+    ).replace(
+        ".csv.gz.betta.csv.gz", ""
+    )
+
+    # Read in from the flat file
+    # also add the annotation name
+    df.append(
+        pd.read_csv(fp).assign(
+            annotation = annotation_name
+        )
+    )
+
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
 
-    # Iterate over each input file
-    for fp in "${betta_csv_list}".split(" "):
+    # Write to HDF5
+    key = "/stats/cag/betta/"
+    print("Writing to %s" % key)
 
-        # Each input file should be named corncob.by.{annotation_type}.csv.gz.betta.csv.gz
-
-        # Make sure that the file has the expected prefix and suffix
-        assert fp.endswith(".csv.gz.betta.csv.gz"), fp
-        assert fp.startswith("corncob.by."), fp
-
-        # Get the annotation label from the file name
-        annotation_name = fp.replace(
-            "corncob.by.", ""
-        ).replace(
-            ".csv.gz.betta.csv.gz", ""
-        )
-
-        # Read in from the flat file
-        betta_df = pd.read_csv(fp)
-
-        # Write to HDF5
-        key = "/stats/betta/%s" % annotation_name
-        print("Writing to %s" % key)
-        betta_df.to_hdf(store, key)
+    # Join all of the results and write as a single table
+    pd.concat(
+        df
+    ).reset_index(
+        drop=True
+    ).to_hdf(store, key)
 
     print("Closing store")
 
