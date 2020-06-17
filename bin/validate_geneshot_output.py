@@ -52,6 +52,23 @@ def validate_results_hdf(results_hdf):
         msg = "Could not read index ({}) in {}".format(key_name, where_str)
         assert df.shape[0] > 0, msg
 
+    # If there are corncob results AND gene annotations, there should also be enrichment tables
+    if check_for_table_in_hdf(results_hdf, "/stats/cag/corncob"):
+        print("Corncob results found, checking for gene annotations")
+
+        gene_annot = read_table_from_hdf(results_hdf, "/annot/gene/all")
+
+        if "eggNOG_desc" in gene_annot.columns.values:
+            print("Found eggNOG annotations -- checking for label enrichment")
+
+            df = read_table_from_hdf(results_hdf, "/stats/enrichment/eggNOG_desc")
+
+        if "tax_id" in gene_annot.columns.values:
+            print("Found taxonomic annotations -- checking for label enrichment")
+            for rank in ["species", "genus", "family"]:
+                table_name = "/stats/enrichment/{}".format(rank)
+                df = read_table_from_hdf(results_hdf, table_name)
+
 
 def validate_details_hdf(details_hdf, manifest_df, skip_assembly=False):
     """Validate that the details HDF has all expected data."""
@@ -84,6 +101,15 @@ def read_table_from_hdf(hdf_fp, key_name, **kwargs):
     with pd.HDFStore(hdf_fp, "r") as store:
         assert key_name in store, "{} not found in {}".format(key_name, hdf_fp)
         return pd.read_hdf(store, key_name, **kwargs)
+
+
+def check_for_table_in_hdf(hdf_fp, key_name):
+    logging.info("Checking for {} in {}".format(
+        key_name,
+        hdf_fp,
+    ))
+    with pd.HDFStore(hdf_fp, "r") as store:
+        return key_name in store
 
 
 def validate_geneshot_output(results_hdf, details_hdf, skip_assembly = False):
