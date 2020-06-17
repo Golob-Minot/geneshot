@@ -54,20 +54,25 @@ def validate_results_hdf(results_hdf):
 
     # If there are corncob results AND gene annotations, there should also be enrichment tables
     if check_for_table_in_hdf(results_hdf, "/stats/cag/corncob"):
-        print("Corncob results found, checking for gene annotations")
+        logging.info("Corncob results found, checking for gene annotations")
 
         gene_annot = read_table_from_hdf(results_hdf, "/annot/gene/all")
 
         if "eggNOG_desc" in gene_annot.columns.values:
-            print("Found eggNOG annotations -- checking for label enrichment")
+            logging.info("Found eggNOG annotations -- checking for label enrichment")
 
             df = read_table_from_hdf(results_hdf, "/stats/enrichment/eggNOG_desc")
 
+        else:
+            logging.info("No eggNOG annotation found")
+
         if "tax_id" in gene_annot.columns.values:
-            print("Found taxonomic annotations -- checking for label enrichment")
+            logging.info("Found taxonomic annotations -- checking for label enrichment")
             for rank in ["species", "genus", "family"]:
                 table_name = "/stats/enrichment/{}".format(rank)
                 df = read_table_from_hdf(results_hdf, table_name)
+        else:
+            logging.info("No taxonomic annotation found")
 
 
 def validate_details_hdf(details_hdf, manifest_df, skip_assembly=False):
