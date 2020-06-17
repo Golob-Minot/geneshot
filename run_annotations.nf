@@ -134,7 +134,7 @@ workflow {
     outputHDF = renameHDF.out
 
     // Add the eggNOG results
-    if (annotation_wf.out.eggnog_tsv != false) {
+    if (annotation_wf.out.eggnog_tsv != false && params.eggnog_db != false && params.eggnog_dmnd != false) {
         addEggnogResults(
             outputHDF,
             annotation_wf.out.eggnog_tsv
@@ -143,7 +143,7 @@ workflow {
     }
     
     // Add the taxonomic assignment results
-    if (annotation_wf.out.tax_tsv != false) {
+    if (annotation_wf.out.tax_tsv != false && params.ncbi_taxdump != false && params.taxonomic_dmnd != false) {
         readTaxonomy(
             file(params.ncbi_taxdump)
         )
