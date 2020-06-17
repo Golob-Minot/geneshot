@@ -878,7 +878,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 process readTaxonomy {
     tag "Read the NCBI taxonomy"
     container "${container__experiment_collection}"
-    label 'io_limited'
+    label 'mem_medium'
     errorStrategy 'retry'
 
     input:
