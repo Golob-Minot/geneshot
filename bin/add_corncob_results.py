@@ -187,6 +187,9 @@ def calc_enrichment_parameter(parameter_name, cag_pvalues, gene_annot, col_name)
     for annotation_label, annotated_genes in gene_annot.groupby(col_name):
         # If there is just a single CAG with this annotation, skip it
         if annotated_genes["CAG"].unique().shape[0] == 1:
+            print("There is only a single CAG with an annotation for {}, skipping".format(
+                annotation_label
+            ))
             continue
 
         # Consider separately the CAGs with estimated coefficients > 0 or < 0
@@ -203,7 +206,17 @@ def calc_enrichment_parameter(parameter_name, cag_pvalues, gene_annot, col_name)
                 errors="ignore"
             ).dropna()
 
-            if pvalues_with_annot.shape[0] == 0 or pvalues_lacking_annot.shape[0] == 0:
+            if pvalues_lacking_annot.shape[0] == 0:
+                print("No CAGs with {} coefficients found which lack the annotation {}, skipping".format(
+                    subset_label,
+                    annotation_label
+                ))
+                continue
+            if pvalues_with_annot.shape[0] == 0:
+                print("No CAGs with {} coefficients found which have the annotation {}, skipping".format(
+                    subset_label,
+                    annotation_label
+                ))
                 continue
 
             statistic, pvalue = stats.mannwhitneyu(
