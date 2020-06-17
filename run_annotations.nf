@@ -17,7 +17,13 @@ params.gene_fasta = false
 params.output_hdf = false
 params.output_folder = false
 params.help = false
+params.min_coverage = 50
 params.min_identity = 90
+params.taxonomic_dmnd = false
+params.ncbi_taxdump = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
+params.eggnog_db = false
+params.eggnog_dmnd = false
+params.noannot = false
 
 // Function which prints help message text
 def helpMessage() {
@@ -77,9 +83,11 @@ include repackHDF from './modules/general' params(
 include annotation_wf from './modules/assembly' params(
     output_folder: params.output_folder,
     min_identity: params.min_identity,
+    min_coverage: params.min_coverage,
     eggnog_db: params.eggnog_db,
     eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
+    noannot: params.noannot
 )
 
 // Process to rename the input HDF file
