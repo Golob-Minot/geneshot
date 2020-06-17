@@ -75,9 +75,15 @@ jobs:
       - name:  Run geneshot
         run: |
           NXF_VER=20.04.1 nextflow run main.nf -c nextflow.config -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --distance_threshold 0.5 -w work/ --noannot -with-docker ubuntu:latest
+      - name:  Download annotations
+        run: |
+          wget https://github.com/eggnogdb/eggnog-mapper/raw/master/tests/fixtures/eggnog_proteins.dmnd && wget https://github.com/eggnogdb/eggnog-mapper/raw/master/tests/fixtures/eggnog.db
+      - name:  Add annotations
+        run: |
+          NXF_VER=20.04.1 nextflow run run_annotations.nf -c nextflow.config -profile testing --input_hdf output/geneshot.results.hdf5 --gene_fasta output/ref/genes.fasta.gz --output_folder output_with_annotations --output_hdf geneshot.results.hdf5 --eggnog_db eggnog.db --eggnog_dmnd eggnog_proteins.dmnd  -w work/ -with-docker ubuntu:latest
       - name:  Run corncob
         run: |
-          NXF_VER=20.04.1 nextflow run run_corncob.nf -c nextflow.config -profile testing --input_hdf output/geneshot.results.hdf5 --input_folder output/ --output_folder output_with_corncob --output_prefix geneshot --formula "label1,label2" -w work/ -with-docker ubuntu:latest
+          NXF_VER=20.04.1 nextflow run run_corncob.nf -c nextflow.config -profile testing --input_hdf output_with_annotations/geneshot.results.hdf5 --input_folder output/ --output_folder output_with_corncob --output_prefix geneshot --formula "label1,label2" -w work/ -with-docker ubuntu:latest
       - name:  Validate results
         run: |
           docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5
@@ -123,9 +129,12 @@ jobs:
           sudo apt clean
           docker rmi $(docker image ls -aq)
           df -h
+      - name:  Download annotations
+        run: |
+          wget https://github.com/eggnogdb/eggnog-mapper/raw/master/tests/fixtures/eggnog_proteins.dmnd && wget https://github.com/eggnogdb/eggnog-mapper/raw/master/tests/fixtures/eggnog.db
       - name:  Run geneshot
         run: |
-          wget https://github.com/eggnogdb/eggnog-mapper/raw/master/tests/fixtures/eggnog_proteins.dmnd && wget https://github.com/eggnogdb/eggnog-mapper/raw/master/tests/fixtures/eggnog.db && NXF_VER=20.04.1 nextflow run main.nf -c nextflow.config -profile testing --manifest data/mock.manifest.long.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.15 -w work/ -with-docker ubuntu:latest --gene_fasta data/genes.fasta.2.gz --eggnog_dmnd eggnog_proteins.dmnd --eggnog_db eggnog.db --taxonomic_dmnd false
+          NXF_VER=20.04.1 nextflow run main.nf -c nextflow.config -profile testing --manifest data/mock.manifest.long.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2" --distance_threshold 0.15 -w work/ -with-docker ubuntu:latest --gene_fasta data/genes.fasta.2.gz --eggnog_dmnd eggnog_proteins.dmnd --eggnog_db eggnog.db --taxonomic_dmnd false
       - name:  Validate results
         run: |
           docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --skip-assembly
