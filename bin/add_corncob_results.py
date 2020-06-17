@@ -41,14 +41,44 @@ def read_corncob_results(fdr_method="${params.fdr_method}", corncob_csv= "${corn
     return corncob_wide
 
 
+def annotate_taxa(gene_annot, hdf_fp):
+    """Function to add species, genus, etc. labels to the gene annotation."""
+    return gene_annot
+
+
+def calc_enrichment(corncob_wide, gene_annot, rank):
+    """Function to calculate the enrichment of each label with each parameter from the geneshot output."""
+    return
+
+
 # Read in the table of corncob results
 corncob_wide = read_corncob_results()
 
 # Read in the gene annotations
 gene_annot = pd.read_hdf(hdf_fp, "/annot/gene/all")
 
+# If we are able to calculate any label enrichment scores, save them in this dict
+enrichment_dict = dict()
+
+# Check if we have taxonomic assignments annotating the gene catalog
+if "tax_id" in gene_annot.columns.values:
+    gene_annot = annotate_taxa(gene_annot, hdf_fp)
+
+    for rank in ["species", "genus", "family"]:
+        enrichment_dict[rank] = calc_enrichment(corncob_wide, gene_annot, rank)
+
+# Check if we have eggNOG annotations for each gene
+if "eggNOG_desc" in gene_annot.columns.values:
+    enrichment_dict["eggNOG_desc"] = calc_enrichment(corncob_wide, gene_annot, "eggNOG_desc")
+
 # Open a connection to the HDF5
 with pd.HDFStore(hdf_fp, "a") as store:
 
     # Write corncob results to HDF5
     corncob_wide.to_hdf(store, "/stats/cag/corncob")
+
+    # Write any enrichment results to the HDF
+    if len(enrichment_dict) > 0:
+        for enrichment_label, enrichment_df in enrichment_dict.items():
+            if enrichment_df is not None:
+                enrichment_df.to_hdf(store, "/stats/enrichment/{}".format(enrichment_label))
