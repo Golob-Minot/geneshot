@@ -2,12 +2,14 @@
 
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
+import sys
 
 # Set the path to the HDF
-hdf_fp = "${results_hdf}"
+hdf_fp = sys.argv[1]
+corncob_csv = sys.argv[2]
+fdr_method = sys.argv[3]
 
-
-def read_corncob_results(fdr_method="${params.fdr_method}", corncob_csv= "${corncob_csv}"):
+def read_corncob_results(fdr_method=fdr_method, corncob_csv=corncob_csv):
     # Read in the corncob results
     corncob_df = pd.read_csv(corncob_csv)
 
@@ -46,7 +48,7 @@ def annotate_taxa(gene_annot, hdf_fp):
     return gene_annot
 
 
-def calc_enrichment(corncob_wide, gene_annot, rank):
+def calc_enrichment(corncob_wide, gene_annot, col_name):
     """Function to calculate the enrichment of each label with each parameter from the geneshot output."""
     return
 

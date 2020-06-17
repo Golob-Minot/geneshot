@@ -682,7 +682,7 @@ process addCorncobResults{
 """
 #!/bin/bash
 
-add_corncob_results.py
+add_corncob_results.py "${results_hdf}" "${corncob_csv}" "${params.fdr_method}"
 
 """
 
