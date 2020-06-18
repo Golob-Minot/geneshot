@@ -667,6 +667,7 @@ process addBetta{
 """
 #!/usr/bin/env python3
 
+import os
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
