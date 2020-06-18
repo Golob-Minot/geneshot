@@ -200,7 +200,9 @@ if "eggNOG_desc" in gene_annot.columns.values:
 # have a given annotation
 # This will be used to run betta in a separate step
 write_corncob_by_annot(
-    corncob_wide,
+    corncob_wide.query(
+        "parameter != '(Intercept)'"
+    ),
     gene_annot,
     columns_to_use,
     "corncob.shard.{}.csv.gz"
