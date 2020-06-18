@@ -599,7 +599,6 @@ trim_trailing <- function(v){round(v, num_decimal_places(v) - 1)}
 # Make a function to run betta while tolerating faults
 fault_tolerant_betta <- function(df, f){
     if(nrow(df) == 1){
-        print(df)
         return(
             data.frame(
                 estimate=df[1,"estimate"],
@@ -624,12 +623,11 @@ fault_tolerant_betta <- function(df, f){
                 return(NULL)
             })
         if(!is.null(r)){
-            print(r)
             return(
                 data.frame(
-                    estimate=r\$table[1,"Estimates"],
-                    std_error=r\$table[1,"Standard Errors"],
-                    p_value=r\$table[1,"p-values"],
+                    estimate=r[1,"Estimates"],
+                    std_error=r[1,"Standard Errors"],
+                    p_value=r[1,"p-values"],
                 )
             )
         } else {
