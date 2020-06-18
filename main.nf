@@ -111,9 +111,9 @@ def helpMessage() {
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
       --eggnog_dmnd         One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog_proteins.dmnd)
+                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.eggnog.db)
+                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog.db)
     
     For Alignment:
       --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
@@ -260,6 +260,10 @@ include validation_wf from './modules/statistics' params(
 include corncob_wf from './modules/statistics' params(
     output_folder: output_folder,
     formula: params.formula
+)
+include runBetta from './modules/statistics'
+include addBetta from './modules/statistics' params(
+    fdr_method: params.fdr_method
 )
 include breakaway from './modules/statistics'
 include collectBreakaway from './modules/statistics' params(
@@ -467,16 +471,6 @@ workflow {
         resultsHDF = addMetaPhlAn2Results.out
     }
 
-    // If we performed statistical analysis, add the results to the HDF5
-    if ( params.formula ) {
-        addCorncobResults(
-            resultsHDF,
-            corncob_wf.out
-        )
-
-        resultsHDF = addCorncobResults.out
-    }
-
     // If we performed functional analysis with eggNOG, add the results to the HDF5
     if ( params.noannot == false ) {
         if ( params.eggnog_db && params.eggnog_dmnd ) {
@@ -508,6 +502,26 @@ workflow {
                 resultsHDF = addTaxResults.out
             }
         }
+    }
+
+    // If we performed statistical analysis, add the results to the HDF5
+    if ( params.formula ) {
+        addCorncobResults(
+            resultsHDF,
+            corncob_wf.out
+        )
+
+        runBetta(
+            addCorncobResults.out[1]
+        )
+
+        addBetta(
+            addCorncobResults.out[0],
+            runBetta.out
+        )
+
+        resultsHDF = addBetta.out[0]
+
     }
 
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression

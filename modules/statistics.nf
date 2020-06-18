@@ -1,5 +1,8 @@
 // // Processes to perform statistical analysis
 
+// Container versions
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+
 // Workflow to test out the provided formula and manifest CSV in a dry run
 // This is intended to catch the case early on where the provided formula
 // is not formatted correctly, or does not match the manifest (sample sheet)
@@ -548,6 +551,176 @@ df = pd.concat([
 print("Writing out to corncob.results.csv")
 df.to_csv("corncob.results.csv", index=None)
 print("Done")
+"""
+
+}
+
+
+// Run meta-analysis on corncob results grouped by annotation label
+// Each input will have the results from a single type of annotation:
+// species, genus, family, or eggNOG_desc
+// The column `label` gives the label, and there is a row for every 
+// CAG which has at least one gene with that label
+// Other columns include CAG, parameter, estimate, and std_error
+process runBetta {
+    container "quay.io/fhcrc-microbiome/breakaway:latest"
+    label "mem_medium"
+    errorStrategy "retry"
+    
+    input:
+    path labelled_corncob_csv
+
+    output:
+    file "${labelled_corncob_csv}.betta.csv.gz"
+
+
+"""
+#!/usr/bin/env Rscript
+library(tidyverse)
+library(magrittr)
+library(reshape2)
+library(breakaway)
+
+# Use vroom to read in the table
+Sys.setenv("VROOM_CONNECTION_SIZE" = 131072 * 20)
+
+# Read in all of the data for a single covariate
+print("Reading in $labelled_corncob_csv")
+df <- vroom::vroom("$labelled_corncob_csv", delim=",")
+df <- as.tibble(df)
+
+print(head(df))
+
+# Make a function which will trim off the trailing digit
+options(scipen=999)
+num_decimal_places <- function(v){nchar(strsplit(as.character(v), "\\\\.")[[1]][2])}
+trim_trailing <- function(v){round(v, num_decimal_places(v) - 1)}
+
+# Make a function to run betta while tolerating faults
+fault_tolerant_betta <- function(df, f){
+    if(nrow(df) == 1){
+        return(
+            data.frame(
+                estimate=df[1,"estimate"],
+                std_error=df[1,"std_error"],
+                p_value=df[1,"p_value"]
+            )
+        )
+    }
+    chats <- df\$estimate
+    ses <- df\$std_error
+    r <- NULL
+    for(ix in c(1:10)){
+        r <- tryCatch({
+            breakaway::betta(chats=chats, ses=ses)\$table
+            },
+            error=function(cond) {
+                print("We have encountered an error:")
+                print(cond)
+                print("The input data which caused the error was:")
+                print(chats)
+                print(ses)
+                return(NULL)
+            })
+        if(!is.null(r)){
+            return(
+                data.frame(
+                    estimate=r[1,"Estimates"],
+                    std_error=r[1,"Standard Errors"],
+                    p_value=r[1,"p-values"]
+                )
+            )
+        } else {
+            print("Trimming down the input data")
+            chats <- trim_trailing(chats)
+            ses <- trim_trailing(ses)
+            print(chats)
+            print(ses)
+        }
+    }
+}
+
+# If there is a single dummy row, skip the entire process
+if(nrow(df) == 1){
+
+    write.table(df, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
+
+} else{
+
+    # Perform meta-analysis combining the results for each label, and each parameter
+    results <- df %>% group_by(annotation, label, parameter) %>% group_modify(fault_tolerant_betta)
+
+    # Write out to a CSV
+    write.table(results, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
+
+}
+
+"""
+
+}
+
+
+process addBetta{
+    tag "Add meta-analysis to HDF"
+    container "${container__pandas}"
+    label 'mem_medium'
+    errorStrategy 'retry'
+
+    input:
+        path results_hdf
+        path betta_csv
+
+    output:
+        path "${results_hdf}"
+
+"""
+#!/usr/bin/env python3
+
+import os
+import pandas as pd
+from statsmodels.stats.multitest import multipletests
+
+betta_csv = "${betta_csv}"
+
+assert os.path.exists(betta_csv)
+
+# Read in from the flat file
+df = pd.read_csv(betta_csv)
+
+print("Read in {:,} lines from {}".format(
+    df.shape[0],
+    betta_csv
+))
+
+# If there are real results (not just a dummy file), write to HDF5
+if df.shape[0] > 1:
+
+    # Add the q-values
+    df = df.assign(
+        q_value = multipletests(
+            df["p_value"],
+            0.2,
+            "${params.fdr_method}"
+        )[1]
+    )
+
+    # Open a connection to the HDF5
+    with pd.HDFStore("${results_hdf}", "a") as store:
+
+        # Write to HDF5
+        key = "/stats/enrichment/betta"
+        print("Writing to %s" % key)
+        
+        # Write to HDF
+        df.to_hdf(store, key)
+
+        print("Closing store")
+
+    print("Done")
+
+else:
+    print("No betta results found -- returning unopened results HDF")
+
 """
 
 }

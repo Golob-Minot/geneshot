@@ -73,6 +73,12 @@ include extractCounts from './modules/statistics' params(
     output_folder: params.input_folder
 )
 
+// Import the processes needed to run meta-analysis of corncob results by annotation
+include runBetta from './modules/statistics'
+include addBetta from './modules/statistics' params(
+    fdr_method: params.fdr_method
+)
+
 // Import the process used to add corncob results to the output
 include repackHDF from './modules/general' params(
     output_folder: params.output_folder
@@ -222,9 +228,18 @@ workflow {
         joinCorncob.out
     )
 
+    runBetta(
+        addCorncobResults.out[1]
+    )
+
+    addBetta(
+        addCorncobResults.out[0],
+        runBetta.out
+    )
+
     // Repack the HDF
     repackHDF(
-        addCorncobResults.out
+        addBetta.out[0]
     )
 
 }
