@@ -163,10 +163,11 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out_templ
                 batch_size = 0
                 batch = []
 
-    pd.concat(batch).to_csv(
-        fp_out_template.format(ix),
-        index=None
-    )
+    if len(batch) > 0:
+        pd.concat(batch).to_csv(
+            fp_out_template.format(ix),
+            index=None
+        )
 
 
 # Read in the table of corncob results
