@@ -661,6 +661,10 @@ df = []
 # Iterate over each input file
 for fp in "${betta_csv_list}".split(" "):
 
+    # Skip empty strings
+    if len(fp) <= 1:
+        continue
+
     # Each input file should be named corncob.by.{annotation_type}.csv.gz.betta.csv.gz
 
     # Make sure that the file has the expected prefix and suffix
