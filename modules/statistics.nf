@@ -695,6 +695,15 @@ print("Read in {:,} lines from {}".format(
 # If there are real results (not just a dummy file), write to HDF5
 if df.shape[0] > 1:
 
+    # Add the q-values
+    df = df.assign(
+        q_value = multipletests(
+            df["p_value"],
+            0.2,
+            "${params.fdr_method}"
+        )[1]
+    )
+
     # Open a connection to the HDF5
     with pd.HDFStore("${results_hdf}", "a") as store:
 

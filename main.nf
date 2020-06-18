@@ -262,7 +262,9 @@ include corncob_wf from './modules/statistics' params(
     formula: params.formula
 )
 include runBetta from './modules/statistics'
-include addBetta from './modules/statistics'
+include addBetta from './modules/statistics' params(
+    fdr_method: params.fdr_method
+)
 include breakaway from './modules/statistics'
 include collectBreakaway from './modules/statistics' params(
     output_folder: output_folder,
