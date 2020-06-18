@@ -136,7 +136,7 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out):
         assert col_name in gene_annot.columns.values
 
     # Reformat and write out the entire dataset
-    pd.concat([
+    df = [
         corncob_wide.loc[
             corncob_wide["CAG"].isin(genes_with_label["CAG"].unique())
         ].assign(
@@ -146,10 +146,24 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out):
         )
         for col_name in col_name_list
         for label, genes_with_label in gene_annot.groupby(col_name)
-    ]).to_csv(
-        fp_out,
-        index=None
-    )
+    ]
+    
+    if len(df) > 0:
+        pd.concat(df).to_csv(
+            fp_out,
+            index=None
+        )
+
+    else:
+        # Write a dummy file to help with data flow
+        pd.DataFrame({
+            "estimate": [1],
+            "p_value": [1],
+            "parameter": ["dummy"]
+        }).to_csv(
+            fp_out,
+            index=None
+        )
 
 
 # Read in the table of corncob results
