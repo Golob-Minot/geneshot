@@ -515,7 +515,7 @@ workflow {
 
         addBetta(
             addCorncobResults.out[0],
-            runBetta.out
+            runBetta.out.collect()
         )
 
         resultsHDF = addBetta.out[0]

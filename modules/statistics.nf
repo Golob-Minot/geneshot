@@ -671,7 +671,9 @@ import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
 betta_csv = "${betta_csv}"
-if os.path.exists(betta_csv):
+if len(betta_csv) > 1:
+
+    assert os.path.exists(betta_csv)
 
     # Read in from the flat file
     df = pd.read_csv(betta_csv)
