@@ -659,7 +659,7 @@ process addBetta{
 
     input:
         path results_hdf
-        path betta_csv optional true
+        path betta_csv
 
     output:
         path "${results_hdf}"
