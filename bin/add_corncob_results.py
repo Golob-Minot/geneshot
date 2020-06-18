@@ -190,6 +190,16 @@ if len(columns_to_use) > 0:
         columns_to_use,
         "corncob.for.betta.csv.gz"
     )
+else:
+    # Write a dummy file to help with data flow
+    pd.DataFrame({
+        "estimate": [1],
+        "p_value": [1],
+        "parameter": ["dummy"]
+    }).to_csv(
+        "corncob.for.betta.csv.gz",
+        index=None
+    )
 
 # Open a connection to the HDF5
 with pd.HDFStore(hdf_fp, "a") as store:

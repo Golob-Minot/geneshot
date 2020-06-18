@@ -640,11 +640,20 @@ fault_tolerant_betta <- function(df, f){
     }
 }
 
-# Perform meta-analysis combining the results for each label, and each parameter
-results <- df %>% group_by(annotation, label, parameter) %>% group_modify(fault_tolerant_betta)
+# If there is a single dummy row, skip the entire process
+if(nrow(df) == 1){
 
-# Write out to a CSV
-write.table(results, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
+    write.table(df, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
+
+} else{
+
+    # Perform meta-analysis combining the results for each label, and each parameter
+    results <- df %>% group_by(annotation, label, parameter) %>% group_modify(fault_tolerant_betta)
+
+    # Write out to a CSV
+    write.table(results, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
+
+}
 
 """
 
@@ -672,17 +681,19 @@ import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
 betta_csv = "${betta_csv}"
-if len(betta_csv) > 1:
 
-    assert os.path.exists(betta_csv)
+assert os.path.exists(betta_csv)
 
-    # Read in from the flat file
-    df = pd.read_csv(betta_csv)
+# Read in from the flat file
+df = pd.read_csv(betta_csv)
 
-    print("Read in {:,} lines from {}".format(
-        df.shape[0],
-        betta_csv
-    ))
+print("Read in {:,} lines from {}".format(
+    df.shape[0],
+    betta_csv
+))
+
+# If there are real results (not just a dummy file), write to HDF5
+if df.shape[0] > 1:
 
     # Open a connection to the HDF5
     with pd.HDFStore("${results_hdf}", "a") as store:

@@ -232,7 +232,7 @@ workflow {
 
     addBetta(
         addCorncobResults.out[0],
-        runBetta.out.collect()
+        runBetta.out
     )
 
     // Repack the HDF
