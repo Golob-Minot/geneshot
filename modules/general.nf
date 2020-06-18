@@ -669,7 +669,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 process addCorncobResults{
     tag "Add statistical analysis to HDF"
     container "${container__pandas}"
-    label 'mem_medium'
+    label 'mem_veryhigh'
     errorStrategy 'retry'
 
     input:
