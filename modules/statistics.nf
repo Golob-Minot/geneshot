@@ -1,5 +1,8 @@
 // // Processes to perform statistical analysis
 
+// Container versions
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+
 // Workflow to test out the provided formula and manifest CSV in a dry run
 // This is intended to catch the case early on where the provided formula
 // is not formatted correctly, or does not match the manifest (sample sheet)
