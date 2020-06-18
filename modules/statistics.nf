@@ -650,6 +650,7 @@ process addBetta{
 #!/usr/bin/env python3
 
 import pandas as pd
+from statsmodels.stats.multitest import multipletests
 
 # Keep track of the results for each set of labels
 df = []
@@ -688,11 +689,14 @@ if len(df) > 0:
         print("Writing to %s" % key)
 
         # Join all of the results and write as a single table
-        pd.concat(
+        df = pd.concat(
             df
         ).reset_index(
             drop=True
-        ).to_hdf(store, key)
+        )
+        
+        # Write to HDF
+        df.to_hdf(store, key)
 
         print("Closing store")
 

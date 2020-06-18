@@ -227,7 +227,7 @@ workflow {
     )
 
     runBetta(
-        addCorncobResults.out[1]
+        addCorncobResults.out[1].flatten()
     )
 
     addBetta(
