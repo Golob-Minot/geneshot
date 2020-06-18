@@ -564,7 +564,7 @@ print("Done")
 // Other columns include CAG, parameter, estimate, and std_error
 process runBetta {
     container "quay.io/fhcrc-microbiome/breakaway:latest"
-    label "mem_veryhigh"
+    label "mem_medium"
     errorStrategy "retry"
     
     input:
