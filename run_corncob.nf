@@ -226,25 +226,18 @@ workflow {
         joinCorncob.out
     )
 
-    if (addCorncobResults.out[1].isEmpty()) {
-        resultsHDF = addCorncobResults.out[0]
-    } else {
-        runBetta(
-            addCorncobResults.out[1]
-        )
+    runBetta(
+        addCorncobResults.out[1]
+    )
 
-        addBetta(
-            runBetta.out.toSortedList(),
-            addCorncobResults.out[0]
-        )
-
-        resultsHDF = addBetta.out[0]
-
-    }
+    addBetta(
+        runBetta.out.toSortedList(),
+        addCorncobResults.out[0]
+    )
 
     // Repack the HDF
     repackHDF(
-        resultsHDF
+        addBetta.out[0]
     )
 
 }
