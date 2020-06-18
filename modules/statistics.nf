@@ -675,23 +675,28 @@ for fp in "${betta_csv_list}".split(" "):
         )
     )
 
-# Open a connection to the HDF5
-with pd.HDFStore("${results_hdf}", "a") as store:
+if len(df) > 0:
 
-    # Write to HDF5
-    key = "/stats/cag/betta/"
-    print("Writing to %s" % key)
+    # Open a connection to the HDF5
+    with pd.HDFStore("${results_hdf}", "a") as store:
 
-    # Join all of the results and write as a single table
-    pd.concat(
-        df
-    ).reset_index(
-        drop=True
-    ).to_hdf(store, key)
+        # Write to HDF5
+        key = "/stats/cag/betta/"
+        print("Writing to %s" % key)
 
-    print("Closing store")
+        # Join all of the results and write as a single table
+        pd.concat(
+            df
+        ).reset_index(
+            drop=True
+        ).to_hdf(store, key)
 
-print("Done")
+        print("Closing store")
+
+    print("Done")
+
+else:
+    print("No betta results found -- returning unopened results HDF")
 
 """
 
