@@ -141,7 +141,7 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out_templ
     batch = []
 
     for col_name in col_name_list:
-        
+
         for label, genes_with_label in gene_annot.groupby(col_name):
             df = corncob_wide.loc[
                 corncob_wide["CAG"].isin(genes_with_label["CAG"].unique())
@@ -162,6 +162,11 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out_templ
                 ix += 1
                 batch_size = 0
                 batch = []
+
+    pd.concat(batch).to_csv(
+        fp_out_template.format(ix),
+        index=None
+    )
 
 
 # Read in the table of corncob results
