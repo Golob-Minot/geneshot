@@ -581,9 +581,12 @@ library(magrittr)
 library(reshape2)
 library(breakaway)
 
+# Use vroom to read in the table
+Sys.setenv("VROOM_CONNECTION_SIZE" = 131072 * 20)
+
 # Read in all of the data for a single covariate
 print("Reading in $labelled_corncob_csv")
-df <- read_csv("$labelled_corncob_csv")
+df <- vroom::vroom("$labelled_corncob_csv", delim=",")
 df <- as.tibble(df)
 
 print(head(df))
