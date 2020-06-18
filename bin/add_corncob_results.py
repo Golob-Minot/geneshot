@@ -154,7 +154,7 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out_templ
             batch_size += df.shape[0]
             batch.append(df)
 
-            if batch_size >= 100:
+            if batch_size >= 10000:
                 pd.concat(batch).to_csv(
                     fp_out_template.format(ix),
                     index=None

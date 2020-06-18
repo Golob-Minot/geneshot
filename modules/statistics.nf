@@ -626,7 +626,7 @@ fault_tolerant_betta <- function(df, f){
 }
 
 # Perform meta-analysis combining the results for each label, and each parameter
-results <- df %>% group_by(annotation) %>% group_by(label) %>% group_by(parameter) %>% fault_tolerant_betta
+results <- df %>% group_by(annotation, label, parameter) %>% group_modify(fault_tolerant_betta, .keep=TRUE)
 
 # Write out to a CSV
 write.table(results, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
