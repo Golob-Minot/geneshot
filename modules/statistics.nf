@@ -626,7 +626,7 @@ fault_tolerant_betta <- function(df, f){
 }
 
 # Perform meta-analysis combining the results for each label, and each parameter
-results <- df %>% group_by(label) %>% group_by(parameter) %>% fault_tolerant_betta
+results <- df %>% group_by(annotation) %>% group_by(label) %>% group_by(parameter) %>% fault_tolerant_betta
 
 # Write out to a CSV
 write.table(results, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
@@ -665,42 +665,33 @@ for fp in "${betta_csv_list}".split(" "):
     if len(fp) <= 1:
         continue
 
-    # Each input file should be named corncob.by.{annotation_type}.csv.gz.betta.csv.gz
-
-    # Make sure that the file has the expected prefix and suffix
-    assert fp.endswith(".csv.gz.betta.csv.gz"), fp
-    assert fp.startswith("corncob.by."), fp
-
-    # Get the annotation label from the file name
-    annotation_name = fp.replace(
-        "corncob.by.", ""
-    ).replace(
-        ".csv.gz.betta.csv.gz", ""
-    )
-
     # Read in from the flat file
-    # also add the annotation name
     df.append(
-        pd.read_csv(fp).assign(
-            annotation = annotation_name
-        )
+        pd.read_csv(fp)
     )
+    print("Read in {:,} lines from {}".format(
+        df[-1].shape[0],
+        fp
+    ))
 
 if len(df) > 0:
+
+    # Join all of the results and write as a single table
+    df = pd.concat(
+        df
+    ).reset_index(
+        drop=True
+    )
+
+    print(df.head())
+    print(df.shape)
 
     # Open a connection to the HDF5
     with pd.HDFStore("${results_hdf}", "a") as store:
 
         # Write to HDF5
-        key = "/stats/cag/betta/"
+        key = "/stats/cag/betta"
         print("Writing to %s" % key)
-
-        # Join all of the results and write as a single table
-        df = pd.concat(
-            df
-        ).reset_index(
-            drop=True
-        )
         
         # Write to HDF
         df.to_hdf(store, key)

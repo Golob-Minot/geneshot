@@ -130,21 +130,38 @@ def annotate_taxa(gene_annot, hdf_fp, rank_list=["family", "genus", "species"]):
     return gene_annot
 
 
-def write_corncob_by_annot(corncob_wide, gene_annot, col_name, fp_out):
+def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out_template):
     
-    assert col_name in gene_annot.columns.values
+    for col_name in col_name_list:
+        assert col_name in gene_annot.columns.values
 
-    pd.concat([
+    # Write out chunks of data
+    batch_size = 0
+    ix = 0
+    batch = []
+
+    for df in [
         corncob_wide.loc[
             corncob_wide["CAG"].isin(genes_with_label["CAG"].unique())
         ].assign(
             label = label
+        ).assign(
+            annotation = col_name
         )
+        for col_name in col_name_list
         for label, genes_with_label in gene_annot.groupby(col_name)
-    ]).to_csv(
-        fp_out,
-        index=None
-    )
+    ]:
+        batch_size += df.shape[0]
+        batch.append(df)
+
+        if batch_size >= 100:
+            pd.concat(batch).to_csv(
+                fp_out_template.format(ix),
+                index=None
+            )
+            ix += 1
+            batch_size = 0
+            batch = []
 
 
 # Read in the table of corncob results
@@ -152,6 +169,9 @@ corncob_wide = read_corncob_results()
 
 # Read in the gene annotations
 gene_annot = pd.read_hdf(hdf_fp, "/annot/gene/all")
+
+# Get the list of columns to use
+columns_to_use = []
 
 # Check if we have taxonomic assignments annotating the gene catalog
 if "tax_id" in gene_annot.columns.values:
@@ -162,29 +182,23 @@ if "tax_id" in gene_annot.columns.values:
 
     for rank in ["species", "genus", "family"]:
 
-        # Write out a CSV with corncob results for each
-        # CAG which are grouped according to which CAGS
-        # have a given annotation
-        # This will be used to run betta in a separate step
-        write_corncob_by_annot(
-            corncob_wide,
-            gene_annot,
-            rank,
-            "corncob.by.{}.csv.gz".format(rank)
-        )
+        columns_to_use.append(rank)
 
 # Check if we have eggNOG annotations for each gene
 if "eggNOG_desc" in gene_annot.columns.values:
-    # Write out a CSV with corncob results for each
-    # CAG which are grouped according to which CAGS
-    # have a given annotation
-    # This will be used to run betta in a separate step
-    write_corncob_by_annot(
-        corncob_wide,
-        gene_annot,
-        "eggNOG_desc",
-        "corncob.by.{}.csv.gz".format("eggNOG_desc")
-    )
+
+    columns_to_use.append("eggNOG_desc")
+
+# Write out a CSV with corncob results for each
+# CAG which are grouped according to which CAGS
+# have a given annotation
+# This will be used to run betta in a separate step
+write_corncob_by_annot(
+    corncob_wide,
+    gene_annot,
+    columns_to_use,
+    "corncob.shard.{}.csv.gz"
+)
 
 # Open a connection to the HDF5
 with pd.HDFStore(hdf_fp, "a") as store:
