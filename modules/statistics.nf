@@ -603,7 +603,7 @@ fault_tolerant_betta <- function(df, f){
             data.frame(
                 estimate=df[1,"estimate"],
                 std_error=df[1,"std_error"],
-                p_value=df[1,"p_value"],
+                p_value=df[1,"p_value"]
             )
         )
     }
@@ -627,7 +627,7 @@ fault_tolerant_betta <- function(df, f){
                 data.frame(
                     estimate=r[1,"Estimates"],
                     std_error=r[1,"Standard Errors"],
-                    p_value=r[1,"p-values"],
+                    p_value=r[1,"p-values"]
                 )
             )
         } else {
