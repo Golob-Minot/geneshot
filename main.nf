@@ -510,12 +510,12 @@ workflow {
         )
 
         runBetta(
-            addCorncobResults.out[1].flatten()
+            addCorncobResults.out[1]
         )
 
         addBetta(
-            runBetta.out.toSortedList(),
-            addCorncobResults.out[0]
+            addCorncobResults.out[0],
+            runBetta.out
         )
 
         resultsHDF = addBetta.out[0]

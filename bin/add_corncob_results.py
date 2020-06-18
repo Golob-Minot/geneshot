@@ -130,44 +130,26 @@ def annotate_taxa(gene_annot, hdf_fp, rank_list=["family", "genus", "species"]):
     return gene_annot
 
 
-def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out_template):
+def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out):
     
     for col_name in col_name_list:
         assert col_name in gene_annot.columns.values
 
-    # Write out chunks of data
-    batch_size = 0
-    ix = 0
-    batch = []
-
-    for col_name in col_name_list:
-
-        for label, genes_with_label in gene_annot.groupby(col_name):
-            df = corncob_wide.loc[
-                corncob_wide["CAG"].isin(genes_with_label["CAG"].unique())
-            ].assign(
-                label = label
-            ).assign(
-                annotation = col_name
-            )
-
-            batch_size += df.shape[0]
-            batch.append(df)
-
-            if batch_size >= 10000:
-                pd.concat(batch).to_csv(
-                    fp_out_template.format(ix),
-                    index=None
-                )
-                ix += 1
-                batch_size = 0
-                batch = []
-
-    if len(batch) > 0:
-        pd.concat(batch).to_csv(
-            fp_out_template.format(ix),
-            index=None
+    # Reformat and write out the entire dataset
+    pd.concat([
+        corncob_wide.loc[
+            corncob_wide["CAG"].isin(genes_with_label["CAG"].unique())
+        ].assign(
+            label = label
+        ).assign(
+            annotation = col_name
         )
+        for col_name in col_name_list
+        for label, genes_with_label in gene_annot.groupby(col_name)
+    ]).to_csv(
+        fp_out,
+        index=None
+    )
 
 
 # Read in the table of corncob results
@@ -199,14 +181,15 @@ if "eggNOG_desc" in gene_annot.columns.values:
 # CAG which are grouped according to which CAGS
 # have a given annotation
 # This will be used to run betta in a separate step
-write_corncob_by_annot(
-    corncob_wide.query(
-        "parameter != '(Intercept)'"
-    ),
-    gene_annot,
-    columns_to_use,
-    "corncob.shard.{}.csv.gz"
-)
+if len(columns_to_use) > 0:
+    write_corncob_by_annot(
+        corncob_wide.query(
+            "parameter != '(Intercept)'"
+        ),
+        gene_annot,
+        columns_to_use,
+        "corncob.for.betta.csv.gz"
+    )
 
 # Open a connection to the HDF5
 with pd.HDFStore(hdf_fp, "a") as store:

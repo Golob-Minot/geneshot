@@ -678,7 +678,7 @@ process addCorncobResults{
 
     output:
         path "${results_hdf}"
-        path "corncob.shard.*.csv.gz" optional true
+        path "corncob.for.betta.csv.gz" optional true
 
 """
 #!/bin/bash

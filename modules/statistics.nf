@@ -658,8 +658,8 @@ process addBetta{
     errorStrategy 'retry'
 
     input:
-        path betta_csv_list
         path results_hdf
+        path betta_csv optional true
 
     output:
         path "${results_hdf}"
@@ -670,42 +670,22 @@ process addBetta{
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
-# Keep track of the results for each set of labels
-df = []
-
-# Iterate over each input file
-for fp in "${betta_csv_list}".split(" "):
-
-    # Skip empty strings
-    if len(fp) <= 1:
-        continue
+betta_csv = "${betta_csv}"
+if os.path.exists(betta_csv):
 
     # Read in from the flat file
-    df.append(
-        pd.read_csv(fp)
-    )
+    df = pd.read_csv(betta_csv)
+
     print("Read in {:,} lines from {}".format(
-        df[-1].shape[0],
-        fp
+        df.shape[0],
+        betta_csv
     ))
-
-if len(df) > 0:
-
-    # Join all of the results and write as a single table
-    df = pd.concat(
-        df
-    ).reset_index(
-        drop=True
-    )
-
-    print(df.head())
-    print(df.shape)
 
     # Open a connection to the HDF5
     with pd.HDFStore("${results_hdf}", "a") as store:
 
         # Write to HDF5
-        key = "/stats/cag/betta"
+        key = "/stats/enrichment/betta"
         print("Writing to %s" % key)
         
         # Write to HDF
