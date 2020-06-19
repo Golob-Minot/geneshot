@@ -149,10 +149,32 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out):
     ]
     
     if len(df) > 0:
-        pd.concat(df).to_csv(
-            fp_out,
-            index=None
-        )
+
+        # Write out the results in batches of ~10,000 lines each
+        ix = 0
+        batch_size = 0
+        batch = []
+
+        for i in df:
+            batch.append(i)
+            batch_size += i.shape[0]
+
+            if batch_size >= 10000:
+
+                pd.concat(batch).to_csv(
+                    fp_out.format(ix),
+                    index=None
+                )
+                ix += 1
+                batch_size = 0
+                batch = []
+
+        # Write out the remainder
+        if len(batch) > 0:
+            pd.concat(batch).to_csv(
+                fp_out.format(ix),
+                index=None
+            )
 
     else:
         # Write a dummy file to help with data flow
@@ -161,7 +183,7 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out):
             "p_value": [1],
             "parameter": ["dummy"]
         }).to_csv(
-            fp_out,
+            fp_out.format(0),
             index=None
         )
 
@@ -202,7 +224,7 @@ if len(columns_to_use) > 0:
         ),
         gene_annot,
         columns_to_use,
-        "corncob.for.betta.csv.gz"
+        "corncob.for.betta.{}.csv.gz"
     )
 else:
     # Write a dummy file to help with data flow
@@ -211,7 +233,7 @@ else:
         "p_value": [1],
         "parameter": ["dummy"]
     }).to_csv(
-        "corncob.for.betta.csv.gz",
+        "corncob.for.betta.{}.csv.gz".format(0),
         index=None
     )
 

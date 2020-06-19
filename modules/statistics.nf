@@ -668,7 +668,7 @@ process addBetta{
 
     input:
         path results_hdf
-        path betta_csv
+        path betta_csv_list
 
     output:
         path "${results_hdf}"
@@ -680,12 +680,18 @@ import os
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
-betta_csv = "${betta_csv}"
+betta_csv_list = "${betta_csv_list}".split(" ")
 
-assert os.path.exists(betta_csv)
+for betta_csv in betta_csv_list:
+    if len(betta_csv) > 1:
+        assert os.path.exists(betta_csv)
 
 # Read in from the flat file
-df = pd.read_csv(betta_csv)
+df = pd.concat([
+    pd.read_csv(betta_csv)
+    for betta_csv in betta_csv_list
+    if len(betta_csv) > 1
+])
 
 print("Read in {:,} lines from {}".format(
     df.shape[0],

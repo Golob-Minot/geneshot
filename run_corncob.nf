@@ -229,12 +229,12 @@ workflow {
     )
 
     runBetta(
-        addCorncobResults.out[1]
+        addCorncobResults.out[1].flatten()
     )
 
     addBetta(
         addCorncobResults.out[0],
-        runBetta.out
+        runBetta.out.toSortedList()
     )
 
     // Repack the HDF
