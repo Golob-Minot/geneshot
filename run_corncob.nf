@@ -226,9 +226,7 @@ workflow {
     runCorncob(
         splitCorncob.out,
         updateFormula.out[1],
-        formula_ch,
-        Channel.from(1.. params.corncob_batches),
-        params.corncob_batches
+        formula_ch
     )
 
     joinCorncob(

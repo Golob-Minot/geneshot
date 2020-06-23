@@ -62,9 +62,7 @@ workflow corncob_wf {
     runCorncob(
         splitCorncob.out,
         manifest_csv,
-        formula_ch,
-        Channel.from(1.. params.corncob_batches),
-        params.corncob_batches
+        formula_ch
     )
 
     joinCorncob(
