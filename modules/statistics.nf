@@ -21,7 +21,7 @@ workflow validation_wf {
     )
 
     runCorncob(
-        splitCorncob.out,
+        splitCorncob.out.flatten(),
         manifest_csv,
         formula_ch
     )
