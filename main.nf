@@ -257,7 +257,8 @@ include alignment_wf from './modules/alignment' params(
 // Import the workflows used for statistical analysis
 include validation_wf from './modules/statistics' params(
     output_folder: output_folder,
-    formula: params.formula
+    formula: params.formula,
+    corncob_batches: params.corncob_batches
 )
 include corncob_wf from './modules/statistics' params(
     output_folder: output_folder,

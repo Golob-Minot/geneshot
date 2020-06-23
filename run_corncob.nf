@@ -58,6 +58,11 @@ if (params.help || params.input_hdf == false || params.input_folder == false || 
     exit 0
 }
 
+// Import the process used to shard CAGs for corncob
+include splitCorncob from './modules/statistics' params(
+    corncob_batches: params.corncob_batches
+)
+
 // Import the process used for statistical analysis
 include runCorncob from './modules/statistics' params(
     formula: params.formula
@@ -213,9 +218,13 @@ workflow {
         params.formula.split(",")
     )
 
+    splitCorncob(
+        input_csv
+    )
+
     // Now run corncob on the extracted manifest, as well as the gene counts table
     runCorncob(
-        input_csv,
+        splitCorncob.out,
         updateFormula.out[1],
         formula_ch,
         Channel.from(1.. params.corncob_batches),

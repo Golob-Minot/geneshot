@@ -16,12 +16,14 @@ workflow validation_wf {
         manifest_csv
     )
 
+    splitCorncob(
+        mockData.out
+    )
+
     runCorncob(
-        mockData.out,
+        splitCorncob.out,
         manifest_csv,
-        formula_ch,
-        1,
-        1
+        formula_ch
     )
 
     joinCorncob(
@@ -53,8 +55,12 @@ workflow corncob_wf {
         cag_csv
     )
 
+    splitCorncob(
+        extractCounts.out
+    )
+
     runCorncob(
-        extractCounts.out,
+        splitCorncob.out,
         manifest_csv,
         formula_ch,
         Channel.from(1.. params.corncob_batches),
@@ -71,7 +77,7 @@ workflow corncob_wf {
 
 process mockData {
     tag "Simulate dataset for validation"
-    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+    container "${container__pandas}"
     label 'io_limited'
 
     input:
@@ -126,7 +132,7 @@ df.reset_index(
 
 process validateFormula {
     tag "Validate user-provided formula"
-    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+    container "${container__pandas}"
     label 'io_limited'
 
     input:
@@ -169,7 +175,7 @@ for cag_id, cag_df in df.groupby("CAG"):
 // and so it needs to have access to those integer values
 process extractCounts {
     tag "Make CAG ~ sample read-count matrix"
-    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+    container "${container__pandas}"
     label 'mem_veryhigh'
     publishDir "${params.output_folder}/abund/", mode: "copy"
     
@@ -284,19 +290,62 @@ logging.info("Done")
 """
 }
 
+process splitCorncob {
+    container "${container__pandas}"
+    label "mem_medium"
+    errorStrategy "retry"
+
+    input:
+    file readcounts_csv_gz
+
+    output:
+    file "readcounts.*.csv.gz"
+
+"""#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in the entire set of readcounts
+print("Reading in ${readcounts_csv_gz}")
+df = pd.read_csv("${readcounts_csv_gz}")
+print("Read in %d rows and %d columns" % (df.shape[0], df.shape[1]))
+
+# Write out shards of the data
+for shard_ix in range(${params.corncob_batches}):
+
+    # Get the list of CAGs to write out
+    cag_list = [
+        n
+        for ix, n in enumerate(df.columns.values)
+        if ix % ${params.corncob_batches} == shard_ix or n in ["specimen", "total"]
+    ]
+
+    # Skip if there are too few CAGs for this shard
+    if len(cag_list) <= 2:
+        print("Skipping shard %d, too few CAGs to populate" % shard_ix)
+        continue
+
+    # Write out the shard
+    print("Writing out %d columns to shard %d" % (len(cag_list), shard_ix))
+
+    df.reindex(columns=cag_list).to_csv("readcounts.%d.csv.gz" % shard_ix, index=None)
+    print("Done with shard %d" % shard_ix)
+
+print("Done with all shards")
+"""
+}
+
 // Extract the counts table from the results HDF5
 process runCorncob {
     tag "Perform statistical analysis"
     container "quay.io/fhcrc-microbiome/corncob"
-    label "mem_veryhigh"
+    label "mem_medium"
     errorStrategy "retry"
     
     input:
     file readcounts_csv_gz
     file metadata_csv
     each formula
-    each shard_ix
-    val n_total_shards
 
     output:
     file "corncob.results.${shard_ix}.csv"
@@ -352,22 +401,10 @@ print("Merging total counts with metadata")
 total_and_meta <- metadata %>% 
   left_join(total_counts, by = c("specimen" = "specimen"))
 
-
-# Make a function to filter the list of CAG index positions
-nth_element <- function(vector, starting_position, n) {
-    vector[seq(starting_position, length(vector), n)]
-}
-
-# Get the complete list of CAGs to analyze
-cags_to_analyze <- c(2:(dim(counts)[2] - 1))
-
-# Filter down to the set of CAGs to analyze in this shard
-cags_to_analyze <- nth_element(cags_to_analyze, ${shard_ix}, ${n_total_shards})
-
 #### Run the analysis for every individual CAG (in this shard)
-print(sprintf("Starting to process %s columns (CAGs)", length(cags_to_analyze)))
+print(sprintf("Starting to process %s columns (CAGs)", length(c(2:(dim(counts)[2] - 1)))))
 corn_tib <- do.call(rbind, mclapply(
-    cags_to_analyze,
+    c(2:(dim(counts)[2] - 1)),
     function(i){
         try_bbdml <- try(
             counts[,c(1, i)] %>%
@@ -421,7 +458,7 @@ corn_tib <- corn_tib %>% add_column(formula = "${formula}")
 print(head(corn_tib))
 
 print(sprintf("Writing out %s rows to corncob.results.csv", nrow(corn_tib)))
-write_csv(corn_tib, "corncob.results.${shard_ix}.csv")
+write_csv(corn_tib, "corncob.results.csv")
 print("Done")
     """
 
