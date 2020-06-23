@@ -156,6 +156,14 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out):
         batch = []
 
         for i in df:
+
+            # Skip any annotations which are shared by >= 50k CAGs
+            # This is done entirely for performance reasons
+            if i.shape[0] >= 50000:
+                print("Skipping the annotation %s -- too many (%d) CAGs found" % (i["label"].values[0], i.shape[0]))
+                continue
+
+            # Add this label to the batch and continue
             batch.append(i)
             batch_size += i.shape[0]
 
