@@ -224,7 +224,7 @@ workflow {
 
     // Now run corncob on the extracted manifest, as well as the gene counts table
     runCorncob(
-        splitCorncob.out,
+        splitCorncob.out.flatten(),
         updateFormula.out[1],
         formula_ch
     )
