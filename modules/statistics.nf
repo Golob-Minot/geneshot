@@ -19,7 +19,9 @@ workflow validation_wf {
     runCorncob(
         mockData.out,
         manifest_csv,
-        formula_ch
+        formula_ch,
+        1,
+        1
     )
 
     joinCorncob(
@@ -54,7 +56,9 @@ workflow corncob_wf {
     runCorncob(
         extractCounts.out,
         manifest_csv,
-        formula_ch
+        formula_ch,
+        Channel.from(1.. params.corncob_batches),
+        params.corncob_batches
     )
 
     joinCorncob(
@@ -291,9 +295,11 @@ process runCorncob {
     file readcounts_csv_gz
     file metadata_csv
     val formula
+    val shard_ix
+    val n_total_shards
 
     output:
-    file "corncob.results.csv"
+    file "corncob.results.${shard_ix}.csv"
 
 
     """
@@ -347,10 +353,21 @@ total_and_meta <- metadata %>%
   left_join(total_counts, by = c("specimen" = "specimen"))
 
 
-#### Run the analysis for every individual CAG
-print(sprintf("Starting to process %s columns (CAGs)", dim(counts)[2]))
+# Make a function to filter the list of CAG index positions
+nth_element <- function(vector, starting_position, n) {
+    vector[seq(starting_position, length(vector), n)]
+}
+
+# Get the complete list of CAGs to analyze
+cags_to_analyze <- c(2:(dim(counts)[2] - 1))
+
+# Filter down to the set of CAGs to analyze in this shard
+cags_to_analyze <- nth_element(cags_to_analyze, ${shard_ix}, ${n_total_shards})
+
+#### Run the analysis for every individual CAG (in this shard)
+print(sprintf("Starting to process %s columns (CAGs)", length(cags_to_analyze)))
 corn_tib <- do.call(rbind, mclapply(
-    c(2:(dim(counts)[2] - 1)),
+    cags_to_analyze,
     function(i){
         try_bbdml <- try(
             counts[,c(1, i)] %>%
@@ -404,7 +421,7 @@ corn_tib <- corn_tib %>% add_column(formula = "${formula}")
 print(head(corn_tib))
 
 print(sprintf("Writing out %s rows to corncob.results.csv", nrow(corn_tib)))
-write_csv(corn_tib, "corncob.results.csv")
+write_csv(corn_tib, "corncob.results.${shard_ix}.csv")
 print("Done")
     """
 
