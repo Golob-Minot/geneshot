@@ -346,7 +346,7 @@ process runCorncob {
     each formula
 
     output:
-    file "corncob.results.*.csv"
+    file "corncob.results.csv"
 
 
     """
