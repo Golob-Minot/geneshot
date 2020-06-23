@@ -18,6 +18,7 @@ params.output_folder = false
 params.output_prefix = false
 params.formula = false
 params.fdr_method = "fdr_bh"
+params.corncob_batches = 10
 params.help = false
 
 // Docker containers
@@ -44,6 +45,7 @@ def helpMessage() {
     For Statistical Analysis:
       --formula             Optional formula used to estimate associations with CAG relative abundance
       --fdr_method          FDR method used to calculate q-values for associations (default: 'fdr_bh')
+      --corncob_batches     Number of parallel processes to use processing each formula
 
     """.stripIndent()
 }
@@ -215,7 +217,9 @@ workflow {
     runCorncob(
         input_csv,
         updateFormula.out[1],
-        formula_ch
+        formula_ch,
+        Channel.from(1.. params.corncob_batches),
+        params.corncob_batches
     )
 
     joinCorncob(
