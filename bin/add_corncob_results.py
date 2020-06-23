@@ -42,6 +42,12 @@ def read_corncob_results(fdr_method=fdr_method, corncob_csv=corncob_csv):
             q_value = multipletests(corncob_wide.p_value.fillna(1), 0.2, fdr_method)[1]
         )
 
+    # Add the wald metric
+    corncob_wide = corncob_wide.assign(
+        wald=corncob_wide["estimate"] / corncob_wide["std_error"]
+    )
+
+
     return corncob_wide
 
 

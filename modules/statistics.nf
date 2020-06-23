@@ -762,6 +762,11 @@ if df.shape[0] > 1:
         )[1]
     )
 
+    # Add the wald
+    df = df.assign(
+        wald = df["estimate"] / df["std_error"],
+    )
+
     # Open a connection to the HDF5
     with pd.HDFStore("${results_hdf}", "a") as store:
 
