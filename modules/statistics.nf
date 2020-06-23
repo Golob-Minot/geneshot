@@ -294,8 +294,8 @@ process runCorncob {
     input:
     file readcounts_csv_gz
     file metadata_csv
-    val formula
-    val shard_ix
+    each val formula
+    each val shard_ix
     val n_total_shards
 
     output:
