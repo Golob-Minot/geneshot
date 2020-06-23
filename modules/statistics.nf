@@ -346,7 +346,7 @@ process runCorncob {
     each formula
 
     output:
-    file "corncob.results.${shard_ix}.csv"
+    file "corncob.results.*.csv"
 
 
     """
