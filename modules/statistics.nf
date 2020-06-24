@@ -290,7 +290,7 @@ logging.info("Done")
 
 process splitCorncob {
     container "${container__pandas}"
-    label "mem_medium"
+    label "mem_veryhigh"
     errorStrategy "retry"
 
     input:
