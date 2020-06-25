@@ -89,7 +89,7 @@ jobs:
           NXF_VER=20.04.1 nextflow run run_corncob.nf -c nextflow.config -profile testing --input_hdf output_with_annotations/geneshot.results.hdf5 --input_folder output/ --output_folder output_with_corncob --output_prefix geneshot --formula "label1,label2" -w work/ -with-docker ubuntu:latest
       - name:  Validate results
         run: |
-          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output_with_corncob/geneshot.corncob.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --check-corncob
+          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output_with_corncob/geneshot.label1_label2.corncob.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --check-corncob
   
   no_assembly:
     runs-on: ubuntu-latest
