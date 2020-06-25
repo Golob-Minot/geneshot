@@ -5,6 +5,8 @@ import pandas as pd
 from scipy import stats
 from statsmodels.stats.multitest import multipletests
 import sys
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 # Set the path to the HDF
 hdf_fp = sys.argv[1]

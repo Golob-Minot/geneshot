@@ -228,6 +228,8 @@ from sklearn.manifold import TSNE
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats.mstats import gmean
 from scipy.stats import entropy
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 cag_csv = "${cag_csv}"
 gene_abund_feather = "${gene_abund_feather}"
@@ -589,6 +591,8 @@ process addGeneAssembly{
 
 import pandas as pd
 import os
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 # Count up the number of genes assembled per-specimen
 n_genes_assembled_per_specimen = dict()
@@ -706,6 +710,8 @@ process addMetaPhlAn2Results{
 #!/usr/bin/env python3
 
 import pandas as pd
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
@@ -759,6 +765,8 @@ process addEggnogResults {
 
 import os
 import pandas as pd
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 # Get the list of files with eggNOG results
 eggnog_csv_list = [
@@ -1010,6 +1018,8 @@ process addTaxResults {
 
 import os
 import pandas as pd
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 diamond_tax_csv_list = [
     fp

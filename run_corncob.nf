@@ -116,6 +116,8 @@ process updateFormula{
 
 import pandas as pd
 import shutil
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 # Come up with a new name for the output file
 formula_name = "${params.formula}".replace(

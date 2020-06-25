@@ -731,6 +731,8 @@ process addBetta{
 import os
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 betta_csv_list = "${betta_csv_list}".split(" ")
 
