@@ -18,6 +18,7 @@ params.output_folder = false
 params.output_prefix = false
 params.formula = false
 params.fdr_method = "fdr_bh"
+params.corncob_batches = 10
 params.help = false
 
 // Docker containers
@@ -44,6 +45,7 @@ def helpMessage() {
     For Statistical Analysis:
       --formula             Optional formula used to estimate associations with CAG relative abundance
       --fdr_method          FDR method used to calculate q-values for associations (default: 'fdr_bh')
+      --corncob_batches     Number of parallel processes to use processing each formula
 
     """.stripIndent()
 }
@@ -55,6 +57,11 @@ if (params.help || params.input_hdf == false || params.input_folder == false || 
     // Exit out and do not run anything else
     exit 0
 }
+
+// Import the process used to shard CAGs for corncob
+include splitCorncob from './modules/statistics' params(
+    corncob_batches: params.corncob_batches
+)
 
 // Import the process used for statistical analysis
 include runCorncob from './modules/statistics' params(
@@ -109,6 +116,8 @@ process updateFormula{
 
 import pandas as pd
 import shutil
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 # Come up with a new name for the output file
 formula_name = "${params.formula}".replace(
@@ -211,9 +220,13 @@ workflow {
         params.formula.split(",")
     )
 
+    splitCorncob(
+        input_csv
+    )
+
     // Now run corncob on the extracted manifest, as well as the gene counts table
     runCorncob(
-        input_csv,
+        splitCorncob.out.flatten(),
         updateFormula.out[1],
         formula_ch
     )

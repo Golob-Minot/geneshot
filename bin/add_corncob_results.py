@@ -5,6 +5,8 @@ import pandas as pd
 from scipy import stats
 from statsmodels.stats.multitest import multipletests
 import sys
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 # Set the path to the HDF
 hdf_fp = sys.argv[1]
@@ -41,6 +43,12 @@ def read_corncob_results(fdr_method=fdr_method, corncob_csv=corncob_csv):
         corncob_wide = corncob_wide.assign(
             q_value = multipletests(corncob_wide.p_value.fillna(1), 0.2, fdr_method)[1]
         )
+
+    # Add the wald metric
+    corncob_wide = corncob_wide.assign(
+        wald=corncob_wide["estimate"] / corncob_wide["std_error"]
+    )
+
 
     return corncob_wide
 
@@ -156,6 +164,14 @@ def write_corncob_by_annot(corncob_wide, gene_annot, col_name_list, fp_out):
         batch = []
 
         for i in df:
+
+            # Skip any annotations which are shared by >= 50k CAGs
+            # This is done entirely for performance reasons
+            if i.shape[0] >= 50000:
+                print("Skipping the annotation %s -- too many (%d) CAGs found" % (i["label"].values[0], i.shape[0]))
+                continue
+
+            # Add this label to the batch and continue
             batch.append(i)
             batch_size += i.shape[0]
 

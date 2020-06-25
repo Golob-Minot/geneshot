@@ -70,6 +70,8 @@ process replaceManifest {
 
 import pandas as pd
 import shutil
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 # Read in the new manifest
 new_manifest = pd.read_csv("${manifest_csv}", sep=",")

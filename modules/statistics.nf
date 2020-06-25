@@ -16,8 +16,12 @@ workflow validation_wf {
         manifest_csv
     )
 
+    splitCorncob(
+        mockData.out
+    )
+
     runCorncob(
-        mockData.out,
+        splitCorncob.out.flatten(),
         manifest_csv,
         formula_ch
     )
@@ -51,8 +55,12 @@ workflow corncob_wf {
         cag_csv
     )
 
+    splitCorncob(
+        extractCounts.out
+    )
+
     runCorncob(
-        extractCounts.out,
+        splitCorncob.out.flatten(),
         manifest_csv,
         formula_ch
     )
@@ -67,7 +75,7 @@ workflow corncob_wf {
 
 process mockData {
     tag "Simulate dataset for validation"
-    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+    container "${container__pandas}"
     label 'io_limited'
 
     input:
@@ -122,7 +130,7 @@ df.reset_index(
 
 process validateFormula {
     tag "Validate user-provided formula"
-    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+    container "${container__pandas}"
     label 'io_limited'
 
     input:
@@ -165,7 +173,7 @@ for cag_id, cag_df in df.groupby("CAG"):
 // and so it needs to have access to those integer values
 process extractCounts {
     tag "Make CAG ~ sample read-count matrix"
-    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+    container "${container__pandas}"
     label 'mem_veryhigh'
     publishDir "${params.output_folder}/abund/", mode: "copy"
     
@@ -280,17 +288,62 @@ logging.info("Done")
 """
 }
 
+process splitCorncob {
+    container "${container__pandas}"
+    label "mem_veryhigh"
+    errorStrategy "retry"
+
+    input:
+    file readcounts_csv_gz
+
+    output:
+    file "readcounts.*.csv.gz"
+
+"""#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in the entire set of readcounts
+print("Reading in ${readcounts_csv_gz}")
+df = pd.read_csv("${readcounts_csv_gz}")
+print("Read in %d rows and %d columns" % (df.shape[0], df.shape[1]))
+
+# Write out shards of the data
+for shard_ix in range(${params.corncob_batches}):
+
+    # Get the list of CAGs to write out
+    cag_list = [
+        n
+        for ix, n in enumerate(df.columns.values)
+        if ix % ${params.corncob_batches} == shard_ix or n in ["specimen", "total"]
+    ]
+
+    # Skip if there are too few CAGs for this shard
+    if len(cag_list) <= 2:
+        print("Skipping shard %d, too few CAGs to populate" % shard_ix)
+        continue
+
+    # Write out the shard
+    print("Writing out %d columns to shard %d" % (len(cag_list), shard_ix))
+
+    df.reindex(columns=cag_list).to_csv("readcounts.%d.csv.gz" % shard_ix, index=None)
+    print("Done with shard %d" % shard_ix)
+
+print("Done with all shards")
+"""
+}
+
 // Extract the counts table from the results HDF5
 process runCorncob {
     tag "Perform statistical analysis"
     container "quay.io/fhcrc-microbiome/corncob"
-    label "mem_veryhigh"
+    label "mem_medium"
     errorStrategy "retry"
     
     input:
     file readcounts_csv_gz
     file metadata_csv
-    val formula
+    each formula
 
     output:
     file "corncob.results.csv"
@@ -346,9 +399,8 @@ print("Merging total counts with metadata")
 total_and_meta <- metadata %>% 
   left_join(total_counts, by = c("specimen" = "specimen"))
 
-
-#### Run the analysis for every individual CAG
-print(sprintf("Starting to process %s columns (CAGs)", dim(counts)[2]))
+#### Run the analysis for every individual CAG (in this shard)
+print(sprintf("Starting to process %s columns (CAGs)", length(c(2:(dim(counts)[2] - 1)))))
 corn_tib <- do.call(rbind, mclapply(
     c(2:(dim(counts)[2] - 1)),
     function(i){
@@ -679,6 +731,8 @@ process addBetta{
 import os
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 betta_csv_list = "${betta_csv_list}".split(" ")
 
@@ -708,6 +762,11 @@ if df.shape[0] > 1:
             0.2,
             "${params.fdr_method}"
         )[1]
+    )
+
+    # Add the wald
+    df = df.assign(
+        wald = df["estimate"] / df["std_error"],
     )
 
     # Open a connection to the HDF5

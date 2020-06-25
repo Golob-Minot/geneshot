@@ -67,6 +67,7 @@ params.linkage_type = "average"
 // Statistical analysis options
 params.formula = false
 params.fdr_method = "fdr_bh"
+params.corncob_batches = 10
 
 // Compositional analysis options
 params.composition = false
@@ -132,6 +133,7 @@ def helpMessage() {
     For Statistical Analysis:
       --formula             Optional formula used to estimate associations with CAG relative abundance
       --fdr_method          FDR method used to calculate q-values for associations (default: 'fdr_bh')
+      --corncob_batches     Number of parallel processes to use processing each formula
 
     For Compositional Analysis:
       --composition         When included, metaPhlAn2 will be run on all specimens
@@ -255,11 +257,13 @@ include alignment_wf from './modules/alignment' params(
 // Import the workflows used for statistical analysis
 include validation_wf from './modules/statistics' params(
     output_folder: output_folder,
-    formula: params.formula
+    formula: params.formula,
+    corncob_batches: params.corncob_batches
 )
 include corncob_wf from './modules/statistics' params(
     output_folder: output_folder,
-    formula: params.formula
+    formula: params.formula,
+    corncob_batches: params.corncob_batches
 )
 include runBetta from './modules/statistics'
 include addBetta from './modules/statistics' params(
@@ -517,7 +521,7 @@ workflow {
 
         addBetta(
             addCorncobResults.out[0],
-            runBetta.out
+            runBetta.out.toSortedList()
         )
 
         resultsHDF = addBetta.out[0]

@@ -17,7 +17,8 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 
-def validate_results_hdf(results_hdf):
+
+def validate_results_hdf(results_hdf, check_corncob = False):
     """Validate that the results HDF has all expected data."""
 
     for key_name in [
@@ -40,6 +41,15 @@ def validate_results_hdf(results_hdf):
 
         # Report errors with empty rows
         assert df.shape[0] > 0, "{} in {} has 0 rows".format(key_name, results_hdf)
+
+    if check_corncob:
+
+        # Read the results from running corncob
+        df = read_table_from_hdf(results_hdf, "/stats/cag/corncob")
+
+        # Report errors with empty rows
+        assert df.shape[0] > 0, "{} in {} has 0 rows".format(key_name, results_hdf)
+        
 
     # Some tables should be indexed -- let's check for that
     for key_name, where_str in [
@@ -86,14 +96,14 @@ def read_table_from_hdf(hdf_fp, key_name, **kwargs):
         return pd.read_hdf(store, key_name, **kwargs)
 
 
-def validate_geneshot_output(results_hdf, details_hdf, skip_assembly = False):
+def validate_geneshot_output(results_hdf, details_hdf, skip_assembly = False, check_corncob = False):
     """Validate that the geneshot outputs have all expected data."""
     assert os.path.exists(results_hdf)
     assert os.path.exists(details_hdf)
 
 
     # Validate the results HDF
-    validate_results_hdf(results_hdf)
+    validate_results_hdf(results_hdf, check_corncob=check_corncob)
 
     # Read the manifest from the results HDF
     manifest_df = read_table_from_hdf(results_hdf, "/manifest")
@@ -119,11 +129,17 @@ if __name__ == '__main__':
         help = "If specified, skip the detailed assembly information",
         action = "store_true"
     )
+    parser.add_argument(
+        "--check-corncob", 
+        help = "If specified, check for corncob output",
+        action = "store_true"
+    )
 
     args = parser.parse_args()
 
     validate_geneshot_output(
         args.results_hdf,
         args.details_hdf,
-        skip_assembly = args.skip_assembly
+        skip_assembly = args.skip_assembly,
+        check_corncob = args.check_corncob
     )

@@ -258,6 +258,8 @@ import os
 import pandas as pd
 import gzip
 import json
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
 # Set up logging
 logFormatter = logging.Formatter(
