@@ -140,6 +140,6 @@ if __name__ == '__main__':
     validate_geneshot_output(
         args.results_hdf,
         args.details_hdf,
-        skip_assembly = args.skip_assembly
+        skip_assembly = args.skip_assembly,
         check_corncob = args.check_corncob
     )
