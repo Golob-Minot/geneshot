@@ -809,6 +809,8 @@ def plot_betta_taxa_and_functions(
         cag_prop_df.columns.values
     )["size"].rename(
         index=lambda cag_id: "CAG {}".format(cag_id)
+    ).apply(
+        np.log10
     ).plot(
         kind="bar",
         ax=cag_size_ax,
@@ -826,7 +828,7 @@ def plot_betta_taxa_and_functions(
 
     # Customize the axis labels
     cag_size_ax.set_ylabel(
-        "CAG Size  \n(# of genes)",
+        "CAG Size     \n(# of genes, log10)",
     )
     cag_wald_ax.set_xticks([])
     cag_wald_ax.set_xlabel("")
