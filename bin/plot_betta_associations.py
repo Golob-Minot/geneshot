@@ -266,6 +266,7 @@ def get_betta_functions(
     min_cag_size=10,
     exclude_prefixes=[],
     exclude_terms=[],
+    show_only_functions=None,
     cags_to_plot=None,
     max_function_string_length=70
 ):
@@ -312,23 +313,35 @@ def get_betta_functions(
         columns=cags_to_plot
     )
 
-    # Pick the top functions to plot as the top functions by abs_wald as a subset of those in these CAGs
-    funcs_to_plot = []
-    for d in betta_wald.reindex(
-        index=cag_func_df.index.values
-    ).dropna().abs().sort_values(ascending=False).index.values:
-        # Skip excluded terms
-        if len(exclude_terms) > 0 and d in exclude_terms:
-            continue
-        # Skip excluded prefixes
-        if any([d.startswith(n) for n in exclude_prefixes]):
-            continue
-        # Stop when the list is full
-        if len(funcs_to_plot) >= plot_n_functions:
-            break
-        # Add to the list
-        if d not in funcs_to_plot:
-            funcs_to_plot.append(d)
+    # If show_only_functions was specified, use that as the list of functions to plot
+    if show_only_functions is not None:
+        funcs_to_plot = [
+            n for n in show_only_functions.split(",")
+            if len(n) > 0
+        ]
+        assert len(funcs_to_plot) > 0, "Please provide functions with --show-only-functions (none found)"
+
+        for func_name in funcs_to_plot:
+            assert func_name in cag_func_df.index.values, "{} not found in results".format(func_name)
+
+    else:
+        # Otherwise, pick the top functions to plot as the top functions by abs_wald as a subset of those in these CAGs
+        funcs_to_plot = []
+        for d in betta_wald.reindex(
+            index=cag_func_df.index.values
+        ).dropna().abs().sort_values(ascending=False).index.values:
+            # Skip excluded terms
+            if len(exclude_terms) > 0 and d in exclude_terms:
+                continue
+            # Skip excluded prefixes
+            if any([d.startswith(n) for n in exclude_prefixes]):
+                continue
+            # Stop when the list is full
+            if len(funcs_to_plot) >= plot_n_functions:
+                break
+            # Add to the list
+            if d not in funcs_to_plot:
+                funcs_to_plot.append(d)
 
     print("\n\n".join(funcs_to_plot))
 
@@ -420,7 +433,8 @@ def plot_betta_taxa_and_functions(
     exclude_prefixes=[
         "Psort location"
     ],
-    include_functions=True
+    include_functions=True,
+    show_only_functions=None,
 ):
 
     # Filter out the non-taxonomic results
@@ -754,6 +768,7 @@ def plot_betta_taxa_and_functions(
             parameter,
             exclude_terms=exclude_terms,
             exclude_prefixes=exclude_prefixes,
+            show_only_functions=show_only_functions,
             cags_to_plot=cag_prop_df.columns.values,
             plot_n_functions=plot_n_functions
         )
@@ -1003,6 +1018,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--show-only-functions",
+        type=str,
+        default=None,
+        help="If specified, only plot the functions which are explicitly defined in this list (comma-delimited, surrounded by quotes to capture whitespace)."
+    )
+
+    parser.add_argument(
         "--figsize",
         type=str,
         default="22,18",
@@ -1079,6 +1101,7 @@ if __name__ == "__main__":
                 pdf=pdf,
                 exclude_terms=args.exclude_functions.split(";"),
                 exclude_prefixes=args.exclude_prefixes.split(";"),
+                show_only_functions=args.show_only_functions,
                 plot_n_taxa=args.n_taxa,
                 plot_n_cags=args.n_cags,
                 plot_n_functions=args.n_functions,
