@@ -1,15 +1,29 @@
-name: Test Geneshot
+name: Release Geneshot Outputs
 
-on: [push, pull_request]  
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
 
-  complete_workflow:
+  build:
     runs-on: ubuntu-latest
     env:
       NXF_ANSI_LOG: 0
     steps:
       - uses: actions/checkout@v1
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
       - name: Install Nextflow
         run: |
           wget -qO- get.nextflow.io | bash
@@ -24,15 +38,23 @@ jobs:
       - name:  Run geneshot
         run: |
           NXF_VER=20.04.1 nextflow run main.nf -c nextflow.config -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2,label1" --distance_threshold 0.5 -w work/ --eggnog_db false --eggnog_dmnd false --taxonomic_dmnd false -with-docker ubuntu:latest
-      - name:  Rerun corncob
-        run: |
-          NXF_VER=20.04.1 nextflow run run_corncob.nf -c nextflow.config -profile testing --input_hdf output/geneshot.results.hdf5 --input_folder output/ --output_folder output_label2 --output_prefix geneshot_label2 --formula "label2" -w work/ -with-docker ubuntu:latest
       - name:  Validate results
         run: |
           docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --check-corncob
-      - name:  Validate results (python 3.7)
+      - name:  Package results
         run: |
-          docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas:py37 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --check-corncob
+          tar cf geneshot.results.tar output/ && gzip geneshot.results.tar
+      - name: Upload Results
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./geneshot.results.tar.gz
+          asset_name: geneshot.results.tar.gz
+          asset_content_type: application/gzip
+          
 
   no_preprocessing:
     runs-on: ubuntu-latest
