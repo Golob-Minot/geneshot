@@ -836,6 +836,59 @@ def plot_betta_taxa_and_functions(
 
     plt.close()
 
+
+def plot_top_annotations(betta, pdf=None, exclude_terms=[], exclude_prefixes=[]):
+    for annotation, annotation_df in betta.groupby("annotation"):
+        plot_df = annotation_df.copy(
+        ).set_index(
+            "label"
+        )
+
+        # Remove any blacklisted annotations
+        to_remove = []
+        for d in plot_df.index.values:
+            # Skip excluded terms
+            if len(exclude_terms) > 0 and d in exclude_terms:
+                to_remove.append(d)
+                continue
+            # Skip excluded prefixes
+            if any([d.startswith(n) for n in exclude_prefixes]):
+                to_remove.append(d)
+                continue
+        if len(to_remove) > 0:
+            plot_df = plot_df.drop(index=to_remove)
+
+        fig, ax = plt.subplots()
+        ax.axvline(x=0, linestyle="--", alpha=0.5)
+
+        y = 0
+        label_list = []
+        for label, r in plot_df.sort_values(
+            by="abs_wald",
+            ascending=False
+        ).head(
+            20
+        ).iterrows(
+        ):
+            ax.plot(
+                [r["estimate"] - (r["std_error"] / 2), r["estimate"] + (r["std_error"] / 2)],
+                [y, y],
+                color="black"
+            )
+            ax.scatter([r["estimate"]], [y], color="black")
+            y += 1
+            label_list.append(label)
+
+        ax.set_yticks(list(range(len(label_list))))
+        ax.set_yticklabels(label_list)
+        ax.set_title(annotation)
+        plt.tight_layout()
+
+        if pdf is not None:
+            pdf.savefig(bbox_inches="tight")
+
+        plt.close()
+
         
 if __name__ == "__main__":
 
@@ -1007,6 +1060,14 @@ if __name__ == "__main__":
 
     # Make the plot
     with PdfPages(args.out) as pdf:
+
+        plot_top_annotations(
+            betta, 
+            pdf=pdf,
+            exclude_terms=args.exclude_functions.split(";"),
+            exclude_prefixes=args.exclude_prefixes.split(";"),
+        )
+
         for include_functions in [False, True]:
             plot_betta_taxa_and_functions(
                 args.hdf, 
