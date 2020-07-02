@@ -592,7 +592,13 @@ def plot_betta_taxa_and_functions(
             figsize=figsize,
             sharey="row",
             gridspec_kw={
-                'height_ratios': [6, 6, 1, 1],
+                'height_ratios': [
+                    6, 
+                    # Set the height of the functional subplot differently if a smaller number of functions are being plotted
+                    6 if show_only_functions is None else 6 * (len(show_only_functions.split(",")) / plot_n_functions),
+                    1, 
+                    1
+                ],
                 'width_ratios': [3, 1, 3],
             }
         )
