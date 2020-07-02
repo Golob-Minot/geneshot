@@ -804,6 +804,9 @@ def plot_betta_taxa_and_functions(
             yticklabels=1,
         )
 
+        # Rotate the yticklabels
+        func_ax.set_yticklabels(func_ax.get_yticklabels(), rotation=0)
+
     # Make a plot with the CAG size in the lowest subplot
     cag_annot.reindex(
         cag_prop_df.columns.values
