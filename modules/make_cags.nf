@@ -13,7 +13,7 @@ process makeInitialCAGs {
     errorStrategy 'retry'
 
     input:
-    path gene_feather
+    path details_hdf
     path gene_list_csv
 
     output:
@@ -22,7 +22,6 @@ process makeInitialCAGs {
     """
 #!/usr/bin/env python3
 
-import feather
 import gzip
 import json
 import logging
@@ -51,37 +50,78 @@ rootLogger.addHandler(consoleHandler)
 threads = int("${task.cpus}")
 pool = Pool(threads)
 
-# Set the file path to the feather with gene abundances
-gene_feather = "${gene_feather}"
+# Set the file path to the HDF5 with gene abundances
+details_hdf = "${details_hdf}"
 
 # Set the file path to the genes for this subset
 gene_list_csv = "${gene_list_csv}"
 
 # Make sure the files exist
-assert os.path.exists(gene_feather), gene_feather
+assert os.path.exists(details_hdf), details_hdf
 assert os.path.exists(gene_list_csv), gene_list_csv
 
-logging.info("Reading in gene abundances from %s" % gene_feather)
-df = feather.read_dataframe(
-    gene_feather
-).set_index("index").applymap(
-    np.float16
-)
-
 logging.info("Reading in the list of genes for this shard from %s" % (gene_list_csv))
-gene_list = [
+gene_list = set([
     line.rstrip("\\n")
     for line in gzip.open(gene_list_csv, "rt")
-]
+])
 logging.info("This shard contains %d genes" % (len(gene_list)))
 
-# Subset the gene abundances
-logging.info("Making sure that the gene names match between the feather and CSV")
-n_mismatch = len(set(gene_list) - set(df.index.values))
-msg = "Gene names do not match between the feather and CSV (n= %d / %d)" % (n_mismatch, len(gene_list))
-assert n_mismatch == 0, msg
-df = df.reindex(index=gene_list)
-logging.info("Subset down to %d genes for this shard" % (len(gene_list)))
+logging.info("Reading in gene abundances from %s" % details_hdf)
+df = {}
+# Open the HDF5 store
+with pd.HDFStore(details_hdf, "r") as store:
+
+    # Iterate over keys in the store
+    for k in store:
+
+        # Sample abundances have a certain prefix
+        if k.startswith("/abund/gene/long/"):
+
+            # Parse the sample name
+            sample_name = k.replace("/abund/gene/long/", "")
+            logging.info("Reading gene abundances for {}".format(sample_name))
+
+            # Read the depth of sequencing for each gene
+            sample_depth = pd.read_hdf(
+                store,
+                k
+            ).set_index(
+                "id"
+            )[
+                "depth"
+            ]
+
+            # Normalize to sum to 1
+            sample_depth = sample_depth / sample_depth.sum()
+
+            logging.info("Making sure that the gene names match between the HDF5 and CSV")
+            n_mismatch = len(gene_list - set(sample_depth.index.values))
+            msg = "Gene names do not match between the HDF5 and CSV (n= %d / %d)" % (n_mismatch, len(gene_list))
+            assert n_mismatch == 0, msg
+
+            # Subset down to the genes in this list
+            genes_in_sample = list(
+                set(sample_depth.index.values) & gene_list
+            )
+
+            # Add genes from this list to the table
+            if len(genes_in_sample) > 0:
+                df[
+                    sample_name
+                ] = sample_depth.reindex(
+                    index = genes_in_sample
+                )
+
+# Make the DataFrame
+logging.info("Formatting DataFrame")
+df = pd.DataFrame(
+    df
+).fillna(
+    0
+).applymap(
+    np.float16
+)
 
 max_dist = float("${params.distance_threshold}")
 logging.info("Maximum cosine distance: %s" % max_dist)
@@ -162,7 +202,7 @@ process refineCAGs {
     errorStrategy 'retry'
 
     input:
-    path gene_feather
+    path details_hdf
     path "shard.CAG.*.csv.gz"
 
     output:
@@ -171,7 +211,6 @@ process refineCAGs {
     """
 #!/usr/bin/env python3
 
-import feather
 import gzip
 import json
 import logging
@@ -200,11 +239,11 @@ rootLogger.addHandler(consoleHandler)
 threads = int("${task.cpus}")
 pool = Pool(threads)
 
-# Set the file path to the feather with gene abundances
-gene_feather = "${gene_feather}"
+# Set the file path to the HDF5 with gene abundances
+details_hdf = "${details_hdf}"
 
 # Make sure the files exist
-assert os.path.exists(gene_feather), gene_feather
+assert os.path.exists(details_hdf), details_hdf
 
 # Set the file path to the CAGs made for each subset
 cag_csv_list = [
@@ -219,24 +258,81 @@ for fp in cag_csv_list:
 
 assert len(cag_csv_list) > 0, "Didn't find CAGs from any previous shard"
 
-logging.info("Reading in gene abundances from %s" % gene_feather)
-df = feather.read_dataframe(
-    gene_feather
-).set_index("index").applymap(
-    np.float16
-)
-
 logging.info("Reading in CAGs from previous shard")
 cags = dict()
 ix = 0
 n = 0
+gene_list = set()
 for fp in cag_csv_list:
     shard_cags = pd.read_csv(fp, compression="gzip", sep=",")
     for _, gene_list in shard_cags.groupby("CAG"):
         cags[ix] = gene_list['gene'].tolist()
         ix += 1
-        n += gene_list.shape[0]
-logging.info("Read in %d CAGs from %d shards covering %d genes" % (len(cags), len(cag_csv_list), n))
+        gene_list.update(set(cags[ix]))
+
+logging.info(
+    "Read in %d CAGs from %d shards covering %d genes" % (
+        len(cags), 
+        len(cag_csv_list), 
+        len(gene_list)
+    )
+)
+
+logging.info("Reading in gene abundances from %s" % details_hdf)
+df = {}
+# Open the HDF5 store
+with pd.HDFStore(details_hdf, "r") as store:
+
+    # Iterate over keys in the store
+    for k in store:
+
+        # Sample abundances have a certain prefix
+        if k.startswith("/abund/gene/long/"):
+
+            # Parse the sample name
+            sample_name = k.replace("/abund/gene/long/", "")
+            logging.info("Reading gene abundances for {}".format(sample_name))
+
+            # Read the depth of sequencing for each gene
+            sample_depth = pd.read_hdf(
+                store,
+                k
+            ).set_index(
+                "id"
+            )[
+                "depth"
+            ]
+
+            # Normalize to sum to 1
+            sample_depth = sample_depth / sample_depth.sum()
+
+            logging.info("Making sure that the gene names match between the HDF5 and CSV")
+            n_mismatch = len(gene_list - set(sample_depth.index.values))
+            msg = "Gene names do not match between the HDF5 and CSV (n= %d / %d)" % (n_mismatch, len(gene_list))
+            assert n_mismatch == 0, msg
+
+            # Subset down to the genes in this list
+            genes_in_sample = list(
+                set(sample_depth.index.values) & gene_list
+            )
+
+            # Add genes from this list to the table
+            if len(genes_in_sample) > 0:
+                df[
+                    sample_name
+                ] = sample_depth.reindex(
+                    index = genes_in_sample
+                )
+
+# Make the DataFrame
+logging.info("Formatting DataFrame")
+df = pd.DataFrame(
+    df
+).fillna(
+    0
+).applymap(
+    np.float16
+)
 
 max_dist = float("${params.distance_threshold}")
 logging.info("Maximum cosine distance: %s" % max_dist)

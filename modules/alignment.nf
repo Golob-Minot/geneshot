@@ -77,53 +77,52 @@ workflow alignment_wf {
 
     // Group shards of genes into Co-Abundant Gene Groups (CAGs)
     makeInitialCAGs(
-        assembleAbundances.out[0],
-        assembleAbundances.out[1].flatten()
+        assembleAbundances.out[2],
+        assembleAbundances.out[0].flatten()
     )
 
     // Perform multiple rounds of combining shards to make ever-larger CAGs
     refineCAGs_round1(
-        assembleAbundances.out[0],
+        assembleAbundances.out[2],
         makeInitialCAGs.out.toSortedList().flatten().collate(2)
     )
     refineCAGs_round2(
-        assembleAbundances.out[0],
+        assembleAbundances.out[2],
         refineCAGs_round1.out.toSortedList().flatten().collate(2)
     )
     refineCAGs_round3(
-        assembleAbundances.out[0],
+        assembleAbundances.out[2],
         refineCAGs_round2.out.toSortedList().flatten().collate(2)
     )
     refineCAGs_round4(
-        assembleAbundances.out[0],
+        assembleAbundances.out[2],
         refineCAGs_round3.out.toSortedList().flatten().collate(2)
     )
     refineCAGs_round5(
-        assembleAbundances.out[0],
+        assembleAbundances.out[2],
         refineCAGs_round4.out.toSortedList().flatten().collate(2)
     )
 
     // Combine the shards and make a new set of CAGs
     refineCAGs_final(
-        assembleAbundances.out[0],
+        assembleAbundances.out[2],
         refineCAGs_round5.out.collect()
     )
 
     // Calculate the relative abundance of each CAG in these samples
     calcCAGabund(
-        assembleAbundances.out[0],
+        assembleAbundances.out[2],
         refineCAGs_final.out
     )
 
     emit:
         cag_csv = refineCAGs_final.out
-        gene_abund_feather = assembleAbundances.out[0]
         cag_abund_feather = calcCAGabund.out
         famli_json_list = famli.out.toSortedList()
-        specimen_gene_count_csv = assembleAbundances.out[2]
-        specimen_reads_aligned_csv = assembleAbundances.out[5]
-        detailed_hdf = assembleAbundances.out[3]
-        gene_length_csv = assembleAbundances.out[4]
+        specimen_gene_count_csv = assembleAbundances.out[1]
+        specimen_reads_aligned_csv = assembleAbundances.out[4]
+        detailed_hdf = assembleAbundances.out[2]
+        gene_length_csv = assembleAbundances.out[3]
 }
 
 // Align each sample against the reference database of genes using DIAMOND
@@ -241,7 +240,6 @@ process assembleAbundances {
     val output_prefix
 
     output:
-    file "gene.abund.feather"
     file "gene_list.*.csv.gz"
     file "specimen_gene_count.csv.gz"
     file "${output_prefix}.details.hdf5"
@@ -282,10 +280,11 @@ def read_json(fp):
 
 # Parse the file list
 sample_jsons = "${sample_jsons}".split(" ")
-logging.info("Getting ready to read in data for %d sample" % len(sample_jsons))
+logging.info("Getting ready to read in data for %d samples" % len(sample_jsons))
 
-# All of the abundances will go into a single dict
-all_abund = dict()
+# Keep track of the complete set of sample names observed in these samples
+all_sample_names = set([])
+
 # Also keep track of the complete set of gene names observed in these samples
 all_gene_names = set([])
 
@@ -297,6 +296,9 @@ gene_length_dict = dict()
 
 # Keep track of the number of reads aligned per sample
 specimen_reads_aligned = dict()
+
+# Keep track of the number of genes detected per sample
+specimen_genes_detected = dict()
 
 # Iterate over the list of files
 for fp in sample_jsons:
@@ -311,11 +313,11 @@ for fp in sample_jsons:
     logging.info("Saving to HDF5")
     df.to_hdf(store, "/abund/gene/long/%s" % sample_name)
     
-    logging.info("Saving depth in memory")
-    all_abund[sample_name] = df.set_index("id")["depth"].to_dict()
+    # Add the sample name to the total list
+    all_sample_names.add(sample_name)
 
     # Add the gene names to the total list
-    for gene_name in all_abund[sample_name]:
+    for gene_name in df["id"].values:
         all_gene_names.add(gene_name)
 
     # Add the gene lengths
@@ -325,56 +327,24 @@ for fp in sample_jsons:
     # Add in the number of reads aligned
     specimen_reads_aligned[sample_name] = df["nreads"].sum()
 
+    # Add in the number of genes detected
+    specimen_genes_detected[sample_name] = df.shape[0]
+
 store.close()
 
 # Serialize sample and gene names
-sample_names = list(all_abund.keys())
+sample_names = list(all_sample_names)
 all_gene_names = list(all_gene_names)
-
-# Now make a DataFrame for all of this data
-df = pd.DataFrame(
-    np.zeros((len(all_gene_names), len(sample_names)), dtype=np.float32),
-    columns=sample_names,
-    index=all_gene_names
-)
-
-# Add all of the data to the DataFrame
-for sample_name, sample_abund in all_abund.items():
-    # Format as a Pandas Series
-    sample_abund = pd.Series(
-        sample_abund
-    )
-
-    # Divide by the sum to get the proportional abundance
-    sample_abund = sample_abund / sample_abund.sum()
-
-    # Add the values to the table
-    df.values[
-        :, sample_names.index(sample_name)
-    ] = sample_abund.reindex(
-        index=all_gene_names
-    ).fillna(
-        0
-    ).apply(
-        np.float32
-    ).values
 
 # Write out the number of genes detected per sample
 pd.DataFrame(
     dict(
-        [
-            (
-                "n_genes_aligned", 
-                (df > 0).sum()
-            )
-        ]
+        n_genes_aligned = specimen_genes_detected
     )
 ).reset_index(
 ).rename(
     columns = dict(
-        [
-            ("index", "specimen")
-        ]
+        index = "specimen"
     )
 ).to_csv(
     "specimen_gene_count.csv.gz",
@@ -385,19 +355,12 @@ pd.DataFrame(
 # Write out the number of reads aligned per sample
 pd.DataFrame(
     dict(
-        [
-            (
-                "n_reads_aligned", 
-                specimen_reads_aligned
-            )
-        ]
+        n_reads_aligned = specimen_reads_aligned
     )
 ).reset_index(
 ).rename(
     columns = dict(
-        [
-            ("index", "specimen")
-        ]
+        index = "specimen"
     )
 ).to_csv(
     "specimen_reads_aligned.csv.gz",
@@ -407,18 +370,16 @@ pd.DataFrame(
 
 # Write out the CSV table with the length of each gene
 pd.DataFrame([
-    dict([("gene", gene), ("length", length)])
+    dict(
+        gene = gene, 
+        length = length
+    )
     for gene, length in gene_length_dict.items()
 ]).to_csv(
     "gene_length.csv.gz",
     index = None,
     compression = "gzip"
 )
-
-# Write out the abundances to a feather file
-logging.info("Writing to disk")
-df.reset_index(inplace=True)
-df.to_feather("gene.abund.feather")
 
 # Write out the gene names in batches of ${params.cag_batchsize}
 for ix, gene_list in enumerate([
@@ -445,7 +406,7 @@ process calcCAGabund {
     publishDir "${params.output_folder}/abund/", mode: "copy"
 
     input:
-    path gene_feather
+    path details_hdf
     path cag_csv_gz
 
     output:
@@ -454,7 +415,7 @@ process calcCAGabund {
     """
 #!/usr/bin/env python3
 
-import feather
+from collections import defaultdict
 import pandas as pd
 import logging
 
@@ -470,30 +431,67 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 
-# Read in the table of CAGs
-cags_df = pd.read_csv(
+# Read in the dictionary linking genes and CAGs
+cags_dict = pd.read_csv(
     "${cag_csv_gz}",
     compression="gzip"
-)
+).set_index(
+    "gene"
+)[
+    "CAG"
+]
+
+# Set the file path to the HDF5 with gene abundances
+details_hdf = "${details_hdf}"
+
+# Make sure the files exist
+assert os.path.exists(details_hdf), details_hdf
 
 # Read in the table of gene abundances
-abund_df = pd.read_feather(
-    "${gene_feather}"
-).set_index(
-    "index"
-)
+abund_df = defaultdict(lambda: defaultdict(float))
 
-# Annotate each gene with the CAG it was assigned to
-abund_df["CAG"] = cags_df.set_index("gene")["CAG"]
+# Open the HDF5 store
+with pd.HDFStore(details_hdf, "r") as store:
 
-# Make sure that every gene was assigned to a CAG
-assert abund_df["CAG"].isnull().sum() == 0
+    # Iterate over keys in the store
+    for k in store:
 
-# Now sum up the gene relative abundance by CAGs
-# and write out to a feather file
-abund_df.groupby(
-    "CAG"
-).sum(
+        # Sample abundances have a certain prefix
+        if k.startswith("/abund/gene/long/"):
+
+            # Parse the sample name
+            sample_name = k.replace("/abund/gene/long/", "")
+            logging.info("Reading gene abundances for {}".format(sample_name))
+
+            # Read the depth of sequencing for each gene
+            sample_depth = pd.read_hdf(
+                store,
+                k
+            ).set_index(
+                "id"
+            )[
+                "depth"
+            ]
+
+            # Normalize to sum to 1
+            sample_depth = sample_depth / sample_depth.sum()
+
+            # Add the abundance of each gene to its linked CAG
+            for gene_name, gene_prop in sample_depth.items():
+                abund_df[
+                    sample_namee
+                ][
+                    cags_dict[
+                        gene_name
+                    ]
+                ] += gene_prop
+
+# Now write out to a feather file
+logging.info("Building a single DataFrame of CAG abundances")
+pd.DataFrame(
+    abund_df
+).fillna(
+    0
 ).reset_index(
 ).to_feather(
     "CAG.abund.feather"
