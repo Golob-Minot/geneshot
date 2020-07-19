@@ -260,10 +260,10 @@ n = 0
 gene_list = set()
 for fp in cag_csv_list:
     shard_cags = pd.read_csv(fp, compression="gzip", sep=",")
-    for _, gene_list in shard_cags.groupby("CAG"):
-        cags[ix] = gene_list['gene'].tolist()
-        ix += 1
+    for _, shard_df in shard_cags.groupby("CAG"):
+        cags[ix] = shard_df['gene'].tolist()
         gene_list.update(set(cags[ix]))
+        ix += 1
 
 logging.info(
     "Read in %d CAGs from %d shards covering %d genes" % (
