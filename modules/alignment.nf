@@ -480,7 +480,7 @@ with pd.HDFStore(details_hdf, "r") as store:
             # Add the abundance of each gene to its linked CAG
             for gene_name, gene_prop in sample_depth.items():
                 abund_df[
-                    sample_namee
+                    sample_name
                 ][
                     cags_dict[
                         gene_name
