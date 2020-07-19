@@ -23,7 +23,8 @@ NXF_VER=20.04.1 nextflow run main.nf \
     --distance_threshold 0.5 \
     -w work/ \
     --noannot \
-    -resume
+    -resume \
+    -with-docker ubuntu:20.04
 
 # # Test with preprocessing and a formula
 # NXF_VER=20.04.1 nextflow run main.nf \
