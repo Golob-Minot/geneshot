@@ -95,11 +95,6 @@ with pd.HDFStore(details_hdf, "r") as store:
             # Normalize to sum to 1
             sample_depth = sample_depth / sample_depth.sum()
 
-            logging.info("Making sure that the gene names match between the HDF5 and CSV")
-            n_mismatch = len(gene_list - set(sample_depth.index.values))
-            msg = "Gene names do not match between the HDF5 and CSV (n= %d / %d)" % (n_mismatch, len(gene_list))
-            assert n_mismatch == 0, msg
-
             # Subset down to the genes in this list
             genes_in_sample = list(
                 set(sample_depth.index.values) & gene_list
@@ -305,11 +300,6 @@ with pd.HDFStore(details_hdf, "r") as store:
 
             # Normalize to sum to 1
             sample_depth = sample_depth / sample_depth.sum()
-
-            logging.info("Making sure that the gene names match between the HDF5 and CSV")
-            n_mismatch = len(gene_list - set(sample_depth.index.values))
-            msg = "Gene names do not match between the HDF5 and CSV (n= %d / %d)" % (n_mismatch, len(gene_list))
-            assert n_mismatch == 0, msg
 
             # Subset down to the genes in this list
             genes_in_sample = list(
