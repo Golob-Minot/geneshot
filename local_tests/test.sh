@@ -12,12 +12,12 @@ set -e
 # 3. Run this script
 
 # Test with preprocessing and a formula
-NXF_VER=19.10.0 nextflow run main.nf \
+NXF_VER=20.04.1 nextflow run main.nf \
     -c nextflow.config \
     -profile testing \
-    --manifest data/mock.manifest.2.csv \
+    --manifest data/mock.manifest.csv \
     --nopreprocess \
-    --output output0 \
+    --output output \
     --hg_index data/hg_chr_21_bwa_index.tar.gz \
     --formula "label1 + label2" \
     --distance_threshold 0.5 \
@@ -26,7 +26,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
     -resume
 
 # # Test with preprocessing and a formula
-# NXF_VER=19.10.0 nextflow run main.nf \
+# NXF_VER=20.04.1 nextflow run main.nf \
 #     -c nextflow.config \
 #     -profile testing \
 #     --manifest data/mock.manifest.csv \
@@ -41,7 +41,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
 #     -resume
 
 # # Test with preprocessing and no formula
-# NXF_VER=19.10.0 nextflow run main.nf \
+# NXF_VER=20.04.1 nextflow run main.nf \
 #     -c nextflow.config \
 #     -profile testing \
 #     --manifest data/mock.manifest.csv \
@@ -54,7 +54,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
 #     -resume
 
 # # Test with formula and no preprocessing
-# NXF_VER=19.10.0 nextflow run main.nf \
+# NXF_VER=20.04.1 nextflow run main.nf \
 #     -c nextflow.config \
 #     -profile testing \
 #     --nopreprocess \
@@ -68,7 +68,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
 #     -resume
 
 # # Test with no formula and no preprocessing
-# NXF_VER=19.10.0 nextflow run main.nf \
+# NXF_VER=20.04.1 nextflow run main.nf \
 #     -c nextflow.config \
 #     -profile testing \
 #     --nopreprocess \
@@ -80,7 +80,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
 #     -resume
 
 # # Test with the gene catalog made in a previous round
-# NXF_VER=19.10.0 nextflow run main.nf \
+# NXF_VER=20.04.1 nextflow run main.nf \
 #     -c nextflow.config \
 #     -profile testing \
 #     --gene_fasta output1/ref/genes.fasta.gz \
@@ -94,7 +94,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
 
 
 # # Test with the gene catalog made in a previous round and whole genome alignment
-# NXF_VER=19.10.0 nextflow run main.nf \
+# NXF_VER=20.04.1 nextflow run main.nf \
 #     -c nextflow.config \
 #     -profile testing \
 #     --gene_fasta output1/ref/genes.fasta.gz \
@@ -111,7 +111,7 @@ NXF_VER=19.10.0 nextflow run main.nf \
 #     -resume
 
 # # Test with de novo assembly and whole genome alignment
-# NXF_VER=19.10.0 nextflow run main.nf \
+# NXF_VER=20.04.1 nextflow run main.nf \
 #     -c nextflow.config \
 #     -profile testing \
 #     --nopreprocess \
