@@ -27,7 +27,6 @@ def validate_results_hdf(results_hdf, check_corncob = False):
         "/annot/gene/cag",
         "/annot/gene/all",
         "/annot/cag/all",
-        "/abund/gene/wide",
         "/abund/cag/wide",
         "/ordination/pca",
         "/ordination/tsne",
