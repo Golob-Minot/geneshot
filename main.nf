@@ -399,10 +399,6 @@ workflow {
         combineReads.out,
         params.output_prefix
     )
-    // Publish the gene abundance feather file
-    publishGeneAbundances(
-        alignment_wf.out.gene_abund_feather
-    )
 
     // ########################
     // # STATISTICAL ANALYSIS #
@@ -439,7 +435,6 @@ workflow {
 
     collectAbundances(
         alignment_wf.out.cag_csv,
-        alignment_wf.out.gene_abund_feather,
         alignment_wf.out.cag_abund_feather,
         countReadsSummary.out,
         manifest_file,

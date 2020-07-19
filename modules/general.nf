@@ -204,7 +204,6 @@ process collectAbundances{
 
     input:
         path cag_csv
-        path gene_abund_feather
         path cag_abund_feather
         path readcount_csv
         path manifest_csv
@@ -232,7 +231,6 @@ import pickle
 pickle.HIGHEST_PROTOCOL = 4
 
 cag_csv = "${cag_csv}"
-gene_abund_feather = "${gene_abund_feather}"
 cag_abund_feather = "${cag_abund_feather}"
 readcount_csv = "${readcount_csv}"
 specimen_gene_count_csv = "${specimen_gene_count_csv}"
@@ -426,6 +424,8 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
     # Read in the table with the CAG-level abundances across all samples
     cag_abund_df = pd.read_feather(
         cag_abund_feather
+    ).rename(
+        columns={"index": "CAG"}
     )
     print(
         "Read in abundances for %d CAGs across %d samples" %
@@ -469,21 +469,6 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
             "/distances/%s" % metric
         )
 
-    # Read in the table with the gene-level abundances across all samples
-    gene_abund_df = pd.read_feather(
-        gene_abund_feather
-    )
-    print(
-        "Read in abundances for %d genes across %d samples" %
-        (gene_abund_df.shape[0], gene_abund_df.shape[1] - 1)
-    )
-    # Add some descriptive statistics
-    summary_dict["num_genes"] = gene_abund_df.shape[0]
-
-
-    # Write to HDF5
-    gene_abund_df.to_hdf(store, "/abund/gene/wide")
-
     # Read in the table describing which genes are grouped into which CAGs
     # This is being called 'cag_df', but it's really a table of CAG annotations per-gene,
     # so there is one row per gene.
@@ -494,6 +479,9 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         (cag_df.shape[0], cag_df["CAG"].unique().shape[0])
     )
 
+    # Save the total number of genes
+    summary_dict["num_genes"] = cag_df.shape[0]
+
     # Write to HDF5
     cag_df.to_hdf(
         store, 
@@ -502,15 +490,8 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         data_columns = ["gene", "CAG"]
     )
 
-    # Calculate prevalence and abundance information for each gene
-    gene_abund_df.set_index("index", inplace=True)
-    gene_abundance = gene_abund_df.mean(axis=1)
-    gene_prevalence = (gene_abund_df > 0).mean(axis=1)
-
     # Add that information on the gene abundance and prevalence to this gene summary table
     cag_df = cag_df.assign(
-        prevalence = cag_df["gene"].apply(gene_prevalence.get),
-        abundance = cag_df["gene"].apply(gene_abundance.get),
         length = cag_df["gene"].apply(gene_length_df.get)
     )
 
