@@ -424,6 +424,8 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
     # Read in the table with the CAG-level abundances across all samples
     cag_abund_df = pd.read_feather(
         cag_abund_feather
+    ).rename(
+        columns={"index": "CAG"}
     )
     print(
         "Read in abundances for %d CAGs across %d samples" %
