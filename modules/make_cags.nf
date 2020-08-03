@@ -32,6 +32,7 @@ import os
 import pandas as pd
 import tarfile
 import zarr
+import shutil
 from ann_linkage_clustering.lib import make_cags_with_ann
 from ann_linkage_clustering.lib import iteratively_refine_cags
 from ann_linkage_clustering.lib import make_nmslib_index
@@ -184,6 +185,9 @@ fp_out = "CAGs.csv.gz"
 logging.info("Writing out CAGs to %s" % fp_out)
 cags_df.to_csv(fp_out, compression="gzip", index=None)
 
+logging.info("Deleting the temporary zarr")
+shutil.rmtree("gene_abundance.zarr")
+
 logging.info("Done")
     """
 }
@@ -216,6 +220,7 @@ import os
 import pandas as pd
 import tarfile
 import zarr
+import shutil
 from ann_linkage_clustering.lib import make_cags_with_ann
 from ann_linkage_clustering.lib import iteratively_refine_cags
 from ann_linkage_clustering.lib import make_nmslib_index
@@ -375,6 +380,9 @@ fp_out = "CAGs.csv.gz"
 
 logging.info("Writing out CAGs to %s" % fp_out)
 cags_df.to_csv(fp_out, compression="gzip", index=None)
+
+logging.info("Deleting the temporary zarr")
+shutil.rmtree("gene_abundance.zarr")
 
 logging.info("Done")
     """
