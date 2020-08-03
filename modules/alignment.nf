@@ -230,7 +230,7 @@ process famli {
 // Make a single feather file with the abundance of every gene across every sample
 process assembleAbundances {
     tag "Make gene ~ sample abundance matrix"
-    container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+    container "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
     label "mem_veryhigh"
     errorStrategy 'retry'
 
@@ -245,6 +245,7 @@ process assembleAbundances {
     file "${output_prefix}.details.hdf5"
     path "gene_length.csv.gz"
     path "specimen_reads_aligned.csv.gz"
+    path "gene_abundance.zarr.tar"
 
 
     """
@@ -254,9 +255,11 @@ import logging
 import numpy as np
 import os
 import pandas as pd
+import tarfile
 import gzip
 import json
 import pickle
+import zarr
 pickle.HIGHEST_PROTOCOL = 4
 
 # Set up logging
@@ -389,6 +392,58 @@ for ix, gene_list in enumerate([
     print("Writing out %d genes in batch %d" % (len(gene_list), ix))
     with gzip.open("gene_list.%d.csv.gz" % ix, "wt") as handle:
         handle.write("\\n".join(gene_list))
+
+# Write out the sequencing depth of each gene in each specimen in zarr format
+z = zarr.open(
+    "gene_abundance.zarr",
+    mode="w",
+    shape=(len(all_gene_names), len(sample_names)), 
+    chunks=True,
+    dtype='f4'
+)
+
+# Iterate over the list of files
+for fp in sample_jsons:
+    # Get the sample name from the file name
+    assert fp.endswith(".json.gz")
+    sample_name = fp[:-len(".json.gz")]
+
+    logging.info("Reading in %s from %s" % (sample_name, fp))
+    df = read_json(fp)
+
+    logging.info("Saving %s to gene_abundance.zarr" % sample_name)
+    # Save the sequencing depth to zarr
+    z[
+        :,
+        sample_names.index(sample_name)
+    ] = df.set_index(
+        "id"
+    ).reindex(
+        index=all_gene_names
+    )[
+        "depth"
+    ].fillna(
+        0
+    ).values
+
+# Write out the sample names and gene names
+logging.info("Writing out sample_names.json.gz")
+with gzip.open("sample_names.json.gz", "wt") as fo:
+    json.dump(sample_names, fo)
+
+logging.info("Writing out gene_names.json.gz")
+with gzip.open("gene_names.json.gz", "wt") as fo:
+    json.dump(all_gene_names, fo)
+
+logging.info("Creating gene_abundance.zarr.tar")
+with tarfile.open("gene_abundance.zarr.tar", "w") as tar:
+    for name in [
+        "gene_names.json.gz",
+        "sample_names.json.gz",
+        "gene_abundance.zarr",
+    ]:
+        logging.info("Adding %s to gene_abundance.zarr.tar" % name)
+        tar.add(name)
 
 logging.info("Done")
 
