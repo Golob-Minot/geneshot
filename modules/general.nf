@@ -849,7 +849,6 @@ with pd.HDFStore("${results_hdf}", "a") as store:
         store,
         "/annot/gene/eggnog",
         format = "fixed",
-        dtype=str,
     )
     
     # Write summary annotation table to HDF5
