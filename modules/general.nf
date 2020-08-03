@@ -858,7 +858,6 @@ with pd.HDFStore("${results_hdf}", "a") as store:
         "/annot/gene/all",
         format = "table",
         data_columns = ["CAG"],
-        dtype=str,
     )
 
 """
