@@ -455,7 +455,7 @@ logging.info("Done")
 // Summarize the abundance of every CAG across each sample
 process calcCAGabund {
     tag "Make CAG ~ sample abundance matrix"
-    container "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+    container "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
     label "mem_veryhigh"
     errorStrategy 'retry'
     publishDir "${params.output_folder}/abund/", mode: "copy"

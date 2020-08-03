@@ -2,7 +2,7 @@
 // Container versions
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 container__ubuntu = "ubuntu:18.04"
-container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collection@sha256:fae756a380a3d3335241b68251942a8ed0bf1ae31a33a882a430085b492e44fe"
+container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 
 // Default parameters
