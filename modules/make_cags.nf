@@ -79,7 +79,6 @@ with gzip.open("sample_names.json.gz", "rt") as handle:
 gene_list_csv = "${gene_list_csv}"
 
 # Make sure the files exist
-assert os.path.exists(details_hdf), details_hdf
 assert os.path.exists(gene_list_csv), gene_list_csv
 
 logging.info("Reading in the list of genes for this shard from %s" % (gene_list_csv))
