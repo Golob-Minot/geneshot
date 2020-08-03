@@ -215,6 +215,7 @@ import numpy as np
 import os
 import pandas as pd
 import tarfile
+import zarr
 from ann_linkage_clustering.lib import make_cags_with_ann
 from ann_linkage_clustering.lib import iteratively_refine_cags
 from ann_linkage_clustering.lib import make_nmslib_index
