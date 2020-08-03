@@ -94,7 +94,10 @@ z = zarr.open("gene_abundance.zarr", mode="r")
 
 # Set up an array for gene abundances
 df = pd.DataFrame(
-    shape = (len(gene_list), len(sample_names)),
+    data = np.zeros(
+        (len(gene_list), len(sample_names)),
+        dtype = np.float32,
+    ),
     dtype = np.float32,
     index = gene_list,
     columns = sample_names
@@ -293,9 +296,13 @@ z = zarr.open("gene_abundance.zarr", mode="r")
 
 # Set up an array for CAG abundances
 df = pd.DataFrame(
-    shape = (len(cags), len(sample_names)),
+    data = np.zeros(
+        (len(cags), len(sample_names)),
+        dtype = np.float32,
+    ),
     dtype = np.float32,
-    columns = sample_names
+    columns = sample_names,
+    index = list(range(len(cags))),
 )
 
 # Iterate over each sample
