@@ -1,4 +1,4 @@
-container__find_cags = "quay.io/fhcrc-microbiome/find-cags:v0.12.2"
+container__find_cags = "quay.io/fhcrc-microbiome/find-cags:v0.13.0"
 
 // Default options
 params.distance_threshold = 0.5
