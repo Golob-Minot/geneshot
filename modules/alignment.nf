@@ -77,41 +77,41 @@ workflow alignment_wf {
 
     // Group shards of genes into Co-Abundant Gene Groups (CAGs)
     makeInitialCAGs(
-        assembleAbundances.out[2],
+        assembleAbundances.out[5],
         assembleAbundances.out[0].flatten()
     )
 
     // Perform multiple rounds of combining shards to make ever-larger CAGs
     refineCAGs_round1(
-        assembleAbundances.out[2],
+        assembleAbundances.out[5],
         makeInitialCAGs.out.toSortedList().flatten().collate(2)
     )
     refineCAGs_round2(
-        assembleAbundances.out[2],
+        assembleAbundances.out[5],
         refineCAGs_round1.out.toSortedList().flatten().collate(2)
     )
     refineCAGs_round3(
-        assembleAbundances.out[2],
+        assembleAbundances.out[5],
         refineCAGs_round2.out.toSortedList().flatten().collate(2)
     )
     refineCAGs_round4(
-        assembleAbundances.out[2],
+        assembleAbundances.out[5],
         refineCAGs_round3.out.toSortedList().flatten().collate(2)
     )
     refineCAGs_round5(
-        assembleAbundances.out[2],
+        assembleAbundances.out[5],
         refineCAGs_round4.out.toSortedList().flatten().collate(2)
     )
 
     // Combine the shards and make a new set of CAGs
     refineCAGs_final(
-        assembleAbundances.out[2],
+        assembleAbundances.out[5],
         refineCAGs_round5.out.collect()
     )
 
     // Calculate the relative abundance of each CAG in these samples
     calcCAGabund(
-        assembleAbundances.out[2],
+        assembleAbundances.out[5],
         refineCAGs_final.out
     )
 
@@ -411,12 +411,8 @@ for fp in sample_jsons:
     logging.info("Reading in %s from %s" % (sample_name, fp))
     df = read_json(fp)
 
-    logging.info("Saving %s to gene_abundance.zarr" % sample_name)
-    # Save the sequencing depth to zarr
-    z[
-        :,
-        sample_names.index(sample_name)
-    ] = df.set_index(
+    # Calculate the proportional depth of sequencing per gene
+    gene_depth = df.set_index(
         "id"
     ).reindex(
         index=all_gene_names
@@ -424,7 +420,16 @@ for fp in sample_jsons:
         "depth"
     ].fillna(
         0
-    ).values
+    ) / df[
+        "depth"
+    ].sum()
+
+    logging.info("Saving %s to gene_abundance.zarr" % sample_name)
+    # Save the sequencing depth to zarr
+    z[
+        :,
+        sample_names.index(sample_name)
+    ] = gene_depth.values
 
 # Write out the sample names and gene names
 logging.info("Writing out sample_names.json.gz")
