@@ -128,7 +128,7 @@ workflow alignment_wf {
 // Align each sample against the reference database of genes using DIAMOND
 process diamondDB {
     tag "Make a DIAMOND database"
-    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
     errorStrategy 'retry'
     publishDir "${params.output_folder}/ref/", mode: "copy"
@@ -154,7 +154,7 @@ process diamondDB {
 // Align each sample against the reference database of genes using DIAMOND
 process diamond {
     tag "Align to the gene catalog"
-    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
     errorStrategy 'retry'
     
