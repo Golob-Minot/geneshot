@@ -186,6 +186,7 @@ logging.info("Writing out CAGs to %s" % fp_out)
 cags_df.to_csv(fp_out, compression="gzip", index=None)
 
 logging.info("Deleting the temporary zarr")
+del z
 shutil.rmtree("gene_abundance.zarr")
 
 logging.info("Done")
@@ -382,8 +383,10 @@ logging.info("Writing out CAGs to %s" % fp_out)
 cags_df.to_csv(fp_out, compression="gzip", index=None)
 
 logging.info("Deleting the temporary zarr")
+del z
 shutil.rmtree("gene_abundance.zarr")
 
 logging.info("Done")
+os._exit(0)
     """
 }
