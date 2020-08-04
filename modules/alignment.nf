@@ -466,7 +466,7 @@ process calcCAGabund {
     publishDir "${params.output_folder}/abund/", mode: "copy"
 
     input:
-    path details_hdf
+    path gene_abundances_zarr_tar
     path cag_csv_gz
 
     output:
@@ -476,9 +476,14 @@ process calcCAGabund {
 #!/usr/bin/env python3
 
 from collections import defaultdict
+import gzip
+import json
+import numpy as np
 import os
 import pandas as pd
 import logging
+import tarfile
+import zarr
 
 # Set up logging
 logFormatter = logging.Formatter(
@@ -493,67 +498,71 @@ consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 
 # Read in the dictionary linking genes and CAGs
-cags_dict = pd.read_csv(
-    "${cag_csv_gz}",
-    compression="gzip"
-).set_index(
-    "gene"
-)[
-    "CAG"
-]
+cags = {
+    cag_id: cag_df["gene"].tolist()
+    for cag_id, cag_df in pd.read_csv(
+        "${cag_csv_gz}",
+        compression="gzip"
+    ).groupby(
+        "CAG"
+    )
+}
 
-# Set the file path to the HDF5 with gene abundances
-details_hdf = "${details_hdf}"
+# Extract everything from the gene_abundance.zarr.tar
+logging.info("Extracting ${gene_abundances_zarr_tar}")
+with tarfile.open("${gene_abundances_zarr_tar}") as tar:
+    tar.extractall()
 
-# Make sure the files exist
-assert os.path.exists(details_hdf), details_hdf
+# Make sure that the expected contents are present
+for fp in [
+    "gene_names.json.gz",
+    "sample_names.json.gz",
+    "gene_abundance.zarr",
+]:
+    logging.info("Checking that %s is present" % fp)
+    assert os.path.exists(fp)
 
-# Read in the table of gene abundances
-abund_df = defaultdict(lambda: defaultdict(float))
+# Read in the gene names and sample names as indexed in the zarr
+logging.info("Reading in gene_names.json.gz")
+with gzip.open("gene_names.json.gz", "rt") as handle:
+    gene_names = json.load(handle)
 
-# Open the HDF5 store
-with pd.HDFStore(details_hdf, "r") as store:
+logging.info("Reading in sample_names.json.gz")
+with gzip.open("sample_names.json.gz", "rt") as handle:
+    sample_names = json.load(handle)
 
-    # Iterate over keys in the store
-    for k in store:
+# Open the zarr store
+logging.info("Reading in gene abundances from gene_abundance.zarr")
+z = zarr.open("gene_abundance.zarr", mode="r")
 
-        # Sample abundances have a certain prefix
-        if k.startswith("/abund/gene/long/"):
+# Set up an array for CAG abundances
+df = pd.DataFrame(
+    data = np.zeros(
+        (len(cags), len(sample_names)),
+        dtype = np.float32,
+    ),
+    dtype = np.float32,
+    columns = sample_names,
+    index = list(range(len(cags))),
+)
 
-            # Parse the sample name
-            sample_name = k.replace("/abund/gene/long/", "")
-            logging.info("Reading gene abundances for {}".format(sample_name))
+# Iterate over each sample
+for sample_ix, sample_name in enumerate(sample_names):
 
-            # Read the depth of sequencing for each gene
-            sample_depth = pd.read_hdf(
-                store,
-                k
-            ).set_index(
-                "id"
-            )[
-                "depth"
-            ]
+    # Read the depth of sequencing for each gene
+    logging.info("Reading gene abundances for %s" % sample_name)
+    sample_gene_depth = pd.Series(z[:, sample_ix], index=gene_names)
 
-            # Normalize to sum to 1
-            sample_depth = sample_depth / sample_depth.sum()
+    # Sum up the depth by CAG
+    df[sample_name] = pd.Series({
+        cag_ix: sample_gene_depth.reindex(index=cag_gene_list).sum()
+        for cag_ix, cag_gene_list in cags.items()
+    })
 
-            # Add the abundance of each gene to its linked CAG
-            for gene_name, gene_prop in sample_depth.items():
-                abund_df[
-                    sample_name
-                ][
-                    cags_dict[
-                        gene_name
-                    ]
-                ] += gene_prop
 
 # Now write out to a feather file
 logging.info("Building a single DataFrame of CAG abundances")
-pd.DataFrame(
-    abund_df
-).fillna(
-    0
-).reset_index(
+df.reset_index(
 ).to_feather(
     "CAG.abund.feather"
 )
