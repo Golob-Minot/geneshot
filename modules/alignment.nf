@@ -1,6 +1,6 @@
 // Processes used for alignment of reads against gene databases
 
-params.cag_batchsize = 100000
+params.cag_batchsize = 10000
 
 // Default options
 params.distance_threshold = 0.5
@@ -84,23 +84,23 @@ workflow alignment_wf {
     // Perform multiple rounds of combining shards to make ever-larger CAGs
     refineCAGs_round1(
         assembleAbundances.out[5],
-        makeInitialCAGs.out.toSortedList().flatten().collate(2)
+        makeInitialCAGs.out.toSortedList().flatten().collate(4)
     )
     refineCAGs_round2(
         assembleAbundances.out[5],
-        refineCAGs_round1.out.toSortedList().flatten().collate(2)
+        refineCAGs_round1.out.toSortedList().flatten().collate(4)
     )
     refineCAGs_round3(
         assembleAbundances.out[5],
-        refineCAGs_round2.out.toSortedList().flatten().collate(2)
+        refineCAGs_round2.out.toSortedList().flatten().collate(4)
     )
     refineCAGs_round4(
         assembleAbundances.out[5],
-        refineCAGs_round3.out.toSortedList().flatten().collate(2)
+        refineCAGs_round3.out.toSortedList().flatten().collate(4)
     )
     refineCAGs_round5(
         assembleAbundances.out[5],
-        refineCAGs_round4.out.toSortedList().flatten().collate(2)
+        refineCAGs_round4.out.toSortedList().flatten().collate(4)
     )
 
     // Combine the shards and make a new set of CAGs
