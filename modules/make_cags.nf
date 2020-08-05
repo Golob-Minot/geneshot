@@ -9,7 +9,7 @@ params.linkage_type = "average"
 process makeInitialCAGs {
     tag "Group gene subsets by co-abundance"
     container "${container__find_cags}"
-    label "mem_veryhigh"
+    label "mem_medium"
     errorStrategy 'retry'
 
     input:
@@ -197,7 +197,7 @@ logging.info("Done")
 process refineCAGs {
     tag "Group all genes by co-abundance"
     container "${container__find_cags}"
-    label "mem_veryhigh"
+    label "mem_medium"
     errorStrategy 'retry'
 
     input:
