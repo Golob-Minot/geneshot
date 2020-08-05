@@ -1,4 +1,4 @@
-container__find_cags = "quay.io/fhcrc-microbiome/find-cags:v0.12.2"
+container__find_cags = "quay.io/fhcrc-microbiome/find-cags:v0.13.0"
 
 // Default options
 params.distance_threshold = 0.5
@@ -13,7 +13,7 @@ process makeInitialCAGs {
     errorStrategy 'retry'
 
     input:
-    path details_hdf
+    path gene_abundances_zarr_tar
     path gene_list_csv
 
     output:
@@ -30,6 +30,9 @@ import nmslib
 import numpy as np
 import os
 import pandas as pd
+import tarfile
+import zarr
+import shutil
 from ann_linkage_clustering.lib import make_cags_with_ann
 from ann_linkage_clustering.lib import iteratively_refine_cags
 from ann_linkage_clustering.lib import make_nmslib_index
@@ -50,73 +53,70 @@ rootLogger.addHandler(consoleHandler)
 threads = int("${task.cpus}")
 pool = Pool(threads)
 
-# Set the file path to the HDF5 with gene abundances
-details_hdf = "${details_hdf}"
+# Extract everything from the gene_abundance.zarr.tar
+logging.info("Extracting ${gene_abundances_zarr_tar}")
+with tarfile.open("${gene_abundances_zarr_tar}") as tar:
+    tar.extractall()
+
+# Make sure that the expected contents are present
+for fp in [
+    "gene_names.json.gz",
+    "sample_names.json.gz",
+    "gene_abundance.zarr",
+]:
+    logging.info("Checking that %s is present" % fp)
+    assert os.path.exists(fp)
+
+# Read in the gene names and sample names as indexed in the zarr
+logging.info("Reading in gene_names.json.gz")
+with gzip.open("gene_names.json.gz", "rt") as handle:
+    gene_names = json.load(handle)
+
+logging.info("Reading in sample_names.json.gz")
+with gzip.open("sample_names.json.gz", "rt") as handle:
+    sample_names = json.load(handle)
 
 # Set the file path to the genes for this subset
 gene_list_csv = "${gene_list_csv}"
 
 # Make sure the files exist
-assert os.path.exists(details_hdf), details_hdf
 assert os.path.exists(gene_list_csv), gene_list_csv
 
 logging.info("Reading in the list of genes for this shard from %s" % (gene_list_csv))
-gene_list = set([
+gene_list = [
     line.rstrip("\\n")
     for line in gzip.open(gene_list_csv, "rt")
-])
+]
 logging.info("This shard contains %d genes" % (len(gene_list)))
 
-logging.info("Reading in gene abundances from %s" % details_hdf)
-df = {}
-# Open the HDF5 store
-with pd.HDFStore(details_hdf, "r") as store:
+# Open the zarr store
+logging.info("Reading in gene abundances from gene_abundance.zarr")
+z = zarr.open("gene_abundance.zarr", mode="r")
 
-    # Iterate over keys in the store
-    for k in store:
-
-        # Sample abundances have a certain prefix
-        if k.startswith("/abund/gene/long/"):
-
-            # Parse the sample name
-            sample_name = k.replace("/abund/gene/long/", "")
-            logging.info("Reading gene abundances for {}".format(sample_name))
-
-            # Read the depth of sequencing for each gene
-            sample_depth = pd.read_hdf(
-                store,
-                k
-            ).set_index(
-                "id"
-            )[
-                "depth"
-            ]
-
-            # Normalize to sum to 1
-            sample_depth = sample_depth / sample_depth.sum()
-
-            # Subset down to the genes in this list
-            genes_in_sample = list(
-                set(sample_depth.index.values) & gene_list
-            )
-
-            # Add genes from this list to the table
-            if len(genes_in_sample) > 0:
-                df[
-                    sample_name
-                ] = sample_depth.reindex(
-                    index = genes_in_sample
-                )
-
-# Make the DataFrame
-logging.info("Formatting DataFrame")
+# Set up an array for gene abundances
 df = pd.DataFrame(
-    df
-).fillna(
-    0
-).applymap(
-    np.float16
+    data = np.zeros(
+        (len(gene_list), len(sample_names)),
+        dtype = np.float32,
+    ),
+    dtype = np.float32,
+    index = gene_list,
+    columns = sample_names
 )
+
+# Iterate over each sample
+for sample_ix, sample_name in enumerate(sample_names):
+
+    # Read in the abundances for this sample
+    logging.info("Reading in gene abundances for %s" % sample_name)
+    df[sample_name] = pd.Series(
+        z[:, sample_ix],
+        index=gene_names
+    ).reindex(
+        gene_list
+    ).apply(
+        np.float32
+    )
 
 max_dist = float("${params.distance_threshold}")
 logging.info("Maximum cosine distance: %s" % max_dist)
@@ -185,6 +185,10 @@ fp_out = "CAGs.csv.gz"
 logging.info("Writing out CAGs to %s" % fp_out)
 cags_df.to_csv(fp_out, compression="gzip", index=None)
 
+logging.info("Deleting the temporary zarr")
+del z
+shutil.rmtree("gene_abundance.zarr")
+
 logging.info("Done")
     """
 }
@@ -197,7 +201,7 @@ process refineCAGs {
     errorStrategy 'retry'
 
     input:
-    path details_hdf
+    path gene_abundances_zarr_tar
     path "shard.CAG.*.csv.gz"
 
     output:
@@ -206,6 +210,7 @@ process refineCAGs {
     """
 #!/usr/bin/env python3
 
+from collections import defaultdict
 import gzip
 import json
 import logging
@@ -214,6 +219,9 @@ import nmslib
 import numpy as np
 import os
 import pandas as pd
+import tarfile
+import zarr
+import shutil
 from ann_linkage_clustering.lib import make_cags_with_ann
 from ann_linkage_clustering.lib import iteratively_refine_cags
 from ann_linkage_clustering.lib import make_nmslib_index
@@ -234,11 +242,28 @@ rootLogger.addHandler(consoleHandler)
 threads = int("${task.cpus}")
 pool = Pool(threads)
 
-# Set the file path to the HDF5 with gene abundances
-details_hdf = "${details_hdf}"
+# Extract everything from the gene_abundance.zarr.tar
+logging.info("Extracting ${gene_abundances_zarr_tar}")
+with tarfile.open("${gene_abundances_zarr_tar}") as tar:
+    tar.extractall()
 
-# Make sure the files exist
-assert os.path.exists(details_hdf), details_hdf
+# Make sure that the expected contents are present
+for fp in [
+    "gene_names.json.gz",
+    "sample_names.json.gz",
+    "gene_abundance.zarr",
+]:
+    logging.info("Checking that %s is present" % fp)
+    assert os.path.exists(fp)
+
+# Read in the gene names and sample names as indexed in the zarr
+logging.info("Reading in gene_names.json.gz")
+with gzip.open("gene_names.json.gz", "rt") as handle:
+    gene_names = json.load(handle)
+
+logging.info("Reading in sample_names.json.gz")
+with gzip.open("sample_names.json.gz", "rt") as handle:
+    sample_names = json.load(handle)
 
 # Set the file path to the CAGs made for each subset
 cag_csv_list = [
@@ -273,63 +298,46 @@ logging.info(
     )
 )
 
-logging.info("Reading in gene abundances from %s" % details_hdf)
-df = {}
-# Open the HDF5 store
-with pd.HDFStore(details_hdf, "r") as store:
+# Open the zarr store
+logging.info("Reading in gene abundances from gene_abundance.zarr")
+z = zarr.open("gene_abundance.zarr", mode="r")
 
-    # Iterate over keys in the store
-    for k in store:
-
-        # Sample abundances have a certain prefix
-        if k.startswith("/abund/gene/long/"):
-
-            # Parse the sample name
-            sample_name = k.replace("/abund/gene/long/", "")
-            logging.info("Reading gene abundances for {}".format(sample_name))
-
-            # Read the depth of sequencing for each gene
-            sample_depth = pd.read_hdf(
-                store,
-                k
-            ).set_index(
-                "id"
-            )[
-                "depth"
-            ]
-
-            # Normalize to sum to 1
-            sample_depth = sample_depth / sample_depth.sum()
-
-            # Subset down to the genes in this list
-            genes_in_sample = list(
-                set(sample_depth.index.values) & gene_list
-            )
-
-            # Add genes from this list to the table
-            if len(genes_in_sample) > 0:
-                df[
-                    sample_name
-                ] = sample_depth.reindex(
-                    index = genes_in_sample
-                )
-
-# Make the DataFrame
-logging.info("Formatting DataFrame")
+# Set up an array for CAG abundances
 df = pd.DataFrame(
-    df
-).fillna(
-    0
-).applymap(
-    np.float16
+    data = np.zeros(
+        (len(cags), len(sample_names)),
+        dtype = np.float32,
+    ),
+    dtype = np.float32,
+    columns = sample_names,
+    index = list(range(len(cags))),
 )
+
+# Iterate over each sample
+for sample_ix, sample_name in enumerate(sample_names):
+
+    # Read the depth of sequencing for each gene
+    logging.info("Reading gene abundances for %s" % sample_name)
+    sample_gene_depth = pd.Series(z[:, sample_ix], index=gene_names)
+
+    # Sum up the depth by CAG
+    df[sample_name] = pd.Series({
+        cag_ix: sample_gene_depth.reindex(index=cag_gene_list).sum()
+        for cag_ix, cag_gene_list in cags.items()
+    })
 
 max_dist = float("${params.distance_threshold}")
 logging.info("Maximum cosine distance: %s" % max_dist)
 
+# In the `iteratively_refine_cags` step, CAGs will be combined
+grouped_cags = {
+    cag_ix: [cag_ix]
+    for cag_ix in range(len(cags))
+}
+
 logging.info("Refining CAGS")
 iteratively_refine_cags(
-    cags,
+    grouped_cags,
     df.copy(),
     max_dist,
     threads=threads,
@@ -338,6 +346,16 @@ iteratively_refine_cags(
     max_iters = 5
 )
 
+logging.info("Expanding with the original set of CAGs")
+new_cags = {
+    cag_group_ix: [
+        gene_name
+        for original_cag in cag_group_list
+        for gene_name in cags[original_cag]
+    ]
+    for cag_group_ix, cag_group_list in grouped_cags.items()
+}
+
 logging.info("Formatting CAGs as a DataFrame")
 cags_df = pd.DataFrame(
     [
@@ -345,7 +363,7 @@ cags_df = pd.DataFrame(
         for ix, list_of_genes in enumerate(
             sorted(
                 list(
-                    cags.values()
+                    new_cags.values()
                 ), 
                 key=len, 
                 reverse=True
@@ -364,6 +382,11 @@ fp_out = "CAGs.csv.gz"
 logging.info("Writing out CAGs to %s" % fp_out)
 cags_df.to_csv(fp_out, compression="gzip", index=None)
 
+logging.info("Deleting the temporary zarr")
+del z
+shutil.rmtree("gene_abundance.zarr")
+
 logging.info("Done")
+os._exit(0)
     """
 }

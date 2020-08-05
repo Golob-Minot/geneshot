@@ -476,7 +476,7 @@ gzip genes.shard.*.fasta
 
 process diamond_tax {
     tag "Annotate genes by taxonomy"
-    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
 
     input:
@@ -615,7 +615,7 @@ with gzip.open("genes.fasta.gz", "wt") as fo:
 // Use alignment to figure out which assembled allele was grouped into which gene
 process alignAlleles {
     tag "Match alleles to gene centroids"
-    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_medium'
     errorStrategy 'retry'
     
