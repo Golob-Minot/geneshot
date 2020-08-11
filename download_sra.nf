@@ -426,7 +426,7 @@ fi
 
 // Extract the FASTQ files from the SRA file
 process extractSRA {
-    container "quay.io/fhcrc-microbiome/get_sra@sha256:16b7988e435da5d21bb1fbd7c83e97db769f1c95c9d32823fde49c729a64774a"
+    container "quay.io/fhcrc-microbiome/get_sra:v0.4"
     label "io_limited"
     errorStrategy 'retry'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
