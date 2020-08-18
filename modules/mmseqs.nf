@@ -21,23 +21,38 @@ set -e
 echo "Combining input files"
 cat input.genes.* > input.genes.fasta.gz
 
-# Make the MMSeqs2 database
-echo "Running linclust"
-mmseqs createdb input.genes.fasta.gz db
+# Don't run linclust if the file is extremely small
+# In this case, the subsequent DIAMOND deduplication
+# will be sufficient.
+# Also, linclust seems to break on very small input files
 
-# Cluster the protein sequences
-mmseqs linclust db cluster_db ./ \
-    --min-seq-id ${params.min_identity / 100} \
-    --max-seqs 100000 \
-    -c ${params.min_coverage / 100}
+if (( \$(gunzip -c input.genes.fasta.gz | grep -v '>' | wc -c ) < 1000000 )); then
 
-# Get the representative sequences
-mmseqs result2repseq db cluster_db genes
-mmseqs result2flat db db genes output.genes.fasta --use-fasta-header
-echo "Compressing"
-gzip output.genes.fasta
+    echo "Input files are < 1M characters -- skipping linclust"
+    mv input.genes.fasta.gz output.genes.fasta.gz
 
-echo "Done"
+else
+
+    # Make the MMSeqs2 database
+    echo "Running linclust"
+    mmseqs createdb input.genes.fasta.gz db
+
+    # Cluster the protein sequences
+    mmseqs linclust db cluster_db ./ \
+        --min-seq-id ${params.min_identity / 100} \
+        --max-seqs 100000 \
+        -c ${params.min_coverage / 100}
+
+    # Get the representative sequences
+    mmseqs result2repseq db cluster_db genes
+    mmseqs result2flat db db genes output.genes.fasta --use-fasta-header
+    echo "Compressing"
+    gzip output.genes.fasta
+
+    echo "Done"
+
+fi
+
 """
 }
 
