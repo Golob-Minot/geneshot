@@ -63,6 +63,7 @@ params.eggnog_dmnd = false
 params.distance_threshold = 0.25
 params.distance_metric = "cosine"
 params.linkage_type = "average"
+params.cag_batchsize = 10000
 
 // Statistical analysis options
 params.formula = false
@@ -251,7 +252,8 @@ include alignment_wf from './modules/alignment' params(
     distance_threshold: params.distance_threshold,
     linkage_type: params.linkage_type,
     sd_mean_cutoff: params.sd_mean_cutoff,
-    famli_batchsize: params.famli_batchsize
+    famli_batchsize: params.famli_batchsize,
+    cag_batchsize: params.cag_batchsize
 )
 
 // Import the workflows used for statistical analysis
