@@ -392,11 +392,11 @@ output_cag_size = pd.Series({
 }).sort_values(
     ascending=False
 )
+
 output_cag_ranking = pd.Series(
     range(output_cag_size.shape[0]), 
     index=output_cag_size.index
 )
-
 
 logging.info("Renaming genes with new CAG groupings")
 new_cag_mapping = {
@@ -414,7 +414,7 @@ cag_membership.replace(
 
 logging.info("Computing the abundance of new CAGs")
 cag_abund = pd.DataFrame({
-    new_cag_id: cag_abund.reindex(index=old_cag_id_list).sum()
+    output_cag_ranking[new_cag_id]: cag_abund.reindex(index=old_cag_id_list).sum()
     for new_cag_id, old_cag_id_list in grouped_cags.items()
 }).T
 
