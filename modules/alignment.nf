@@ -83,41 +83,35 @@ workflow alignment_wf {
 
     // Perform multiple rounds of combining shards to make ever-larger CAGs
     refineCAGs_round1(
-        assembleAbundances.out[5],
-        makeInitialCAGs.out.toSortedList().flatten().collate(4)
+        makeInitialCAGs.out[0].toSortedList().flatten().collate(4),
+        makeInitialCAGs.out[1].toSortedList().flatten().collate(4),
     )
     refineCAGs_round2(
-        assembleAbundances.out[5],
-        refineCAGs_round1.out.toSortedList().flatten().collate(4)
+        refineCAGs_round1.out[0].toSortedList().flatten().collate(4),
+        refineCAGs_round1.out[1].toSortedList().flatten().collate(4),
     )
     refineCAGs_round3(
-        assembleAbundances.out[5],
-        refineCAGs_round2.out.toSortedList().flatten().collate(4)
+        refineCAGs_round2.out[0].toSortedList().flatten().collate(4),
+        refineCAGs_round2.out[1].toSortedList().flatten().collate(4),
     )
     refineCAGs_round4(
-        assembleAbundances.out[5],
-        refineCAGs_round3.out.toSortedList().flatten().collate(4)
+        refineCAGs_round3.out[0].toSortedList().flatten().collate(4),
+        refineCAGs_round3.out[1].toSortedList().flatten().collate(4),
     )
     refineCAGs_round5(
-        assembleAbundances.out[5],
-        refineCAGs_round4.out.toSortedList().flatten().collate(4)
+        refineCAGs_round4.out[0].toSortedList().flatten().collate(4),
+        refineCAGs_round4.out[1].toSortedList().flatten().collate(4),
     )
 
     // Combine the shards and make a new set of CAGs
     refineCAGs_final(
-        assembleAbundances.out[5],
-        refineCAGs_round5.out.collect()
-    )
-
-    // Calculate the relative abundance of each CAG in these samples
-    calcCAGabund(
-        assembleAbundances.out[5],
-        refineCAGs_final.out
+        refineCAGs_round5.out[0].toSortedList(),
+        refineCAGs_round5.out[1].toSortedList(),
     )
 
     emit:
-        cag_csv = refineCAGs_final.out
-        cag_abund_feather = calcCAGabund.out
+        cag_csv = refineCAGs_final.out[0]
+        cag_abund_feather = refineCAGs_final.out[1]
         famli_json_list = famli.out.toSortedList()
         specimen_gene_count_csv = assembleAbundances.out[1]
         specimen_reads_aligned_csv = assembleAbundances.out[4]
@@ -384,7 +378,7 @@ pd.DataFrame([
     compression = "gzip"
 )
 
-# Write out the gene names in batches of ${params.cag_batchsize}
+# Write out the gene names in batches of ${cag_batchsize}
 for ix, gene_list in enumerate([
     all_gene_names[ix: (ix + ${cag_batchsize})]
     for ix in range(0, len(all_gene_names), ${cag_batchsize})
@@ -466,7 +460,6 @@ process calcCAGabund {
     publishDir "${params.output_folder}/abund/", mode: "copy"
 
     input:
-    path gene_abundances_zarr_tar
     path cag_csv_gz
 
     output:
