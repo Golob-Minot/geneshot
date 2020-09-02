@@ -315,6 +315,9 @@ for fp in cag_csv_list:
         feather_fp
     ))
 
+    # Make sure that the number of CAGs is the same in both files
+    assert shard_cags_abundance.shape[0] == shard_cags_membership["CAG"].unique().shape[0]
+
     # Transform each of the CAG IDs from the shard into a new CAG ID for the combined set
     cag_id_mapping = {}
     for previous_cag_id in shard_cags_membership["CAG"].unique():
