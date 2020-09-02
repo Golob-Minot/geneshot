@@ -18,6 +18,7 @@ process makeInitialCAGs {
 
     output:
     file "CAGs.csv.gz"
+    file "CAGs.abund.feather"
 
     """
 #!/usr/bin/env python3
@@ -159,30 +160,52 @@ iteratively_refine_cags(
     max_iters = 5
 )
 
-logging.info("Formatting CAGs as a DataFrame")
+logging.info("Sorting CAGs by size")
+cags = {
+    ix: list_of_genes
+    for ix, list_of_genes in enumerate(
+        sorted(
+            list(
+                cags.values()
+            ), 
+            key=len, 
+            reverse=True
+        )
+    )
+}
+
+logging.info("Computing relative abundance of CAGs")
+# Rows are CAGs, columns are specimens
+cags_abund_df = pd.DataFrame({
+    cag_id: df.reindex(
+        index=list_of_genes
+    ).sum()
+    for cag_id, list_of_genes in cags.items()
+}).T.sort_index()
+
+fp_out = "CAGs.abund.feather"
+logging.info("Saving CAG relative abundances to %s" % fp_out)
+cags_abund_df.reset_index().to_feather(
+    fp_out
+)
+
+logging.info("Formatting CAG membership as a DataFrame")
 cags_df = pd.DataFrame(
     [
         [ix, gene_id]
-        for ix, list_of_genes in enumerate(
-            sorted(
-                list(
-                    cags.values()
-                ), 
-                key=len, 
-                reverse=True
-            )
-        )
+        for ix, list_of_genes in cags.items()
         for gene_id in list_of_genes
     ],
     columns=["CAG", "gene"]
 )
 
 logging.info("Largest CAGs:")
-print(cags_df["CAG"].value_counts().head())
+for cag_id, cag_size in cags_df["CAG"].value_counts().head().items():
+    logging.info("CAG ID: %d, %d genes" % (cag_id, cag_size))
 
 fp_out = "CAGs.csv.gz"
 
-logging.info("Writing out CAGs to %s" % fp_out)
+logging.info("Writing out CAG membership to %s" % fp_out)
 cags_df.to_csv(fp_out, compression="gzip", index=None)
 
 logging.info("Deleting the temporary zarr")
@@ -201,11 +224,12 @@ process refineCAGs {
     errorStrategy 'retry'
 
     input:
-    path gene_abundances_zarr_tar
-    path "shard.CAG.*.csv.gz"
+    file "shard.CAG.*.csv.gz"
+    file "shard.CAG.*.feather"
 
     output:
     file "CAGs.csv.gz"
+    file "CAGs.abund.feather"
 
     """
 #!/usr/bin/env python3
@@ -242,89 +266,100 @@ rootLogger.addHandler(consoleHandler)
 threads = int("${task.cpus}")
 pool = Pool(threads)
 
-# Extract everything from the gene_abundance.zarr.tar
-logging.info("Extracting ${gene_abundances_zarr_tar}")
-with tarfile.open("${gene_abundances_zarr_tar}") as tar:
-    tar.extractall()
-
-# Make sure that the expected contents are present
-for fp in [
-    "gene_names.json.gz",
-    "sample_names.json.gz",
-    "gene_abundance.zarr",
-]:
-    logging.info("Checking that %s is present" % fp)
-    assert os.path.exists(fp)
-
-# Read in the gene names and sample names as indexed in the zarr
-logging.info("Reading in gene_names.json.gz")
-with gzip.open("gene_names.json.gz", "rt") as handle:
-    gene_names = json.load(handle)
-
-logging.info("Reading in sample_names.json.gz")
-with gzip.open("sample_names.json.gz", "rt") as handle:
-    sample_names = json.load(handle)
-
 # Set the file path to the CAGs made for each subset
 cag_csv_list = [
     fp
     for fp in os.listdir(".")
-    if fp.startswith("shard.CAG.")
+    if fp.startswith("shard.CAG.") and ".csv.gz" in fp
 ]
+cag_feather_list = [
+    fp
+    for fp in os.listdir(".")
+    if fp.startswith("shard.CAG.") and ".feather" in fp
+]
+
 # Make sure all of the files have the complete ending
 # (incompletely staged files will have a random suffix appended)
 for fp in cag_csv_list:
     assert fp.endswith(".csv.gz"), "Incomplete input file found: %s" % (fp)
 
+    # Make sure that we have a feather file which matches the CAG membership
+    assert fp.replace(".csv.gz", ".feather") in cag_feather_list, "Names of CAG membership and feather files do not match"
+
 assert len(cag_csv_list) > 0, "Didn't find CAGs from any previous shard"
+assert len(cag_csv_list) == len(cag_feather_list), "Number of CSV and feather files does not match"
+
+# Keep track of the abundances of the CAGs from the inputs
+cag_abund = []
+
+# Keep track of the genes that the previous set of CAGs corresponded to
+cag_membership = []
 
 logging.info("Reading in CAGs from previous shard")
-cags = dict()
 ix = 0
-n = 0
-gene_list = set()
 for fp in cag_csv_list:
-    shard_cags = pd.read_csv(fp, compression="gzip", sep=",")
-    for _, shard_df in shard_cags.groupby("CAG"):
-        cags[ix] = shard_df['gene'].tolist()
-        gene_list.update(set(cags[ix]))
+
+    # Read in the gene membership from this shard
+    shard_cags_membership = pd.read_csv(fp, compression="gzip", sep=",")
+    logging.info("Read in %d genes in %d CAGs from %s" % (
+        shard_cags_membership.shape[0],
+        shard_cags_membership["CAG"].unique().shape[0],
+        fp
+    ))
+
+    # Read in the abundances of the CAGs in this shard
+    feather_fp = fp.replace(".csv.gz", ".feather")
+    shard_cags_abundance = pd.read_feather(feather_fp)
+    logging.info("Read in abundances for %d CAGs from %s" % (
+        shard_cags_abundance.shape[0],
+        feather_fp
+    ))
+
+    # Transform each of the CAG IDs from the shard into a new CAG ID for the combined set
+    cag_id_mapping = {}
+    for previous_cag_id in shard_cags_membership["CAG"].unique():
+        cag_id_mapping[previous_cag_id] = ix
         ix += 1
+
+    # Now change the CAG ID for the shard in the membership table
+    shard_cags_membership.replace(
+        to_replace={
+            "CAG": cag_id_mapping
+        },
+        inplace=True
+    )
+    # Also change the CAG IDs for the abundance table
+    shard_cags_abundance.replace(
+        to_replace={
+            "index": cag_id_mapping
+        },
+        inplace=True
+    )
+    # Set the index on the abundance table
+    shard_cags_abundance.set_index("index", inplace=True)
+
+    # Add both the membership and abundance to the running total
+    cag_membership.append(shard_cags_membership)
+    cag_abund.append(shard_cags_abundance)
+
+# Combine all of the tables
+logging.info("Combining CAG abundance and membership across all CAGs")
+cag_membership = pd.concat(cag_membership)
+cag_abund = pd.concat(cag_abund)
+
+# Make sure that things all add up
+cag_abund.shape[0] == ix
+cag_abund.shape[0] == cag_membership["CAG"].max() + 1
+cag_abund.shape[0] == cag_membership["CAG"].unique().shape[0]
 
 logging.info(
     "Read in %d CAGs from %d shards covering %d genes" % (
-        len(cags), 
+        cag_abund.shape[0], 
         len(cag_csv_list), 
-        len(gene_list)
+        cag_membership.shape[0]
     )
 )
 
-# Open the zarr store
-logging.info("Reading in gene abundances from gene_abundance.zarr")
-z = zarr.open("gene_abundance.zarr", mode="r")
-
-# Set up an array for CAG abundances
-df = pd.DataFrame(
-    data = np.zeros(
-        (len(cags), len(sample_names)),
-        dtype = np.float32,
-    ),
-    dtype = np.float32,
-    columns = sample_names,
-    index = list(range(len(cags))),
-)
-
-# Iterate over each sample
-for sample_ix, sample_name in enumerate(sample_names):
-
-    # Read the depth of sequencing for each gene
-    logging.info("Reading gene abundances for %s" % sample_name)
-    sample_gene_depth = pd.Series(z[:, sample_ix], index=gene_names)
-
-    # Sum up the depth by CAG
-    df[sample_name] = pd.Series({
-        cag_ix: sample_gene_depth.reindex(index=cag_gene_list).sum()
-        for cag_ix, cag_gene_list in cags.items()
-    })
 
 max_dist = float("${params.distance_threshold}")
 logging.info("Maximum cosine distance: %s" % max_dist)
@@ -332,13 +367,13 @@ logging.info("Maximum cosine distance: %s" % max_dist)
 # In the `iteratively_refine_cags` step, CAGs will be combined
 grouped_cags = {
     cag_ix: [cag_ix]
-    for cag_ix in range(len(cags))
+    for cag_ix in cag_abund.index.values
 }
 
 logging.info("Refining CAGS")
 iteratively_refine_cags(
     grouped_cags,
-    df.copy(),
+    cag_abund.copy(),
     max_dist,
     threads=threads,
     distance_metric="${params.distance_metric}",
@@ -346,45 +381,37 @@ iteratively_refine_cags(
     max_iters = 5
 )
 
-logging.info("Expanding with the original set of CAGs")
-new_cags = {
-    cag_group_ix: [
-        gene_name
-        for original_cag in cag_group_list
-        for gene_name in cags[original_cag]
-    ]
-    for cag_group_ix, cag_group_list in grouped_cags.items()
+logging.info("Renaming genes with new CAG groupings")
+new_cag_mapping = {
+    old_cag_id: new_cag_id
+    for new_cag_id, old_cag_id_list in grouped_cags.items()
+    for old_cag_id in old_cag_id_list
 }
 
-logging.info("Formatting CAGs as a DataFrame")
-cags_df = pd.DataFrame(
-    [
-        [ix, gene_id]
-        for ix, list_of_genes in enumerate(
-            sorted(
-                list(
-                    new_cags.values()
-                ), 
-                key=len, 
-                reverse=True
-            )
-        )
-        for gene_id in list_of_genes
-    ],
-    columns=["CAG", "gene"]
+# Update the CAG membership table
+cag_membership.replace(
+    to_replace = {
+        "CAG": new_cag_mapping
+    }
 )
 
+logging.info("Computing the abundance of new CAGs")
+cag_abund = pd.DataFrame({
+    new_cag_id: cag_abund.reindex(index=old_cag_id_list).sum()
+    for new_cag_id, old_cag_id_list in grouped_cags.items()
+}).T
+
 logging.info("Largest CAGs:")
-print(cags_df["CAG"].value_counts().head())
+for cag_id, cag_size in cag_membership["CAG"].value_counts().head().items():
+    logging.info("CAG %d, %d genes" % (cag_id, cag_size))
 
 fp_out = "CAGs.csv.gz"
+logging.info("Writing out CAG membership to %s" % fp_out)
+cag_membership.to_csv(fp_out, compression="gzip", index=None)
 
-logging.info("Writing out CAGs to %s" % fp_out)
-cags_df.to_csv(fp_out, compression="gzip", index=None)
-
-logging.info("Deleting the temporary zarr")
-del z
-shutil.rmtree("gene_abundance.zarr")
+fp_out = "CAGs.abund.feather"
+logging.info("Writing out CAG abundance to %s" % fp_out)
+cag_abund.reset_index().to_feather(fp_out)
 
 logging.info("Done")
 os._exit(0)
