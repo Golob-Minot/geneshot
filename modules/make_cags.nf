@@ -381,9 +381,26 @@ iteratively_refine_cags(
     max_iters = 5
 )
 
+logging.info("Sorting CAGs by size")
+input_cag_size = cag_membership["CAG"].value_counts()
+output_cag_size = pd.Series({
+    new_cag_id: sum([
+        input_cag_size[old_cag_id]
+        for old_cag_id in old_cag_id_list
+    ])
+    for new_cag_id, old_cag_id_list in grouped_cags.items()
+}).sort_values(
+    ascending=False
+)
+output_cag_ranking = pd.Series(
+    range(output_cag_size.shape[0]), 
+    index=output_cag_size.index
+)
+
+
 logging.info("Renaming genes with new CAG groupings")
 new_cag_mapping = {
-    old_cag_id: new_cag_id
+    old_cag_id: output_cag_ranking[new_cag_id]
     for new_cag_id, old_cag_id_list in grouped_cags.items()
     for old_cag_id in old_cag_id_list
 }
