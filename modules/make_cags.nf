@@ -351,9 +351,9 @@ cag_membership = pd.concat(cag_membership)
 cag_abund = pd.concat(cag_abund)
 
 # Make sure that things all add up
-cag_abund.shape[0] == ix
-cag_abund.shape[0] == cag_membership["CAG"].max() + 1
-cag_abund.shape[0] == cag_membership["CAG"].unique().shape[0]
+assert cag_abund.shape[0] == ix
+assert cag_abund.shape[0] == cag_membership["CAG"].max() + 1
+assert cag_abund.shape[0] == cag_membership["CAG"].unique().shape[0]
 
 logging.info(
     "Read in %d CAGs from %d shards covering %d genes" % (
