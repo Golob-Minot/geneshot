@@ -220,7 +220,7 @@ logging.info("Done")
 process refineCAGs {
     tag "Group all genes by co-abundance"
     container "${container__find_cags}"
-    label "mem_medium"
+    label "mem_veryhigh"
     errorStrategy 'retry'
 
     input:
