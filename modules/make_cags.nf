@@ -412,7 +412,8 @@ new_cag_mapping = {
 cag_membership.replace(
     to_replace = {
         "CAG": new_cag_mapping
-    }
+    },
+    inplace=True
 )
 
 logging.info("Computing the abundance of new CAGs")
