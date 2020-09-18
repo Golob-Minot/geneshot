@@ -262,10 +262,6 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 
-# Set up the multiprocessing pool
-threads = int("${task.cpus}")
-pool = Pool(threads)
-
 # Set the file path to the CAGs made for each subset
 cag_csv_list = [
     fp
