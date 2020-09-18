@@ -369,6 +369,10 @@ grouped_cags = {
     for cag_ix in cag_abund.index.values
 }
 
+# Parse the number of threads available
+threads = int("${task.cpus}")
+logging.info("Number of threads available: %d" % threads)
+
 logging.info("Refining CAGS")
 iteratively_refine_cags(
     grouped_cags,
