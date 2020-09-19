@@ -379,7 +379,7 @@ iteratively_refine_cags(
     threads=threads,
     distance_metric="${params.distance_metric}",
     linkage_type="${params.linkage_type}",
-    max_iters = 5
+    max_iters = 10
 )
 
 logging.info("Sorting CAGs by size")
