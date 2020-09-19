@@ -321,21 +321,19 @@ for fp in cag_csv_list:
         ix += 1
 
     # Now change the CAG ID for the shard in the membership table
-    shard_cags_membership.replace(
+    shard_cags_membership = shard_cags_membership.replace(
         to_replace={
             "CAG": cag_id_mapping
         },
-        inplace=True
     )
     # Also change the CAG IDs for the abundance table
-    shard_cags_abundance.replace(
+    shard_cags_abundance = shard_cags_abundance.replace(
         to_replace={
             "index": cag_id_mapping
         },
-        inplace=True
     )
     # Set the index on the abundance table
-    shard_cags_abundance.set_index("index", inplace=True)
+    shard_cags_abundance = shard_cags_abundance.set_index("index")
 
     # Add both the membership and abundance to the running total
     cag_membership.append(shard_cags_membership)
@@ -401,6 +399,7 @@ output_cag_ranking = pd.Series(
     index=output_cag_size.index
 )
 
+# Name the CAGs based on the rank order of aggregate size (num. genes)
 logging.info("Renaming genes with new CAG groupings")
 new_cag_mapping = {
     old_cag_id: output_cag_ranking[new_cag_id]
@@ -409,11 +408,11 @@ new_cag_mapping = {
 }
 
 # Update the CAG membership table
-cag_membership.replace(
+logging.info("Updating the CAG membership table")
+cag_membership = cag_membership.replace(
     to_replace = {
         "CAG": new_cag_mapping
     },
-    inplace=True
 )
 
 logging.info("Computing the abundance of new CAGs")
