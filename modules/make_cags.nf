@@ -289,7 +289,7 @@ assert len(cag_csv_list) == len(cag_feather_list), "Number of CSV and feather fi
 cag_abund = []
 
 # Keep track of the genes that the previous set of CAGs corresponded to
-cag_membership = []
+cag_membership = {}
 
 logging.info("Reading in CAGs from previous shard")
 ix = 0
@@ -320,34 +320,32 @@ for fp in cag_csv_list:
         cag_id_mapping[previous_cag_id] = ix
         ix += 1
 
-    # Now change the CAG ID for the shard in the membership table
-    shard_cags_membership = shard_cags_membership.replace(
-        to_replace={
-            "CAG": cag_id_mapping
-        },
-    )
+    # Record which gene goes with which CAG (with the new IDs)
+    for _, r in shard_cags_membership.iterrows():
+        cag_membership[r["gene"]] = cag_id_mapping[r["CAG"]]
+
     # Also change the CAG IDs for the abundance table
     shard_cags_abundance = shard_cags_abundance.replace(
         to_replace={
             "index": cag_id_mapping
         },
     )
-    # Set the index on the abundance table
-    shard_cags_abundance = shard_cags_abundance.set_index("index")
 
-    # Add both the membership and abundance to the running total
-    cag_membership.append(shard_cags_membership)
+    # Add the abundance to the running total
     cag_abund.append(shard_cags_abundance)
 
 # Combine all of the tables
-logging.info("Combining CAG abundance and membership across all CAGs")
-cag_membership = pd.concat(cag_membership).reset_index(drop=True)
+logging.info("Combining CAG abundance across all CAGs")
 cag_abund = pd.concat(cag_abund)
+cag_membership = pd.Series(cag_membership)
+
+# Calculate the size of all of the input CAGs
+input_cag_size = cag_membership.value_counts()
 
 # Make sure that things all add up
 assert cag_abund.shape[0] == ix
-assert cag_abund.shape[0] == cag_membership["CAG"].max() + 1
-assert cag_abund.shape[0] == cag_membership["CAG"].unique().shape[0]
+assert cag_abund.shape[0] == max(input_cag_size.index.values)
+assert cag_abund.shape[0] == input_cag_size.shape[0]
 
 logging.info(
     "Read in %d CAGs from %d shards covering %d genes" % (
@@ -383,7 +381,6 @@ iteratively_refine_cags(
 )
 
 logging.info("Sorting CAGs by size")
-input_cag_size = cag_membership["CAG"].value_counts()
 output_cag_size = pd.Series({
     new_cag_id: sum([
         input_cag_size[old_cag_id]
@@ -407,12 +404,12 @@ new_cag_mapping = {
     for old_cag_id in old_cag_id_list
 }
 
-# Update the CAG membership table
+# Update the CAG membership table and format as a DataFrame
 logging.info("Updating the CAG membership table")
-cag_membership = pd.DataFrame(dict(
-    "gene": cag_membership["gene"],
-    "CAG": cag_membership["CAG"].apply(new_cag_mapping.get)
-))
+cag_membership = pd.DataFrame({
+    "gene": cag_membership.index.values,
+    "CAG": cag_membership.apply(new_cag_mapping.get)
+})
 
 logging.info("Computing the abundance of new CAGs")
 cag_abund = pd.DataFrame({
