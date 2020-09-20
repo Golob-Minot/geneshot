@@ -343,8 +343,11 @@ cag_membership = pd.Series(cag_membership)
 input_cag_size = cag_membership.value_counts()
 
 # Make sure that things all add up
+logging.info("Number of CAGs with abundances: %d" % cag_abund.shape[0])
+logging.info("Number of CAGs with members: %d" % input_cag_size.shape[0])
+logging.info("Largest CAG index: %d" % max(input_cag_size.index.values))
 assert cag_abund.shape[0] == ix
-assert cag_abund.shape[0] == max(input_cag_size.index.values)
+assert cag_abund.shape[0] == int(max(input_cag_size.index.values))
 assert cag_abund.shape[0] == input_cag_size.shape[0]
 
 logging.info(
