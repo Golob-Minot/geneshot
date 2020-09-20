@@ -341,7 +341,7 @@ for fp in cag_csv_list:
 
 # Combine all of the tables
 logging.info("Combining CAG abundance and membership across all CAGs")
-cag_membership = pd.concat(cag_membership)
+cag_membership = pd.concat(cag_membership).reset_index(drop=True)
 cag_abund = pd.concat(cag_abund)
 
 # Make sure that things all add up
@@ -409,11 +409,10 @@ new_cag_mapping = {
 
 # Update the CAG membership table
 logging.info("Updating the CAG membership table")
-cag_membership = cag_membership.replace(
-    to_replace = {
-        "CAG": new_cag_mapping
-    },
-)
+cag_membership = pd.DataFrame(dict(
+    "gene": cag_membership["gene"],
+    "CAG": cag_membership["CAG"].apply(new_cag_mapping.get)
+))
 
 logging.info("Computing the abundance of new CAGs")
 cag_abund = pd.DataFrame({
