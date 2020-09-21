@@ -430,7 +430,9 @@ cag_membership.to_csv(fp_out, compression="gzip", index=None)
 
 fp_out = "CAGs.abund.feather"
 logging.info("Writing out CAG abundance to %s" % fp_out)
-cag_abund.reset_index().to_feather(fp_out)
+cag_abund.assign(
+    index = cag_abund.index.values
+).to_feather(fp_out)
 
 logging.info("Done")
 os._exit(0)
