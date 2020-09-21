@@ -418,7 +418,7 @@ logging.info("Computing the abundance of new CAGs")
 cag_abund = pd.DataFrame({
     output_cag_ranking[new_cag_id]: cag_abund.reindex(index=old_cag_id_list).sum()
     for new_cag_id, old_cag_id_list in grouped_cags.items()
-}).T
+}).T.sort_index().reset_index()
 
 logging.info("Largest CAGs:")
 for cag_id, cag_size in cag_membership["CAG"].value_counts().head().items():
@@ -430,9 +430,7 @@ cag_membership.to_csv(fp_out, compression="gzip", index=None)
 
 fp_out = "CAGs.abund.feather"
 logging.info("Writing out CAG abundance to %s" % fp_out)
-cag_abund.assign(
-    index = cag_abund.index.values
-).to_feather(fp_out)
+cag_abund.to_feather(fp_out)
 
 logging.info("Done")
 os._exit(0)
