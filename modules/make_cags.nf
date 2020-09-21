@@ -318,7 +318,7 @@ for fp in cag_csv_list:
     ))
 
     # Make sure that the number of CAGs is the same in both files
-    assert shard_cags_abundance.shape[0] == shard_cags_membership["CAG"].unique().shape[0]
+    assert shard_cags_abundance.shape[0] == len(shard_cag_set)
 
     # Transform each of the CAG IDs from the shard into a new CAG ID for the combined set
     logging.info("Mapping shard CAG IDs into complete set")
