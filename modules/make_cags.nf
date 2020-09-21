@@ -295,11 +295,17 @@ logging.info("Reading in CAGs from previous shard")
 ix = 0
 for fp in cag_csv_list:
 
-    # Read in the gene membership from this shard
-    shard_cags_membership = pd.read_csv(fp, compression="gzip", sep=",")
+    # Read in the gene membership from this shard in chunks
+    shard_cags_membership = {}
+    shard_cag_set = set([])
+    for chunk in pd.read_csv(fp, compression="gzip", sep=",", iterator=True, chunksize=10000):
+        for _, r in chunk.iterrows():
+            shard_cags_membership[r["gene"]] = r["CAG"]
+            shard_cag_set.add(r["CAG"])
+
     logging.info("Read in %d genes in %d CAGs from %s" % (
-        shard_cags_membership.shape[0],
-        shard_cags_membership["CAG"].unique().shape[0],
+        len(shard_cags_membership),
+        len(shard_cag_set),
         fp
     ))
 
@@ -315,20 +321,23 @@ for fp in cag_csv_list:
     assert shard_cags_abundance.shape[0] == shard_cags_membership["CAG"].unique().shape[0]
 
     # Transform each of the CAG IDs from the shard into a new CAG ID for the combined set
+    logging.info("Mapping shard CAG IDs into complete set")
     cag_id_mapping = {}
-    for previous_cag_id in shard_cags_membership["CAG"].unique():
+    for previous_cag_id in list(shard_cag_set):
         cag_id_mapping[previous_cag_id] = ix
         ix += 1
 
     # Record which gene goes with which CAG (with the new IDs)
-    for _, r in shard_cags_membership.iterrows():
-        cag_membership[r["gene"]] = cag_id_mapping[r["CAG"]]
+    logging.info("Recording gene membership in complete set")
+    for gene_id, shard_cag_id in shard_cags_membership.items():
+        cag_membership[gene_id] = cag_id_mapping[shard_cag_id]
 
     # Also change the CAG IDs for the abundance table
+    logging.info("Mapping CAG abundances into complete set")
     shard_cags_abundance = shard_cags_abundance.replace(
         to_replace={
             "index": cag_id_mapping
-        },
+        }
     )
 
     # Add the abundance to the running total
