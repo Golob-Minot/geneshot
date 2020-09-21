@@ -336,7 +336,7 @@ for fp in cag_csv_list:
 
 # Combine all of the tables
 logging.info("Combining CAG abundance across all CAGs")
-cag_abund = pd.concat(cag_abund)
+cag_abund = pd.concat(cag_abund).set_index("index")
 cag_membership = pd.Series(cag_membership)
 
 # Calculate the size of all of the input CAGs
