@@ -286,7 +286,7 @@ assert len(cag_csv_list) > 0, "Didn't find CAGs from any previous shard"
 assert len(cag_csv_list) == len(cag_feather_list), "Number of CSV and feather files does not match"
 
 # Keep track of the abundances of the CAGs from the inputs
-cag_abund = []
+cag_abund = {}
 
 # Keep track of the genes that the previous set of CAGs corresponded to
 cag_membership = {}
@@ -311,7 +311,11 @@ for fp in cag_csv_list:
 
     # Read in the abundances of the CAGs in this shard
     feather_fp = fp.replace(".csv.gz", ".feather")
-    shard_cags_abundance = pd.read_feather(feather_fp)
+    shard_cags_abundance = pd.read_feather(
+        feather_fp
+    ).set_index(
+        "index"
+    )
     logging.info("Read in abundances for %d CAGs from %s" % (
         shard_cags_abundance.shape[0],
         feather_fp
@@ -334,18 +338,20 @@ for fp in cag_csv_list:
 
     # Also change the CAG IDs for the abundance table
     logging.info("Mapping CAG abundances into complete set")
-    shard_cags_abundance = shard_cags_abundance.replace(
-        to_replace={
-            "index": cag_id_mapping
-        }
-    )
+    for shard_cag_id, shard_cag_abund in shard_cags_abundance.iterrows():
+        # Add to the cag_abund dict using the updated CAG ID
+        cag_abund[
+            cag_id_mapping[shard_cag_id]
+        ] = shard_cag_abund
 
-    # Add the abundance to the running total
-    cag_abund.append(shard_cags_abundance)
+    logging.info("Cleaning up temporary data objects")
+    del shard_cags_abundance
+    del shard_cags_membership
 
 # Combine all of the tables
 logging.info("Combining CAG abundance across all CAGs")
-cag_abund = pd.concat(cag_abund).set_index("index")
+cag_abund = pd.DataFrame(cag_abund).T
+logging.info("Combining CAG membership across all CAGs")
 cag_membership = pd.Series(cag_membership)
 
 # Calculate the size of all of the input CAGs
