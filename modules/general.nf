@@ -731,7 +731,7 @@ print("Done")
 process addEggnogResults {
     tag "Add functional predictions to HDF"
     container "${container__experiment_collection}"
-    label 'mem_medium'
+    label 'mem_veryhigh'
     errorStrategy 'retry'
 
     input:
