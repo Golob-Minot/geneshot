@@ -150,8 +150,8 @@ workflow alignment_wf {
 
     // Combine the shards and make a new set of CAGs
     refineCAGs_final(
-        refineCAGs_round5.out[0].toSortedList(),
-        refineCAGs_round5.out[1].toSortedList(),
+        refineCAGs_round10.out[0].toSortedList(),
+        refineCAGs_round10.out[1].toSortedList(),
     )
 
     emit:
