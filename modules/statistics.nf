@@ -2,6 +2,7 @@
 
 // Container versions
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+container__bbdml = 'golob/bbdml:0.0.1'
 
 // Workflow to test out the provided formula and manifest CSV in a dry run
 // This is intended to catch the case early on where the provided formula
@@ -785,6 +786,354 @@ if df.shape[0] > 1:
 
 else:
     print("No betta results found -- returning unopened results HDF")
+
+"""
+
+}
+
+// *** //
+
+// Extract a CAG-level counts table from the FAMLI JSON outputs
+// Corncob takes the absolute number of reads from each sample into account
+// and so it needs to have access to those integer values
+process ExtractCountsT {
+    tag "Make CAG ~ sample read-count matrix where columns are samples, rows CAGs"
+    container "${container__pandas}"
+    label 'io_mem'
+    publishDir "${params.output_folder}/abund/", mode: "copy"
+    
+    input:
+    file famli_json_list
+    file results_hdf
+
+    output:
+    file "CAG.readcounts.T.csv.gz"
+
+
+"""
+#!/usr/bin/env python3
+
+import gzip
+import json
+import pandas as pd
+import numpy as np
+from collections import defaultdict
+import csv
+import logging
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [extractCountsT] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+logging.info("Start of loading CAG-Gene membership into memory")
+cag_gene = pd.read_hdf('${results_hdf}', '/annot/gene/cag')
+logging.info("Done with CAG-Gene membership into memory")
+
+
+logging.info("Loading gene count data for specimens into memory")
+sp_json = "${famli_json_list}".split(" ")
+
+# Build a set of nested dicts to hold specimen-gene-nreads
+# sgr[specimen_id][gene_id] = n_reads
+sgr = defaultdict(lambda: defaultdict(int))
+# Also generate a specimen total reads dict where
+# specimen_tot[specimen_id] = total_reads
+specimen_tot = {}
+# Finally a list of specimens for which we have gene-count data
+specimens = []
+for sp_j_fn in [fn for fn in sp_json if fn.endswith('.json.gz')]:
+    specimen = sp_j_fn.replace(".json.gz", "")
+    specimens.append(specimen)
+    sp_j = json.load(
+            gzip.open(
+                sp_j_fn,
+                'rt'
+            )
+        )
+    sp_total = 0
+    for r in sp_j:
+        sgr[specimen][r['id']] = int(r['nreads'])
+        sp_total += int(r['nreads'])
+    # Done. Update specimen total
+    specimen_tot[specimen] = sp_total
+logging.info("Done loading specimen gene counts")
+
+logging.info("Now grouping and outputting specimen-CAG-counts")
+# Great. Now we can start to build our CAG-count table
+# First a header
+with gzip.open('CAG.readcounts.T.csv.gz', 'wt') as out_h:
+    out_w = csv.writer(out_h)
+    header = ['CAG'] + specimens
+    
+    out_w.writerow(header)
+    out_w.writerow(['total']+[specimen_tot[sp] for sp in specimens])
+    # Then use groupby on our cag-gene table
+    for c_i, (CAG_num, C_block) in enumerate(cag_gene.groupby('CAG')):
+        if (c_i+1) % 10000 == 0:
+            logging.info("CAG {:,} of {:,} done".format(
+                c_i+1,
+                len(cag_gene.CAG.unique())
+            ))
+        cag_id = "cag__{:07d}".format(CAG_num)
+        cag_row = [cag_id] + [np.sum([sgr[sp][gene_id] for gene_id in C_block.gene]) for sp in specimens]
+        out_w.writerow(cag_row)
+
+logging.info("Done")
+"""
+}
+
+
+// Extract a CAG-level counts table from the FAMLI JSON outputs
+// Corncob takes the absolute number of reads from each sample into account
+// and so it needs to have access to those integer values
+process RunBBDML {
+    tag "Run beta-binomial regression on counts and covariates for abundance and dispersion"
+    container "${container__bbdml}"
+    label 'multithread'
+    publishDir "${params.output_folder}/bbdml/", mode: "copy"
+    
+    input:
+    file readcounts_csv_gz
+    file X
+    file X_star
+
+    output:
+    file "${params.output_prefix}BBDML.results.csv.gz"
+
+
+    """
+    set -e
+
+    pigz -d -c ${readcounts_csv_gz} | \
+    cc_bbdml \
+    -X ${X} \
+    -X_star ${X_star} | \
+    pigz > ${params.output_prefix}BBDML.results.csv.gz
+    """
+}
+
+process RunBBDML_nodisp {
+    tag "Run beta-binomial regression on counts and covariates for abundance only"
+    container "${container__bbdml}"
+    label 'multithread'
+    publishDir "${params.output_folder}/bbdml/", mode: "copy"
+    
+    input:
+    file readcounts_csv_gz
+    file X
+
+    output:
+    file "${params.output_prefix}BBDML.results.csv.gz"
+
+
+    """
+    set -e
+
+    pigz -d -c ${readcounts_csv_gz} | \
+    cc_bbdml \
+    -X ${X} | \
+    pigz > ${params.output_prefix}BBDML.results.csv.gz
+    """
+}
+
+process RunBBDML_noabund {
+    tag "Run beta-binomial regression on counts and covariates for dispersion only"
+    container "${container__bbdml}"
+    label 'multithread'
+    publishDir "${params.output_folder}/bbdml/", mode: "copy"
+    
+    input:
+    file readcounts_csv_gz
+    file X_star
+
+    output:
+    file "${params.output_prefix}BBDML.results.csv.gz"
+
+
+    """
+    set -e
+
+    pigz -d -c ${readcounts_csv_gz} | \
+    cc_bbdml \
+    -X_star ${X_star} | \
+    pigz > ${params.output_prefix}BBDML.results.csv.gz
+    """
+}
+
+
+process Shard_CAG_Readcounts {
+    tag "Split up CAG readcount file into blocks of no more than a number of CAGs"
+    container "${container__pandas}"
+    label 'io_limited'
+
+    input:
+    file readcounts_csv_gz
+
+    output:
+    file "CAG_readcount.*.csv.gz"
+
+"""
+#!/usr/bin/env python3
+import gzip
+import csv
+
+cur_shard = 0
+with gzip.open("${readcounts_csv_gz}", 'rt') as in_h:
+    in_r = csv.reader(in_h)
+    # Grab the header and the total row to use in each shard.
+    header = next(in_r)
+    totals = next(in_r)
+
+    # Now loop through the master file 
+    for cag_i, cag in enumerate(in_r):
+        if cag_i % ${params.batchsize} == 0:
+            if cag_i != 0:
+                out_h.close()
+            cur_shard += 1
+            out_h = gzip.open("CAG_readcount.{:06d}.csv.gz".format(cur_shard), 'wt')
+            out_w = csv.writer(out_h)
+            out_w.writerow(header)
+            out_w.writerow(totals)
+        out_w.writerow(cag)
+    
+    # Close after final row even if the shard is only partial
+    out_h.close()
+
+"""
+}
+
+process Join_BBDML {
+    tag "Combine sharded BBDML results"
+    container "${container__pandas}"
+    label 'io_limitied'
+    
+    input:
+    file "bbdml.results.*.csv.gz"
+
+    output:
+    file "${params.output_prefix}bbdml.results.csv.gz"
+
+
+"""
+#!/usr/bin/env python3
+
+import os
+import pandas as pd
+import logging
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [Join_BBDML] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+logging.info("Finding BBDML result shards")
+# Get the list of files to join
+fp_list = [
+    fp
+    for fp in os.listdir(".")
+    if fp.startswith("bbdml.results.") and fp.endswith(".csv.gz")
+]
+
+logging.info("Starting to load and combine BBDML results")
+
+df = pd.concat([
+    pd.read_csv(fp)
+    for fp in fp_list
+])
+# Rename the former index to now be the CAG column
+df.rename({'Unnamed: 0': 'CAG'}, axis=1, inplace=True)
+logging.info("Outputting results")
+df.to_csv("${params.output_prefix}bbdml.results.csv.gz", compression='gzip', index=None)
+logging.info("DONE!")
+"""
+}
+
+process Add_FDR {
+    tag "Add FDR (q) for each parameter"
+    container "${container__pandas}"
+    label 'io_limitied'
+    publishDir "${params.output_folder}/stats/", mode: "copy"
+    
+    input:
+    file bbdml_results_csv_gz
+
+    output:
+    file "${params.output_prefix}bbdml.results.fdr.csv.gz"
+
+"""
+#!/usr/bin/env python3
+import pandas as pd
+import re
+from statsmodels.stats.multitest import multipletests
+import logging
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [Add_FDR] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+# Regular expression to find P columns
+re_p = re.compile(r'^(?P<attribute>abd|disp)__(?P<covariate>.+)__p\$')
+
+logging.info("Loading current results")
+results = pd.read_csv("${bbdml_results_csv_gz}")
+logging.info("Results loaded")
+logging.info("Finding p-value columns")
+# Search all the columns into a list
+p_col_m = [
+    (
+        re_p.search(c),
+        c
+    )
+    for c in results.columns
+]
+# Narrow down to just the p-value columns
+p_col = [
+    (
+        c[0]['attribute'],
+        c[0]['covariate'],
+        c[1]
+    )
+    for c in p_col_m
+    if c[0] is not None
+]
+# For each p-value column....
+for (attribute, cov, col) in p_col:
+    # Find rows that are not na
+    valid_results = results[
+        ~results[col].isna()
+    ]
+    # And add q-values for these rows, in place.
+    results.loc[
+        valid_results.index,
+        "{}__{}__q".format(attribute, cov)] = multipletests(
+        valid_results[col],
+        0.2,
+        'fdr_bh'
+    )[1]
+
+results.to_csv("${params.output_prefix}bbdml.results.fdr.csv.gz", index=None, compression='gzip')
 
 """
 
