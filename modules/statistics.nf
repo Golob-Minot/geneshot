@@ -799,7 +799,7 @@ else:
 process ExtractCountsT {
     tag "Make CAG ~ sample read-count matrix where columns are samples, rows CAGs"
     container "${container__pandas}"
-    label 'io_mem'
+    label 'mem_veryhigh'
     publishDir "${params.output_folder}/abund/", mode: "copy"
     
     input:
