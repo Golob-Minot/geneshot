@@ -872,11 +872,16 @@ logging.info("Now grouping and outputting specimen-CAG-counts")
 with gzip.open('CAG.readcounts.T.csv.gz', 'wt') as out_h:
     out_w = csv.writer(out_h)
     header = ['CAG'] + specimens
-    
     out_w.writerow(header)
+    logging.info("Header done")
+    # Output totals
     out_w.writerow(['total']+[specimen_tot[sp] for sp in specimens])
+    logging.info("Totals done")
     # Then use groupby on our cag-gene table
-    for c_i, (CAG_num, C_block) in enumerate(cag_gene.groupby('CAG')):
+    for c_i, CAG_num in enumerate(cag_gene.CAG.unique()):
+        C_block = cag_gene[
+            cag_gene.CAG == CAG_num
+        ]
         if (c_i+1) % 10000 == 0:
             logging.info("CAG {:,} of {:,} done".format(
                 c_i+1,
