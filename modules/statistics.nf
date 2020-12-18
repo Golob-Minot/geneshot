@@ -835,6 +835,7 @@ rootLogger.addHandler(consoleHandler)
 
 logging.info("Start of loading CAG-Gene membership into memory")
 cag_gene = pd.read_hdf('${results_hdf}', '/annot/gene/cag')
+cag_ids = cag_gene.CAG.unique()
 logging.info("Done with CAG-Gene membership into memory")
 
 
@@ -878,14 +879,14 @@ with gzip.open('CAG.readcounts.T.csv.gz', 'wt') as out_h:
     out_w.writerow(['total']+[specimen_tot[sp] for sp in specimens])
     logging.info("Totals done")
     # Then use groupby on our cag-gene table
-    for c_i, CAG_num in enumerate(cag_gene.CAG.unique()):
+    for c_i, CAG_num in enumerate(cag_ids):
         C_block = cag_gene[
             cag_gene.CAG == CAG_num
         ]
         if (c_i+1) % 10000 == 0:
             logging.info("CAG {:,} of {:,} done".format(
                 c_i+1,
-                len(cag_gene.CAG.unique())
+                len(cag_ids)
             ))
         cag_id = "cag__{:07d}".format(CAG_num)
         cag_row = [cag_id] + [np.sum([sgr[sp][gene_id] for gene_id in C_block.gene]) for sp in specimens]
