@@ -112,7 +112,7 @@ workflow {
             ).toSortedList(),
             file(params.input_hdf)
         )
-        crc_csv = extractCountsT.out
+        crc_csv = ExtractCountsT.out
     } else {
         crc_csv = file("${abund_folder}/CAG.readcounts.T.csv.gz")
     }
