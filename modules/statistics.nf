@@ -842,30 +842,25 @@ logging.info("Done with CAG-Gene membership into memory")
 logging.info("Loading gene count data for specimens into memory")
 sp_json = "${famli_json_list}".split(" ")
 
-# Build a set of nested dicts to hold specimen-gene-nreads
-# sgr[specimen_id][gene_id] = n_reads
-sgr = defaultdict(lambda: defaultdict(int))
-# Also generate a specimen total reads dict where
-# specimen_tot[specimen_id] = total_reads
-specimen_tot = {}
-# Finally a list of specimens for which we have gene-count data
-specimens = []
-for sp_j_fn in [fn for fn in sp_json if fn.endswith('.json.gz')]:
-    specimen = sp_j_fn.replace(".json.gz", "")
-    specimens.append(specimen)
-    sp_j = json.load(
-            gzip.open(
-                sp_j_fn,
-                'rt'
-            )
-        )
-    sp_total = 0
-    for r in sp_j:
-        sgr[specimen][r['id']] = int(r['nreads'])
-        sp_total += int(r['nreads'])
-    # Done. Update specimen total
-    specimen_tot[specimen] = sp_total
+
+specimens = [
+    sp_j_fn.replace(".json.gz", "")
+    for sp_j_fn in [fn for fn in sp_json if fn.endswith('.json.gz')]
+]
+sp_g_r = [
+    {
+        r['id']: int(r['nreads'])
+        for r in json.load(gzip.open(sp_j_fn, 'rt'))
+    }
+    for sp_j_fn in [fn for fn in sp_json if fn.endswith('.json.gz')]
+]
 logging.info("Done loading specimen gene counts")
+
+specimen_tot = [
+    sum(gc.values())
+    for gc in sp_g_r
+]
+logging.info("Done totalling up reads for each specimen")
 
 logging.info("Now grouping and outputting specimen-CAG-counts")
 # Great. Now we can start to build our CAG-count table
@@ -876,20 +871,22 @@ with gzip.open('CAG.readcounts.T.csv.gz', 'wt') as out_h:
     out_w.writerow(header)
     logging.info("Header done")
     # Output totals
-    out_w.writerow(['total']+[specimen_tot[sp] for sp in specimens])
+    out_w.writerow(['total']+specimen_tot)
     logging.info("Totals done")
     # Then use groupby on our cag-gene table
     for c_i, CAG_num in enumerate(cag_ids):
-        C_block = cag_gene[
-            cag_gene.CAG == CAG_num
-        ]
         if (c_i+1) % 10000 == 0:
             logging.info("CAG {:,} of {:,} done".format(
                 c_i+1,
                 len(cag_ids)
-            ))
+            ))    
+        C_block = cag_gene[
+            cag_gene.CAG == CAG_num
+        ]
+        cag_genes = set(C_block.gene)
+
         cag_id = "cag__{:07d}".format(CAG_num)
-        cag_row = [cag_id] + [np.sum([sgr[sp][gene_id] for gene_id in C_block.gene]) for sp in specimens]
+        cag_row = [cag_id] + [np.sum([gr.get(gene_id, 0) for gene_id in cag_genes]) for gr in sp_g_r]
         out_w.writerow(cag_row)
 
 logging.info("Done")
