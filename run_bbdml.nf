@@ -106,7 +106,7 @@ workflow {
     // and also to publish that file back to the input folder.
     abund_folder = "${params.input_folder.replaceAll(/\/$/, "")}/abund"
     if(file("${abund_folder}/CAG.readcounts.T.csv.gz").isEmpty()){
-        extractCountsT(
+        ExtractCountsT(
             Channel.fromPath(
                 "${abund_folder}/details/*json.gz"
             ).toSortedList(),
