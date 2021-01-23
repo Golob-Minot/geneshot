@@ -189,6 +189,7 @@ include {
     repackHDF as repackFullHDF;
     repackHDF as repackDetailedHDF;
 } from './modules/general' params(
+    output_folder: output_folder,
     output_prefix: params.output_prefix,
     formula: params.formula,
     distance_metric: params.distance_metric,
