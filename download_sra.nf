@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
 // Using DSL-2
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 // Script to download FASTQ files from SRA
 

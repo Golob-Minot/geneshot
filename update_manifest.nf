@@ -8,7 +8,7 @@
 */
 
 // Using DSL-2
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 // Parameters
 params.input_hdf = false
@@ -48,7 +48,7 @@ if (params.help || params.input_hdf == false || params.manifest == false || para
 }
 
 // Import the process used to repack the output HDF5 file
-include repackHDF from './modules/general'
+include { repackHDF } from './modules/general'
 
 // Process to update the formula listed in the summary table
 // Also extract the manifest to reduce the number of times

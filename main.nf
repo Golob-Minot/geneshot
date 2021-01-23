@@ -20,7 +20,7 @@
 */
 
 // Using DSL-2
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 // Default values for boolean flags
 // If these are not set by the user, then they will be set to the values below
@@ -165,7 +165,7 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include preprocess_wf from './modules/preprocess' params(
+include { preprocess_wf } from './modules/preprocess' params(
     manifest: params.manifest,
     adapter_F: params.adapter_F,
     adapter_R: params.adapter_R,
@@ -174,12 +174,21 @@ include preprocess_wf from './modules/preprocess' params(
     min_hg_align_score: params.min_hg_align_score,
 )
 // Import some general tasks, such as combineReads and writeManifest
-include read_manifest from './modules/general'
-include countReads from './modules/general'
-include countReadsSummary from './modules/general' params(
-    output_folder: output_folder
-)
-include collectAbundances from './modules/general' params(
+include { 
+    countReads;
+    read_manifest;
+    countReadsSummary;
+    collectAbundances;
+    writeManifest;
+    combineReads;
+    addGeneAssembly;
+    readTaxonomy;
+    addEggnogResults;
+    addCorncobResults;
+    addTaxResults;
+    repackHDF as repackFullHDF;
+    repackHDF as repackDetailedHDF;
+} from './modules/general' params(
     output_prefix: params.output_prefix,
     formula: params.formula,
     distance_metric: params.distance_metric,
@@ -189,47 +198,18 @@ include collectAbundances from './modules/general' params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,
     dmnd_min_identity: params.dmnd_min_identity,
-    dmnd_min_coverage: params.dmnd_min_coverage
-)
-include writeManifest from './modules/general' params(
+    dmnd_min_coverage: params.dmnd_min_coverage,
     savereads: params.savereads,
-    output_folder: output_folder
-)
-include combineReads from './modules/general' params(
-    savereads: params.savereads,
-    output_folder: output_folder
-)
-include addGeneAssembly from './modules/general'
-include readTaxonomy from './modules/general'
-include addEggnogResults from './modules/general'
-include addCorncobResults from './modules/general' params(
-    fdr_method: params.fdr_method
-)
-include addTaxResults from './modules/general'
-include repackHDF as repackFullHDF from './modules/general' params(
-    output_folder: output_folder
-)
-include repackHDF as repackDetailedHDF from './modules/general' params(
-    output_folder: output_folder
+    fdr_method: params.fdr_method,
 )
 
 // Import the workflows used for assembly
-include assembly_wf from './modules/assembly' params(
+include { 
+    assembly_wf;
+    annotation_wf;
+} from './modules/assembly' params(
     output_folder: output_folder,
     output_prefix: params.output_prefix,
-    phred_offset: params.phred_offset,
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage,
-    noannot: params.noannot,
-    eggnog_db: params.eggnog_db,
-    eggnog_dmnd: params.eggnog_dmnd,
-    taxonomic_dmnd: params.taxonomic_dmnd,
-    gencode: params.gencode,
-)
-
-// Import the workflows used for annotation
-include annotation_wf from './modules/assembly' params(
-    output_folder: output_folder,
     phred_offset: params.phred_offset,
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,
@@ -241,7 +221,7 @@ include annotation_wf from './modules/assembly' params(
 )
 
 // Import the workflows used for alignment-based analysis
-include alignment_wf from './modules/alignment' params(
+include { alignment_wf } from './modules/alignment' params(
     output_folder: output_folder,
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
@@ -257,35 +237,31 @@ include alignment_wf from './modules/alignment' params(
 )
 
 // Import the workflows used for statistical analysis
-include validation_wf from './modules/statistics' params(
+include { 
+    validation_wf; 
+    corncob_wf;
+    runBetta;
+    addBetta;
+    breakaway;
+    collectBreakaway;
+} from './modules/statistics' params(
     output_folder: output_folder,
     formula: params.formula,
-    corncob_batches: params.corncob_batches
-)
-include corncob_wf from './modules/statistics' params(
-    output_folder: output_folder,
-    formula: params.formula,
-    corncob_batches: params.corncob_batches
-)
-include runBetta from './modules/statistics'
-include addBetta from './modules/statistics' params(
-    fdr_method: params.fdr_method
-)
-include breakaway from './modules/statistics'
-include collectBreakaway from './modules/statistics' params(
-    output_folder: output_folder,
-    output_prefix: params.output_prefix
+    corncob_batches: params.corncob_batches,
+    fdr_method: params.fdr_method,
+    output_prefix: params.output_prefix,    
 )
 
 // Import the workflow used for composition analysis
-include metaphlan2_fastq from './modules/composition' params(
+include { metaphlan2_fastq } from './modules/composition' params(
     output_folder: output_folder
 )
-// include join_metaphlan2 from './modules/composition'
-include addMetaPhlAn2Results from './modules/general'
 
 // Process to publish specific output files
-include publish as publishGeneAbundances from './modules/general' params(
+include {
+    addMetaPhlAn2Results;
+    publish as publishGeneAbundances
+} from './modules/general' params(
     output_folder: "${output_folder}/abund/"
 )
 

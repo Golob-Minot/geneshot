@@ -7,43 +7,23 @@ params.output_prefix = "geneshot"
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 
-include diamondDB from "./alignment" params(
+include { diamondDB } from "./alignment" params(
     output_folder: params.output_folder
 )
-include linclust as linclustRound1 from "./mmseqs" params(
+include {
+    linclust as linclustRound1;
+    linclust as linclustRound2;
+    linclust as linclustRound3;
+    linclust as linclustRound4;
+    linclust as linclustRound5;
+    diamondDedup as dedupRound1;
+    diamondDedup as dedupRound2;
+    diamondDedup as dedupRound3;
+    diamondDedup as dedupRound4;
+    diamondDedup as dedupRound5;
+ } from "./mmseqs" params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
-)
-include linclust as linclustRound2 from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
-)
-include linclust as linclustRound3 from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
-)
-include linclust as linclustRound4 from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
-)
-include linclust as linclustRound5 from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
-)
-include diamondDedup as dedupRound1 from "./mmseqs" params(
-    min_identity: params.min_identity
-)
-include diamondDedup as dedupRound2 from "./mmseqs" params(
-    min_identity: params.min_identity
-)
-include diamondDedup as dedupRound3 from "./mmseqs" params(
-    min_identity: params.min_identity
-)
-include diamondDedup as dedupRound4 from "./mmseqs" params(
-    min_identity: params.min_identity
-)
-include diamondDedup as dedupRound5 from "./mmseqs" params(
-    min_identity: params.min_identity
 )
 
 workflow assembly_wf {
