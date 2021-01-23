@@ -115,11 +115,11 @@ process barcodecop {
     maxRetries 10
 
     input:
-        tuple specimen, file(R1), file(R2), file(I1), file(I2)
+        tuple val(specimen), file(R1), file(R2), file(I1), file(I2)
 
     output:
-        tuple specimen, file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_to_cutadapt_ch
-        tuple specimen, file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_empty_ch
+        tuple val(specimen), file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_to_cutadapt_ch
+        tuple val(specimen), file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_empty_ch
 """
 set -e
 
@@ -158,10 +158,10 @@ process cutadapt {
     maxRetries 10
 
     input:
-    tuple sample_name, file(R1), file(R2)
+    tuple val(sample_name), file(R1), file(R2)
 
     output:
-    tuple sample_name, file("${R1.getSimpleName()}_R1.noadapt.fq.gz"), file("${R2.getSimpleName()}_R2.noadapt.fq.gz"), file("${R1.getSimpleName()}.cutadapt.log")
+    tuple val(sample_name), file("${R1.getSimpleName()}_R1.noadapt.fq.gz"), file("${R2.getSimpleName()}_R2.noadapt.fq.gz"), file("${R1.getSimpleName()}.cutadapt.log")
 
 """
 set -e 
@@ -203,10 +203,10 @@ process bwa {
 
     input:
         file hg_index_tgz
-        tuple sample_name, file(R1), file(R2), file(cutadapt_log)
+        tuple val(sample_name), file(R1), file(R2), file(cutadapt_log)
 
     output:
-        tuple sample_name, file("${R1.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R2.getSimpleName()}.noadapt.nohuman.fq.gz")
+        tuple val(sample_name), file("${R1.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R2.getSimpleName()}.noadapt.nohuman.fq.gz")
 
     afterScript "rm -rf hg_index/*"
 

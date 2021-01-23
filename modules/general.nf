@@ -129,7 +129,7 @@ process countReads {
     errorStrategy "retry"
 
     input:
-    tuple sample_name, file(R1), file(R2)
+    tuple val(sample_name), file(R1), file(R2)
 
     output:
     file "${sample_name}.countReads.csv"
