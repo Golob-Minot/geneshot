@@ -456,7 +456,7 @@ gzip genes.shard.*.fasta
 
 process diamond_tax {
     tag "Annotate genes by taxonomy"
-    container "quay.io/fhcrc-microbiome/famli:v1.5"
+    container "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6"
     label 'mem_veryhigh'
 
     input:
@@ -595,7 +595,7 @@ with gzip.open("genes.fasta.gz", "wt") as fo:
 // Use alignment to figure out which assembled allele was grouped into which gene
 process alignAlleles {
     tag "Match alleles to gene centroids"
-    container "quay.io/fhcrc-microbiome/famli:v1.5"
+    container "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6"
     label 'mem_medium'
     errorStrategy 'retry'
     
