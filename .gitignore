@@ -2,8 +2,8 @@
 .nextflow*
 work/
 output*/
-report.html*
-trace.txt*
+*.html*
+*trace.txt*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
