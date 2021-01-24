@@ -40,7 +40,6 @@ else
     # Cluster the protein sequences
     mmseqs linclust db cluster_db ./ \
         --min-seq-id ${params.min_identity / 100} \
-        --max-seqs 3000 \
         -c ${params.min_coverage / 100}
 
     # Get the representative sequences
@@ -59,7 +58,7 @@ fi
 
 process diamondDedup {
     tag "Deduplicate sequences by alignment with DIAMOND"
-    container "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6"
+    container "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6-biopython"
     label 'mem_veryhigh'
     errorStrategy 'retry'
     
