@@ -1,5 +1,7 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 
+container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
+
 // Default parameters
 params.output_prefix = "geneshot"
 
@@ -105,9 +107,15 @@ workflow assembly_wf {
         )
     )
 
+    // Combine all outputs into a single HDF and CSV
+    joinAssemblyData(
+        annotateAssemblies.out.toSortedList()
+    )
+
     emit:
         gene_fasta = renameGenes.out
-        allele_assembly_csv_list = annotateAssemblies.out.toSortedList()
+        n_genes_assembled_csv = joinAssemblyData.out[0]
+        detailed_hdf = joinAssemblyData.out[1]
 
 }
 
@@ -638,5 +646,79 @@ process alignAlleles {
 
     fi
     """
+
+}
+
+// Combine all assembly results into a single HDF file (and summary CSV)
+process joinAssemblyData{
+    tag "Convert gene assembly data to HDF"
+    container "${container__experiment_collection}"
+    label 'mem_veryhigh'
+    errorStrategy 'retry'
+
+    input:
+        path allele_assembly_csv_list
+
+    output:
+        path "n_genes_assembled.csv"
+        path "assembly_details.hdf"
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+import os
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
+
+# Count up the number of genes assembled per-specimen
+n_genes_assembled_per_specimen = dict()
+
+# Open a connection to the detailed HDF5 output store
+detailed_store = pd.HDFStore("assembly_details.hdf", "w")
+
+# Read in the summary of allele assembly for each sample
+for fp in "${allele_assembly_csv_list}".split(" "):
+
+    # Make sure that the file path has the expected pattern
+    assert fp.endswith(".csv.gz"), fp
+    sample_name = fp.replace(".csv.gz", "")
+    print("Reading in assembly information for %s" % sample_name)
+    assembly_df = pd.read_csv(fp)
+    print("Read in %d assembled genes" % assembly_df.shape[0])
+
+    # Save the information on how many genes were assembled in each sample
+    n_genes_assembled_per_specimen[sample_name] = assembly_df.shape[0]
+
+    # Write out to the detailed HDF
+    assembly_df.to_hdf(
+        detailed_store,
+        "/abund/allele/assembly/%s" % sample_name
+    )
+
+detailed_store.close()
+
+n_genes_assembled_per_specimen = pd.DataFrame(
+    dict(
+        [
+            (
+                "n_genes_assembled",
+                pd.Series(n_genes_assembled_per_specimen)
+            )
+        ]
+    )
+).reset_index(
+).rename(
+    columns = dict(
+        [
+            ("index", "specimen")
+        ]
+    )
+)
+
+# Write the summary of the number of genes assembled per sample
+n_genes_assembled_per_specimen.to_csv("n_genes_assembled.csv", index=None)
+
+"""
 
 }

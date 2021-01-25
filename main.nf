@@ -62,8 +62,8 @@ params.eggnog_dmnd = false
 // CAG options
 params.distance_threshold = 0.25
 params.distance_metric = "cosine"
-params.linkage_type = "average"
-params.cag_batchsize = 10000
+params.min_contig_size = 3
+params.min_contig_depth = 5
 
 // Statistical analysis options
 params.formula = false
@@ -101,6 +101,8 @@ def helpMessage() {
     For Assembly:
       --gene_fasta          (optional) Compressed FASTA with pre-generated catalog of microbial genes.
                             If provided, then the entire de novo assembly process will be skipped entirely.
+      --cags_csv            (optional) If a pre-generated --gene_fasta is provided, CAG groups must be provided
+                            in "*.csv.gz" format from the geneshot run which generated that gene catalog.
       --phred_offset        for spades. Default 33.
       --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90)
       --min_coverage        Length cutoff used to combine similar genes (default: 50) (linclust)
@@ -129,7 +131,8 @@ def helpMessage() {
     For CAGs:
       --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
       --distance_threshold  Distance threshold used to group genes by co-abundance (default: 0.25)
-      --linkage_type        Linkage type used to group genes by co-abundance (default: average)
+      --min_contig_size     Only cluster genes which are found on contigs with at least this number of genes
+      --min_contig_depth    Minimum depth of sequencing per contig
       
     For Statistical Analysis:
       --formula             Optional formula used to estimate associations with CAG relative abundance
@@ -181,7 +184,6 @@ include {
     collectAbundances;
     writeManifest;
     combineReads;
-    addGeneAssembly;
     readTaxonomy;
     addEggnogResults;
     addCorncobResults;
@@ -194,7 +196,6 @@ include {
     formula: params.formula,
     distance_metric: params.distance_metric,
     distance_threshold: params.distance_threshold,
-    linkage_type: params.linkage_type,
     sd_mean_cutoff: params.sd_mean_cutoff,
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,
@@ -229,12 +230,16 @@ include { alignment_wf } from './modules/alignment' params(
     dmnd_top_pct: params.dmnd_top_pct,
     dmnd_min_score: params.dmnd_min_score,
     gencode: params.gencode,
-    distance_metric: params.distance_metric,
-    distance_threshold: params.distance_threshold,
-    linkage_type: params.linkage_type,
     sd_mean_cutoff: params.sd_mean_cutoff,
     famli_batchsize: params.famli_batchsize,
-    cag_batchsize: params.cag_batchsize
+)
+
+// Import the workflow used to make CAGs
+include { makeCAGs } from './modules/make_cags' params(
+    distance_metric: params.distance_metric,
+    distance_threshold: params.distance_threshold,
+    min_contig_size: params.min_contig_size,
+    min_contig_depth: params.min_contig_depth,
 )
 
 // Import the workflows used for statistical analysis
@@ -350,7 +355,7 @@ workflow {
     // A gene catalog was provided, so skip de novo assembly
     if ( params.gene_fasta ) {
 
-        // Point to the file provided
+        // Point to the gene catalog provided
         gene_fasta = file(params.gene_fasta)
 
     } else {
@@ -359,8 +364,9 @@ workflow {
         assembly_wf(
             combineReads.out
         )
-
+        // Point to the output of that workflow
         gene_fasta = assembly_wf.out.gene_fasta
+
     }
 
     // Run the annotation steps on the gene catalog
@@ -378,6 +384,26 @@ workflow {
         combineReads.out,
         params.output_prefix
     )
+
+    // #############
+    // # MAKE CAGS #
+    // #############
+
+    // If a gene catalog was provided
+    if ( params.gene_fasta ) {
+
+        // Point to the CAG assignments which were also provided
+        cags_csv = file(params.cags_csv)
+
+    } else {
+
+        // Make CAGs using both co-assembly and co-abundance information
+        makeCAGs(
+            assembly_wf.out.detailed_hdf,
+            alignment_wf.out.detailed_hdf,
+        )
+
+    }
 
     // ########################
     // # STATISTICAL ANALYSIS #
@@ -413,30 +439,18 @@ workflow {
     // NOTE: The code used here is imported from ./modules/general.nf
 
     collectAbundances(
-        alignment_wf.out.cag_csv,
-        alignment_wf.out.cag_abund_feather,
+        makeCAGs.out[0],
+        makeCAGs.out[1],
         countReadsSummary.out,
         manifest_file,
         alignment_wf.out.specimen_gene_count_csv,
         alignment_wf.out.specimen_reads_aligned_csv,
         alignment_wf.out.gene_length_csv,
         collectBreakaway.out,
+        assembly_wf.out.n_genes_assembled_csv
     )
-
-    // If we performed de novo assembly, add the gene assembly information
-    if ( params.gene_fasta ) {
-        resultsHDF = collectAbundances.out
-        detailedHDF = alignment_wf.out.detailed_hdf
-    } else {
-        addGeneAssembly(
-            collectAbundances.out,
-            alignment_wf.out.detailed_hdf,
-            assembly_wf.out.allele_assembly_csv_list
-        )
-        resultsHDF = addGeneAssembly.out[0]
-        detailedHDF = addGeneAssembly.out[1]
-    }
-
+    resultsHDF = collectAbundances.out
+    
     // If we performed compositional analysis, add the results ot the HDF5
     if (params.composition) {
         addMetaPhlAn2Results(
@@ -507,9 +521,9 @@ workflow {
         resultsHDF
     )
 
-    // "Repack" and compress the detailed results HDF5 as well
-    repackDetailedHDF(
-        detailedHDF
-    )
+    // // "Repack" and compress the detailed results HDF5 as well
+    // repackDetailedHDF(
+    //     detailedHDF
+    // )
 
 }

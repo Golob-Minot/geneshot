@@ -211,6 +211,7 @@ process collectAbundances{
         path specimen_reads_aligned_csv
         path gene_length_csv
         path breakaway_csv
+        path n_genes_assembled_csv
 
     output:
         path "${params.output_prefix}.results.hdf5"
@@ -238,6 +239,7 @@ specimen_reads_aligned_csv = "${specimen_reads_aligned_csv}"
 gene_length_csv = "${gene_length_csv}"
 breakaway_csv = "${breakaway_csv}"
 manifest_csv = "${manifest_csv}"
+n_genes_assembled_csv = "${n_genes_assembled_csv}"
 suffix=".json.gz"
 
 # Keep a list of descriptive statistics
@@ -245,7 +247,6 @@ summary_dict = dict([
     ("formula", "${params.formula}"),
     ("distance_threshold", "${params.distance_threshold}"),
     ("distance_threshold", "${params.distance_threshold}"),
-    ("linkage_type", "${params.linkage_type}"),
     ("sd_mean_cutoff", ${params.sd_mean_cutoff}),
     ("min_identity", ${params.min_identity}),
     ("min_coverage", ${params.min_coverage}),
@@ -370,6 +371,12 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
     # Read in the summary of the number of reads across all samples
     readcount_df = pd.read_csv(readcount_csv)
 
+    # Read in the summary of the number of assembled genes across all samples
+    n_genes_assembled_df = pd.read_csv(n_genes_assembled_csv)
+
+    # Write to HDF5
+    n_genes_assembled_df.to_hdf(store, "/summary/genes_assembled")
+
     # Read in the number of aligned reads per sample
     aligned_reads_dict = pd.read_csv(
         specimen_reads_aligned_csv
@@ -407,7 +414,8 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         [
             readcount_df.set_index("specimen"),
             specimen_gene_count_df.set_index("specimen"),
-            breakaway_df.set_index("specimen")
+            breakaway_df.set_index("specimen"),
+            n_genes_assembled_df.set_index("specimen"),
         ], 
         axis = 1, 
         sort = True
@@ -547,105 +555,6 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
 
     # Write out the manifest provided by the user
     manifest_df.to_hdf(store, "/manifest")
-
-"""
-
-}
-
-process addGeneAssembly{
-    tag "Add gene assembly data to HDF"
-    container "${container__experiment_collection}"
-    label 'mem_veryhigh'
-    errorStrategy 'retry'
-
-    input:
-        path results_hdf
-        path detailed_hdf
-        path allele_assembly_csv_list
-
-    output:
-        path "${results_hdf}"
-        path "${detailed_hdf}"
-
-"""
-#!/usr/bin/env python3
-
-import pandas as pd
-import os
-import pickle
-pickle.HIGHEST_PROTOCOL = 4
-
-# Count up the number of genes assembled per-specimen
-n_genes_assembled_per_specimen = dict()
-
-# Open a connection to the detailed HDF5 output store
-detailed_store = pd.HDFStore("${detailed_hdf}", "a")
-
-# Read in the summary of allele assembly for each sample
-for fp in "${allele_assembly_csv_list}".split(" "):
-
-    # Make sure that the file path has the expected pattern
-    assert fp.endswith(".csv.gz"), fp
-    sample_name = fp.replace(".csv.gz", "")
-    print("Reading in assembly information for %s" % sample_name)
-    assembly_df = pd.read_csv(fp)
-    print("Read in %d assembled genes" % assembly_df.shape[0])
-
-    # Save the information on how many genes were assembled in each sample
-    n_genes_assembled_per_specimen[sample_name] = assembly_df.shape[0]
-
-    # Write out to the detailed HDF
-    assembly_df.to_hdf(
-        detailed_store,
-        "/abund/allele/assembly/%s" % sample_name
-    )
-
-detailed_store.close()
-
-n_genes_assembled_per_specimen = pd.DataFrame(
-    dict(
-        [
-            (
-                "n_genes_assembled",
-                pd.Series(n_genes_assembled_per_specimen)
-            )
-        ]
-    )
-).reset_index(
-).rename(
-    columns = dict(
-        [
-            ("index", "specimen")
-        ]
-    )
-)
-
-# Open a connection to the HDF5
-with pd.HDFStore("${results_hdf}", "a") as store:
-
-    # Write the summary of the number of genes assembled per sample
-    n_genes_assembled_per_specimen.to_hdf(store, "/summary/genes_assembled")
-
-    # Add the number of genes assembled to the combined summary table
-    pd.concat([
-        pd.read_hdf(
-            store,
-            "/summary/all"
-        ).set_index(
-            "specimen"
-        ),
-        n_genes_assembled_per_specimen.set_index(
-            "specimen"
-        )
-    ], axis = 1, sort = True).reset_index(
-    ).rename(
-        columns = dict([
-            ("index", "specimen")
-        ])
-    ).to_hdf(
-        store,
-        "/summary/all"
-    )
 
 """
 

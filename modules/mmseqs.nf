@@ -94,7 +94,7 @@ diamond \
     --block-size ${task.memory.toMega() / (1024 * 6)} \
     --unal 0
 
-python << END
+python3 << END
 
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import gzip

@@ -1,36 +1,11 @@
 // Processes used for alignment of reads against gene databases
 
-params.cag_batchsize = 10000
-
 // Default options
-params.distance_threshold = 0.5
+params.distance_threshold = 0.15
 params.distance_metric = "cosine"
-params.linkage_type = "average"
+params.min_contig_size = 3
+params.min_contig_depth = 5
 params.famli_batchsize = 10000000
-
-include {
-    makeInitialCAGs;
-    refineCAGs as refineCAGs_round1;
-    refineCAGs as refineCAGs_round2;
-    refineCAGs as refineCAGs_round3;
-    refineCAGs as refineCAGs_round4;
-    refineCAGs as refineCAGs_round5;
-    refineCAGs as refineCAGs_round6;
-    refineCAGs as refineCAGs_round7;
-    refineCAGs as refineCAGs_round8;
-    refineCAGs as refineCAGs_round9;
-    refineCAGs as refineCAGs_round10;
- } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-
-include { refineCAGs as refineCAGs_final } from "./make_cags" params(
-    distance_threshold: params.distance_threshold,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
 
 workflow alignment_wf {
     take:
@@ -59,72 +34,15 @@ workflow alignment_wf {
     // Make a single table with the abundance of every gene across every sample
     assembleAbundances(
         famli.out.toSortedList(),
-        params.cag_batchsize,
         output_prefix
     )
 
-    // Group shards of genes into Co-Abundant Gene Groups (CAGs)
-    makeInitialCAGs(
-        assembleAbundances.out[5],
-        assembleAbundances.out[0].flatten()
-    )
-
-    // Perform multiple rounds of combining shards to make ever-larger CAGs
-    refineCAGs_round1(
-        makeInitialCAGs.out[0].toSortedList().flatten().collate(2),
-        makeInitialCAGs.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round2(
-        refineCAGs_round1.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round1.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round3(
-        refineCAGs_round2.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round2.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round4(
-        refineCAGs_round3.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round3.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round5(
-        refineCAGs_round4.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round4.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round6(
-        refineCAGs_round5.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round5.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round7(
-        refineCAGs_round6.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round6.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round8(
-        refineCAGs_round7.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round7.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round9(
-        refineCAGs_round8.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round8.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round10(
-        refineCAGs_round9.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round9.out[1].toSortedList().flatten().collate(2),
-    )
-
-    // Combine the shards and make a new set of CAGs
-    refineCAGs_final(
-        refineCAGs_round10.out[0].toSortedList(),
-        refineCAGs_round10.out[1].toSortedList(),
-    )
-
     emit:
-        cag_csv = refineCAGs_final.out[0]
-        cag_abund_feather = refineCAGs_final.out[1]
         famli_json_list = famli.out.toSortedList()
-        specimen_gene_count_csv = assembleAbundances.out[1]
-        specimen_reads_aligned_csv = assembleAbundances.out[4]
-        detailed_hdf = assembleAbundances.out[2]
-        gene_length_csv = assembleAbundances.out[3]
+        specimen_gene_count_csv = assembleAbundances.out[0]
+        specimen_reads_aligned_csv = assembleAbundances.out[3]
+        detailed_hdf = assembleAbundances.out[1]
+        gene_length_csv = assembleAbundances.out[2]
 }
 
 // Align each sample against the reference database of genes using DIAMOND
@@ -238,11 +156,9 @@ process assembleAbundances {
 
     input:
     file sample_jsons
-    val cag_batchsize
     val output_prefix
 
     output:
-    file "gene_list.*.csv.gz"
     file "specimen_gene_count.csv.gz"
     file "${output_prefix}.details.hdf5"
     path "gene_length.csv.gz"
@@ -385,15 +301,6 @@ pd.DataFrame([
     index = None,
     compression = "gzip"
 )
-
-# Write out the gene names in batches of ${cag_batchsize}
-for ix, gene_list in enumerate([
-    all_gene_names[ix: (ix + ${cag_batchsize})]
-    for ix in range(0, len(all_gene_names), ${cag_batchsize})
-]):
-    print("Writing out %d genes in batch %d" % (len(gene_list), ix))
-    with gzip.open("gene_list.%d.csv.gz" % ix, "wt") as handle:
-        handle.write("\\n".join(gene_list))
 
 # Write out the sequencing depth of each gene in each specimen in zarr format
 z = zarr.open(
