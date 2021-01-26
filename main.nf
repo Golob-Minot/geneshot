@@ -185,6 +185,7 @@ include {
     writeManifest;
     combineReads;
     readTaxonomy;
+    extractCounts;
     addEggnogResults;
     addCorncobResults;
     addTaxResults;
@@ -406,6 +407,12 @@ workflow {
 
     }
 
+    // Extract the readcounts for all CAGs
+    extractCounts(
+        alignment_wf.out.famli_json_list,
+        makeCAGs.out[0],
+    )
+
     // ########################
     // # STATISTICAL ANALYSIS #
     // ########################
@@ -421,8 +428,7 @@ workflow {
     // Calculate the association of individual CAGs with user-provided features
     if ( params.formula ) {
         corncob_wf(
-            alignment_wf.out.famli_json_list,
-            alignment_wf.out.cag_csv,
+            extractCounts.out,
             file(params.manifest),
             formula_ch
         )

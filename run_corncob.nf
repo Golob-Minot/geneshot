@@ -63,7 +63,6 @@ include {
     splitCorncob;
     runCorncob;
     joinCorncob;
-    extractCounts;
     runBetta;
     addBetta;
  } from './modules/statistics' params(
@@ -76,6 +75,7 @@ include {
 
 // Import the process used to add corncob results to the output
 include {
+    extractCounts;
     repackHDF;
     addCorncobResults;
  } from './modules/general' params(
