@@ -188,6 +188,7 @@ include {
     addEggnogResults;
     addCorncobResults;
     addTaxResults;
+    joinHDF as joinDetailedHDF;
     repackHDF as repackFullHDF;
     repackHDF as repackDetailedHDF;
 } from './modules/general' params(
@@ -450,6 +451,12 @@ workflow {
         assembly_wf.out.n_genes_assembled_csv
     )
     resultsHDF = collectAbundances.out
+
+    // Join the detailed results from assembly and annotation
+    joinDetailedHDF(
+        assembly_wf.out.detailed_hdf,
+        alignment_wf.out.detailed_hdf,
+    )
     
     // If we performed compositional analysis, add the results ot the HDF5
     if (params.composition) {
@@ -521,9 +528,9 @@ workflow {
         resultsHDF
     )
 
-    // // "Repack" and compress the detailed results HDF5 as well
-    // repackDetailedHDF(
-    //     detailedHDF
-    // )
+    // "Repack" and compress the detailed results HDF5 as well
+    repackDetailedHDF(
+        joinDetailedHDF.out
+    )
 
 }

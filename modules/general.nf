@@ -583,6 +583,46 @@ add_corncob_results.py "${results_hdf}" "${corncob_csv}" "${params.fdr_method}"
 
 }
 
+process joinHDF{
+    container "${container__pandas}"
+    label 'mem_veryhigh'
+    errorStrategy 'retry'
+
+    input:
+        file "inputA/${params.output_prefix}.details.hdf5"
+        file "inputB/${params.output_prefix}.details.hdf5"
+
+    output:
+        path "inputA/${params.output_prefix}.details.hdf5"
+
+"""#!/usr/bin/env python3
+
+import pandas as pd
+import os
+
+inputA = "inputA/${params.output_prefix}.details.hdf5"
+inputB = "inputB/${params.output_prefix}.details.hdf5"
+
+with pd.HDFStore(inputA, "a") as output_store:
+
+    with pd.HDFStore(inputB, "r") as input_store:
+
+        for k in input_store:
+
+            print(k)
+
+            pd.read_hdf(
+                input_store,
+                k
+            ).to_hdf(
+                output_store,
+                k
+            )
+
+"""
+
+}
+
 process addMetaPhlAn2Results{
     tag "Add composition analysis to HDF"
     container "${container__pandas}"
