@@ -44,6 +44,11 @@ workflow assembly_wf {
         assembly.out
     )
 
+    // Extract rRNA alleles from all contigs
+    barrnap(
+        assembly.out
+    )
+
     // Calculate summary metrics for every assembled gene in each sample
     parseGeneAnnotations(
         prodigal.out[0]
@@ -264,6 +269,31 @@ gzip ${specimen}.faa
 """
 }
 
+
+// Extraction of rRNA alleles with barrnap
+
+process barrnap{
+    tag "Extract predicted rRNA alleles"
+    container "quay.io/biocontainers/barrnap:0.9--3"
+    label 'io_limited'
+    errorStrategy 'retry'
+    publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
+
+    input:
+        tuple val(specimen), file(fasta), file(spades_log)
+
+    output:
+        path "${specimen}.rrna.fasta"
+        path "${specimen}.rrna.gff"
+
+"""
+#!/bin/bash
+
+gunzip -c ${fasta} > FASTA
+barrnap -o ${specimen}.rrna.fasta < FASTA > ${specimen}.rrna.gff
+"""
+
+}
 
 // Summarize the depth of sequencing and GC content for every assembled gene
 process parseGeneAnnotations {
