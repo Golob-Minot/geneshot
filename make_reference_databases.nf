@@ -34,11 +34,11 @@ params.output_prefix = "DB"
 
 process get_taxonomic_db {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
-    label 'mem_veryhigh'
-    publishDir params.output_folder
-
+    label 'io_net'
     output:
-    path "${params.output_prefix}.refseq.tax.dmnd"
+    path "ref.faa.gz" into ref_faa_gz
+    path "prot.accession2taxid.gz" into prot_accession2taxid_gz
+    path "nodes.dmp" into nodes_dmp
 
 """
 set -e
@@ -68,21 +68,38 @@ for fp in ./ftp.ncbi.nlm.nih.gov/refseq/release/bacteria/bacteria.nonredundant_p
 
 done
 
-echo "Indexing with DIAMOND"
-diamond \
-    makedb \
-    --in ref.faa.gz \
-    --db ${params.output_prefix}.refseq.tax.dmnd \
-    --threads ${task.cpus} \
-    --taxonmap prot.accession2taxid.gz \
-    --taxonnodes nodes.dmp
 
 """
 }
 
+process index_taxonomic_db {
+    container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
+    label 'mem_veryhigh'
+    publishDir params.output_folder
+
+    input:
+    file ref_faa_gz
+    file prot_accession2taxid_gz
+    file nodes_dmp
+
+    output:
+    path "${params.output_prefix}.refseq.tax.dmnd"
+"""
+echo "Indexing with DIAMOND"
+diamond \
+    makedb \
+    --in ${ref_faa_gz} \
+    --db ${params.output_prefix}.refseq.tax.dmnd \
+    --threads ${task.cpus} \
+    --taxonmap ${prot_accession2taxid_gz} \
+    --taxonnodes ${nodes_dmp}
+"""    
+
+}
+
 process get_eggnog_db {
     container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
-    label 'io_limited'
+    label 'io_net'
     publishDir params.output_folder
 
     output:
