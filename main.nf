@@ -58,6 +58,7 @@ params.taxonomic_dmnd = false
 params.ncbi_taxdump = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
 params.eggnog_db = false
 params.eggnog_dmnd = false
+params.eggnog_evalue = 0.00001
 
 // CAG options
 params.distance_threshold = 0.25
@@ -118,6 +119,7 @@ def helpMessage() {
                             (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG (default: false)
                             (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog.db)
+      --eggnog_evalue       Maximum E-value threshold for eggNOG ortholog alignment (default: 0.00001)
     
     For Alignment:
       --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
@@ -203,6 +205,7 @@ include {
     min_coverage: params.min_coverage,
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
+    eggnog_evalue: params.eggnog_evalue,
     savereads: params.savereads,
     fdr_method: params.fdr_method,
 )

@@ -7,6 +7,7 @@ container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 
 // Default parameters
 params.fdr_method = "fdr_bh"
+params.eggnog_evalue = 0.00001
 
 // Function to read in a CSV and return a Channel
 def read_manifest(manifest_file){
@@ -633,18 +634,19 @@ for fp in "${famli_json_list}".split(" "):
         )
     ):
 
+        # Get the CAG ID assigned for this gene
+        cag_id = cags.get(i["id"])
+
+        # If no CAG was assigned
+        if cag_id is None:
+
+            # Skip it
+            continue
+
+        # Otherwise
+
         # Add the value in 'nreads' to the CAG assigned to this gene
-        cag_counts[
-            sample_name
-        ][
-            cags[
-                i[
-                    "id"
-                ]
-            ]
-        ] += i[
-            "nreads"
-        ]
+        cag_counts[sample_name][cag_id] += i["nreads"]
 
 # Format as a DataFrame
 logging.info("Making a DataFrame")
@@ -868,6 +870,12 @@ eggnog_df = eggnog_df.reindex(
 print("Read in annotations for %d genes" % eggnog_df.shape[0])
 
 head_and_tail(eggnog_df)
+
+print("Filtering to a maximum E-value of ${params.eggnog_evalue}")
+eggnog_df = eggnog_df.query(
+    "seed_ortholog_evalue <= ${params.eggnog_evalue}"
+)
+print("Retained annotations for %d genes" % eggnog_df.shape[0])
 
 # Set the index to be the gene name
 eggnog_df.set_index("query_name", inplace=True)

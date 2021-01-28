@@ -24,6 +24,7 @@ params.ncbi_taxdump = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
 params.eggnog_db = false
 params.eggnog_dmnd = false
 params.noannot = false
+params.eggnog_evalue = 0.00001
 
 // Function which prints help message text
 def helpMessage() {
@@ -49,6 +50,7 @@ def helpMessage() {
                             (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG (default: false)
                             (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog.db)
+      --eggnog_evalue       Maximum E-value threshold for eggNOG ortholog alignment (default: 0.00001)
     
     """.stripIndent()
 }
@@ -76,7 +78,8 @@ include {
     addEggnogResults;
     repackHDF;
 } from './modules/general' params(
-    output_folder: params.output_folder
+    output_folder: params.output_folder,
+    eggnog_evalue: params.eggnog_evalue,
 )
 
 // Import the workflows used for annotation
