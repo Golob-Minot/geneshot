@@ -106,7 +106,7 @@ workflow {
 process getSRAlist {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_net"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     val accession
@@ -206,7 +206,7 @@ with open("accession_list.txt", "wt") as fo:
 process getMetadata {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_net"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     val sra_id
@@ -392,7 +392,7 @@ metadata_df.to_csv("${params.accession}.metadata.csv", index=None)
 process downloadSRA {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_net"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     val accession
@@ -428,7 +428,7 @@ fi
 process extractSRA {
     container "quay.io/fhcrc-microbiome/get_sra:v0.4"
     label "io_limited"
-    errorStrategy 'ignore'
+    errorStrategy 'finish'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
@@ -460,7 +460,7 @@ process extractSRA {
 process gatherReadnames {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_limited"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
 
     input:
