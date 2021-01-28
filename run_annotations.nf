@@ -20,6 +20,7 @@ params.help = false
 params.min_coverage = 50
 params.min_identity = 90
 params.taxonomic_dmnd = false
+params.tax_evalue = 0.00001
 params.ncbi_taxdump = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
 params.eggnog_db = false
 params.eggnog_dmnd = false
@@ -44,6 +45,7 @@ def helpMessage() {
       --output_hdf          Name of output HDF to be placed in the output folder
       --taxonomic_dmnd      Database used for taxonomic annotation (default: false)
                             (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
+      --tax_evalue          Maximum E-value threshold for taxonomic annotation by DIAMOND alignment
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
       --eggnog_dmnd         One of two databases used for functional annotation with eggNOG (default: false)
@@ -90,6 +92,7 @@ include { annotation_wf } from './modules/assembly' params(
     eggnog_db: params.eggnog_db,
     eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
+    tax_evalue: params.tax_evalue,
     noannot: params.noannot
 )
 

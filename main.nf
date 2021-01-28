@@ -55,6 +55,7 @@ params.famli_batchsize = 10000000 // FAMLI
 // Annotation options
 params.noannot = false
 params.taxonomic_dmnd = false
+params.tax_evalue = 0.00001
 params.ncbi_taxdump = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
 params.eggnog_db = false
 params.eggnog_dmnd = false
@@ -113,6 +114,7 @@ def helpMessage() {
                             Individual annotations can also be disabled by, e.g., setting --eggnog_db false
       --taxonomic_dmnd      Database used for taxonomic annotation (default: false)
                             (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
+      --tax_evalue          Maximum E-value threshold for taxonomic annotation by DIAMOND alignment
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
       --eggnog_dmnd         One of two databases used for functional annotation with eggNOG (default: false)
@@ -225,6 +227,7 @@ include {
     eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
     gencode: params.gencode,
+    tax_evalue: params.tax_evalue,
 )
 
 // Import the workflows used for alignment-based analysis

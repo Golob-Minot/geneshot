@@ -4,6 +4,7 @@ container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collecti
 
 // Default parameters
 params.output_prefix = "geneshot"
+params.tax_evalue = 0.00001
 
 // Containers
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
@@ -515,7 +516,8 @@ diamond \
     --out genes.tax.aln.gz \
     --outfmt 102 \
     --id ${params.min_identity} \
-    --top ${100 - params.min_identity} \
+    --top 5 \
+    --evalue ${params.tax_evalue} \
     --block-size ${task.memory.toMega() / (1024 * 6)} \
     --threads ${task.cpus} \
     --compress 1
