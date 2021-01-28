@@ -22,7 +22,7 @@ workflow composition_wf {
     tag "MetaPhlAn2 composition for paired end fastq reads"
     container "${container__metaphlan2}"
     label = 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     // If the user sets --preprocess_output, write out the combined reads to that folder
     publishDir path: "${params.output_folder}MetaPhlAn2/", mode: "copy"
@@ -47,7 +47,7 @@ metaphlan2.py --nproc ${task.cpus} --input_type sam -t rel_ab_w_read_stats -o ${
     tag "MetaPhlAn2 composition for paired end fastq reads"
     container "${container__metaphlan2}"
     label = 'mem_veryhigh'
-    //errorStrategy 'retry'
+    errorStrategy 'finish'
     //maxRetries 10
 
     // If the user sets --preprocess_output, write out the combined reads to that folder
@@ -72,7 +72,7 @@ metaphlan2.py --nproc ${task.cpus} --input_type sam -t rel_ab_w_read_stats -o ${
     process join_metaphlan2 {
     container "${container__pandas}"
     label = 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
     path metaphlan_tsv_list

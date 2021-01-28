@@ -291,7 +291,7 @@ logging.info("Done")
 process splitCorncob {
     container "${container__pandas}"
     label "mem_veryhigh"
-    errorStrategy "retry"
+    errorStrategy "finish"
 
     input:
     file readcounts_csv_gz
@@ -338,7 +338,7 @@ process runCorncob {
     tag "Perform statistical analysis"
     container "quay.io/fhcrc-microbiome/corncob"
     label "mem_medium"
-    errorStrategy "retry"
+    errorStrategy "finish"
     
     input:
     file readcounts_csv_gz
@@ -518,7 +518,7 @@ process collectBreakaway {
     tag "Join richness tables"
     container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
     label "io_limited"
-    errorStrategy "retry"
+    errorStrategy "finish"
     publishDir "${params.output_folder}stats", mode: "copy", overwrite: true
     
     input:
@@ -570,7 +570,7 @@ output.to_csv("${params.output_prefix}.breakaway.csv.gz", index=None)
 process joinCorncob {
     container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
     label "io_limited"
-    errorStrategy "retry"
+    errorStrategy "finish"
     publishDir "${params.output_folder}/stats/", mode: "copy"
     
     input:
@@ -617,7 +617,7 @@ print("Done")
 process runBetta {
     container "quay.io/fhcrc-microbiome/breakaway:latest"
     label "mem_medium"
-    errorStrategy "retry"
+    errorStrategy "finish"
     
     input:
     path labelled_corncob_csv
@@ -716,7 +716,7 @@ process addBetta{
     tag "Add meta-analysis to HDF"
     container "${container__pandas}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         path results_hdf
