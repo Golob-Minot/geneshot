@@ -105,8 +105,8 @@ workflow {
 // Get the accession for each Run in this BioProject
 process getSRAlist {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-    label "mem_medium"
-    errorStrategy 'retry'
+    label "io_net"
+    errorStrategy 'finish'
     
     input:
     val accession
@@ -205,8 +205,8 @@ with open("accession_list.txt", "wt") as fo:
 // Get the metadata for a single SRA accession
 process getMetadata {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-    label "mem_medium"
-    errorStrategy 'retry'
+    label "io_net"
+    errorStrategy 'finish'
     
     input:
     val sra_id
@@ -391,8 +391,8 @@ metadata_df.to_csv("${params.accession}.metadata.csv", index=None)
 // Download the .sra file for each SRR accession
 process downloadSRA {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-    label "io_limited"
-    errorStrategy 'retry'
+    label "io_net"
+    errorStrategy 'finish'
     
     input:
     val accession
@@ -428,7 +428,7 @@ fi
 process extractSRA {
     container "quay.io/fhcrc-microbiome/get_sra:v0.4"
     label "io_limited"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
@@ -449,7 +449,7 @@ process extractSRA {
     rm ${accession}
 
     echo "Compressing downloaded FASTQ files"
-    gzip ${accession.name}*
+    pigz ${accession.name}*
 
     echo "Done"
     """
@@ -460,7 +460,7 @@ process extractSRA {
 process gatherReadnames {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_limited"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
 
     input:

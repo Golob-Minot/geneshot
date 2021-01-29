@@ -204,7 +204,7 @@ process assembly {
     tag "De novo metagenomic assembly"
     container "${container__assembler}"
     label 'mem_veryhigh'
-    errorStrategy "retry"
+    errorStrategy "finish"
 
     publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
 
@@ -248,7 +248,7 @@ process prodigal {
     tag "Identify protein-coding genes"
     container 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
     label 'io_limited'
-    errorStrategy "retry"
+    errorStrategy "finish"
     publishDir "${params.output_folder}/assembly/${specimen}/", mode: "copy"
 
     input:
@@ -282,7 +282,7 @@ process parseGeneAnnotations {
     tag "Summarize every assembled gene"
     container "${container__pandas}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     tuple val(specimen), file(faa)
@@ -391,7 +391,7 @@ process annotateAssemblies {
     tag "Summarize every assembled gene"
     container "${container__pandas}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
     
@@ -454,7 +454,7 @@ process shard_genes {
     tag "Split the gene catalog into smaller shards"
     container "ubuntu:18.04"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     file fasta_gz
@@ -579,7 +579,7 @@ process renameGenes {
     tag "Make concise unique gene names"
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label 'io_limited'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     publishDir "${params.output_folder}/ref/", mode: "copy"
 
     input:
@@ -617,7 +617,7 @@ process alignAlleles {
     tag "Match alleles to gene centroids"
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     tuple val(specimen), file(alleles_fasta)

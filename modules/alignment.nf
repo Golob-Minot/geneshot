@@ -169,7 +169,7 @@ process diamondDB {
     tag "Make a DIAMOND database"
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     publishDir "${params.output_folder}/ref/", mode: "copy"
     
     input:
@@ -195,7 +195,7 @@ process diamond {
     tag "Align to the gene catalog"
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     tuple val(sample_name), file(R1), file(R2)
@@ -225,7 +225,7 @@ process diamond {
         --query-cover ${params.dmnd_min_coverage} \
         --id ${params.dmnd_min_identity} \
         --top ${params.dmnd_top_pct} \
-        --block-size ${task.memory.toMega() / (1024 * 6 * task.attempt)} \
+        --block-size ${task.memory.toMega() / (1024 * 6 )} \
         --query-gencode ${params.gencode} \
         --compress 1 \
         --unal 0
@@ -243,7 +243,7 @@ process famli {
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
     publishDir "${params.output_folder}/abund/details/", mode: "copy"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     tuple sample_name, file(input_aln)
@@ -271,7 +271,7 @@ process assembleAbundances {
     tag "Make gene ~ sample abundance matrix"
     container "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
     label "mem_veryhigh"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
     file sample_jsons
@@ -501,7 +501,7 @@ process calcCAGabund {
     tag "Make CAG ~ sample abundance matrix"
     container "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
     label "mem_veryhigh"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     publishDir "${params.output_folder}/abund/", mode: "copy"
 
     input:

@@ -3,18 +3,23 @@ profiles{
     standard {
         process {
             withLabel: 'io_limited' {
-                cpus = { 2 * task.attempt }
-                memory = { 4.GB * task.attempt }
+                cpus = 2
+                memory = 4.GB
                 maxRetries = 3
             }
+            withLabel: 'io_net' {
+                cpus = 2
+                memory = 4.GB
+                maxRetries = 3
+            }            
             withLabel: 'mem_medium' {
-                cpus = { 4 * task.attempt }
-                memory = { 30.GB * task.attempt }
+                cpus = 4
+                memory = 30.GB
                 maxRetries = 3
             }
             withLabel: 'mem_veryhigh' {
-                cpus = { 16 * task.attempt }
-                memory = { 120.GB * task.attempt }
+                cpus = 16
+                memory = 120.GB
                 maxRetries = 3
             }
         }
@@ -22,6 +27,10 @@ profiles{
     testing {
         process {
             withLabel: 'io_limited' {
+                cpus = 1
+                memory = 1.GB
+            }
+            withLabel: 'io_net' {
                 cpus = 1
                 memory = 1.GB
             }

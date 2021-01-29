@@ -10,7 +10,7 @@ process makeInitialCAGs {
     tag "Group gene subsets by co-abundance"
     container "${container__find_cags}"
     label "mem_medium"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
     path gene_abundances_zarr_tar
@@ -221,7 +221,7 @@ process refineCAGs {
     tag "Group all genes by co-abundance"
     container "${container__find_cags}"
     label "mem_veryhigh"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
     file "shard.CAG.*.csv.gz"
