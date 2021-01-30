@@ -247,7 +247,7 @@ echo -e "\\nDone\\n"
 process prodigal {
     tag "Identify protein-coding genes"
     container 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
-    label 'io_limited'
+    label 'mem_medium'
     errorStrategy "finish"
     publishDir "${params.output_folder}/assembly/${specimen}/", mode: "copy"
 
