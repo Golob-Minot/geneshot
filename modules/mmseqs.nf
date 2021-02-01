@@ -4,7 +4,7 @@ process linclust {
     tag "Cluster genes with similar sequences"
     container "quay.io/fhcrc-microbiome/mmseqs2:version-12"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     file "input.genes.*.fasta.gz"
@@ -60,7 +60,7 @@ process diamondDedup {
     tag "Deduplicate sequences by alignment with DIAMOND"
     container "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6-biopython"
     label 'mem_veryhigh'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     file "input.genes.fasta.gz"

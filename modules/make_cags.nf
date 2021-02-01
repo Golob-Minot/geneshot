@@ -11,7 +11,7 @@ process makeCAGs {
     tag "Group genes by co-abundance"
     container "${container__find_cags}"
     label "mem_veryhigh"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
     path assembly_hdf

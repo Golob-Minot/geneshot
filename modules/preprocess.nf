@@ -111,7 +111,7 @@ process barcodecop {
     tag "Validate barcode demultiplexing for WGS reads"
     container "${container__barcodecop}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     maxRetries 10
 
     input:
@@ -154,7 +154,7 @@ process cutadapt {
     tag "Trim adapters from WGS reads"
     container "${container__cutadapt}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     maxRetries 10
 
     input:
@@ -196,7 +196,7 @@ wget --quiet ${params.hg_index_url} -O hg_index.tar.gz
 process bwa {
     tag "Remove human reads"
     container "${container__bwa}"
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     maxRetries 10
     label 'mem_veryhigh'
 

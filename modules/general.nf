@@ -53,7 +53,7 @@ process joinFASTQ {
     tag "Join FASTQ files per-specimen"
     container "${container__fastatools}"
     label = 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     maxRetries 10
 
     // If the user sets --preprocess_output, write out the combined reads to that folder
@@ -201,7 +201,7 @@ process collectAbundances{
     tag "Add gene abundances to HDF"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         path cag_csv
@@ -710,7 +710,7 @@ add_corncob_results.py "${results_hdf}" "${corncob_csv}" "${params.fdr_method}"
 process joinHDF{
     container "${container__pandas}"
     label 'mem_veryhigh'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         file "inputA/${params.output_prefix}.details.hdf5"
@@ -751,7 +751,7 @@ process addMetaPhlAn2Results{
     tag "Add composition analysis to HDF"
     container "${container__pandas}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         path results_hdf
@@ -805,7 +805,7 @@ process addEggnogResults {
     tag "Add functional predictions to HDF"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         path results_hdf
@@ -946,7 +946,7 @@ process readTaxonomy {
     tag "Read the NCBI taxonomy"
     container "${container__experiment_collection}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         path taxdump_tar_gz
@@ -1061,7 +1061,7 @@ process addTaxResults {
     tag "Add taxonomic annotations to HDF"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         path results_hdf

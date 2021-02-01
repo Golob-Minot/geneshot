@@ -277,7 +277,7 @@ process barrnap{
     tag "Extract predicted rRNA alleles"
     container "quay.io/biocontainers/barrnap:0.9--3"
     label 'io_limited'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
 
     input:
@@ -301,7 +301,7 @@ process parseGeneAnnotations {
     tag "Summarize every assembled gene"
     container "${container__pandas}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     tuple val(specimen), file(faa)
@@ -410,7 +410,7 @@ process annotateAssemblies {
     tag "Summarize every assembled gene"
     container "${container__pandas}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
     
@@ -473,7 +473,7 @@ process shard_genes {
     tag "Split the gene catalog into smaller shards"
     container "ubuntu:18.04"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     file fasta_gz
@@ -599,7 +599,7 @@ process renameGenes {
     tag "Make concise unique gene names"
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label 'io_limited'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     publishDir "${params.output_folder}/ref/", mode: "copy"
 
     input:
@@ -637,7 +637,7 @@ process alignAlleles {
     tag "Match alleles to gene centroids"
     container "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6-biopython"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
     
     input:
     tuple val(specimen), file(alleles_fasta)
@@ -686,7 +686,7 @@ process joinAssemblyData{
     tag "Convert gene assembly data to HDF"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         path allele_assembly_csv_list

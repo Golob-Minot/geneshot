@@ -90,7 +90,7 @@ include {
 process updateFormula{
     container "${container__pandas}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         path results_hdf

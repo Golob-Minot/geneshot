@@ -56,7 +56,7 @@ include { repackHDF } from './modules/general'
 process replaceManifest {
     container "${container__pandas}"
     label 'mem_medium'
-    errorStrategy 'retry'
+    errorStrategy 'finish'
 
     input:
         path "input.hdf5"
