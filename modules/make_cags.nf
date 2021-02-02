@@ -19,7 +19,6 @@ process makeCAGs {
 
     output:
     file "CAGs.csv.gz"
-    file "CAGs.abund.feather"
     file "CAGs.time.json"
 
     """#!/bin/bash

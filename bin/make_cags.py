@@ -536,39 +536,6 @@ if __name__ == "__main__":
     output_elapsed = time() - output_start
     logging.info(f"Writing out results took {round(output_elapsed, 2)} seconds")
 
-    # Format the CAG abundances in feather format
-    pd.DataFrame({
-        specimen: {
-            cag_id: np.sum([
-                gene_abund.abund.get(
-                    gene_ix,
-                    {}
-                ).get(
-                    gene_abund.specimen_ix.get(specimen),
-                    0
-                )
-                for gene_ix in iac.groups[groups_ix]
-            ])
-            for groups_ix, cag_id in iac.cag_id.items()
-            if len(iac.groups[groups_ix]) > 1
-        }
-        for specimen in specimen_list()
-    }).fillna(
-        0
-    ).applymap(
-        float
-    ).reset_index(
-    ).rename(
-        columns=dict(
-            index="CAG"
-        )
-    ).to_feather(
-        os.path.join(
-            args.output_folder, 
-            f"{args.output_prefix}.abund.feather"
-        )
-    )
-
     # Record the total time elapsed
     with open(
         os.path.join(
