@@ -185,17 +185,17 @@ include {
     countReads;
     read_manifest;
     countReadsSummary;
-    collectAbundances;
+    collectResults;
     writeManifest;
     combineReads;
     readTaxonomy;
-    extractCounts;
     addEggnogResults;
-    addCorncobResults;
     addTaxResults;
+    calcDistances;
     joinHDF as joinDetailedHDF;
     repackHDF as repackFullHDF;
     repackHDF as repackDetailedHDF;
+    buildRedis
 } from './modules/general' params(
     output_folder: output_folder,
     output_prefix: params.output_prefix,
@@ -251,13 +251,15 @@ include { makeCAGs } from './modules/make_cags' params(
 )
 
 // Import the workflows used for statistical analysis
+// Use separate workflows for corncob, each
+// to analyze either the CAGs, tax IDs, or eggNOG groups
 include { 
     validation_wf; 
-    corncob_wf;
-    runBetta;
-    addBetta;
     breakaway;
     collectBreakaway;
+    corncob_wf as cag_corncob_wf;
+    corncob_wf as tax_corncob_wf;
+    corncob_wf as func_corncob_wf;
 } from './modules/statistics' params(
     output_folder: output_folder,
     formula: params.formula,
@@ -288,13 +290,8 @@ workflow {
     // will be to ensure that the formula is written correctly, and is
     // compatible with the data provided in the manifest
     if ( params.formula ) {
-        // Set up a channel with the strings of the formula(s) provided
-        formula_ch = Channel.of(
-            params.formula.split(",")
-        )
         validation_wf(
-            file(params.manifest),
-            formula_ch
+            file(params.manifest)
         )
         manifest_file = validation_wf.out
     } else {
@@ -413,15 +410,9 @@ workflow {
 
     }
 
-    // Extract the readcounts for all CAGs
-    extractCounts(
-        alignment_wf.out.famli_json_list,
-        makeCAGs.out[0],
-    )
-
-    // ########################
-    // # STATISTICAL ANALYSIS #
-    // ########################
+    // ###################################
+    // # STATISTICAL ANALYSIS - RICHNESS #
+    // ###################################
 
     // Calculate the richness of each sample using the breakaway algorithm
     breakaway(
@@ -431,18 +422,6 @@ workflow {
         breakaway.out.toSortedList()
     )
 
-    // Calculate the association of individual CAGs with user-provided features
-    if ( params.formula ) {
-        corncob_wf(
-            extractCounts.out,
-            file(params.manifest),
-            formula_ch
-        )
-        corncob_results = corncob_wf.out
-    } else {
-        corncob_results = Channel.empty()
-    }
-
     // ###################
     // # GATHER RESULTS #
     // ###################
@@ -451,9 +430,14 @@ workflow {
     // no matter what options were selected by the user
     // NOTE: The code used here is imported from ./modules/general.nf
 
-    collectAbundances(
+    // Join the detailed results from assembly and annotation
+    joinDetailedHDF(
+        assembly_wf.out.detailed_hdf,
+        alignment_wf.out.detailed_hdf,
+    )
+
+    collectResults(
         makeCAGs.out[0],
-        makeCAGs.out[1],
         countReadsSummary.out,
         manifest_file,
         alignment_wf.out.specimen_gene_count_csv,
@@ -462,14 +446,26 @@ workflow {
         collectBreakaway.out,
         assembly_wf.out.n_genes_assembled_csv
     )
-    resultsHDF = collectAbundances.out
+    resultsHDF = collectResults.out
 
-    // Join the detailed results from assembly and annotation
-    joinDetailedHDF(
-        assembly_wf.out.detailed_hdf,
-        alignment_wf.out.detailed_hdf,
+    // ##################################
+    // # STATISTICAL ANALYSIS - FORMULA #
+    // ##################################
+
+    // Calculate the association of individual CAGs with user-provided features
+    cag_corncob_wf(
+        resultsHDF,
+        joinDetailedHDF.out,
+        manifest_file,
+        "cag",
+        "CAG"
     )
-    
+    resultsHDF = cag_corncob_wf.out
+
+    // ##########################
+    // # COMPOSITIONAL ANALYSIS #
+    // ##########################
+
     // If we performed compositional analysis, add the results ot the HDF5
     if (params.composition) {
         addMetaPhlAn2Results(
@@ -491,7 +487,15 @@ workflow {
                     annotation_wf.out.eggnog_tsv
                 )
 
-                resultsHDF = addEggnogResults.out
+                // Calculate the association of functional groups with user-provided features
+                func_corncob_wf(
+                    addEggnogResults.out,
+                    joinDetailedHDF.out,
+                    manifest_file,
+                    "func",
+                    "eggNOG_desc_ix"
+                )
+                resultsHDF = func_corncob_wf.out
             }
         }
     }
@@ -510,39 +514,38 @@ workflow {
                     readTaxonomy.out
                 )
 
-                resultsHDF = addTaxResults.out
+                // Calculate the association of functional groups with user-provided features
+                tax_corncob_wf(
+                    addTaxResults.out,
+                    joinDetailedHDF.out,
+                    manifest_file,
+                    "taxa",
+                    "tax_id"
+                )
+                resultsHDF = tax_corncob_wf.out
             }
         }
     }
 
-    // If we performed statistical analysis, add the results to the HDF5
-    if ( params.formula ) {
-        addCorncobResults(
-            resultsHDF,
-            corncob_wf.out
-        )
-
-        runBetta(
-            addCorncobResults.out[1].flatten()
-        )
-
-        addBetta(
-            addCorncobResults.out[0],
-            runBetta.out.toSortedList()
-        )
-
-        resultsHDF = addBetta.out[0]
-
-    }
+    // Add the pairwise distances between every specimen
+    calcDistances(
+        resultsHDF
+    )
 
     // "Repack" the HDF5, which enhances space efficiency and adds GZIP compression
     repackFullHDF(
-        resultsHDF
+        calcDistances.out
     )
 
     // "Repack" and compress the detailed results HDF5 as well
     repackDetailedHDF(
         joinDetailedHDF.out
+    )
+
+    // Compile a redis store with results formatted for rapid visualization
+    buildRedis(
+        repackFullHDF.out,
+        repackDetailedHDF.out
     )
 
 }

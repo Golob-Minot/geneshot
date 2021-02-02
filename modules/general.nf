@@ -197,15 +197,14 @@ cat __INPUT* > ${output_name}
 """
 }
 
-process collectAbundances{
-    tag "Add gene abundances to HDF"
+process collectResults{
+    
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
     errorStrategy 'finish'
 
     input:
         path cag_csv
-        path cag_abund_feather
         path readcount_csv
         path manifest_csv
         path specimen_gene_count_csv
@@ -226,14 +225,12 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from scipy.spatial.distance import pdist, squareform
 from scipy.stats.mstats import gmean
 from scipy.stats import entropy
 import pickle
 pickle.HIGHEST_PROTOCOL = 4
 
 cag_csv = "${cag_csv}"
-cag_abund_feather = "${cag_abund_feather}"
 readcount_csv = "${readcount_csv}"
 specimen_gene_count_csv = "${specimen_gene_count_csv}"
 specimen_reads_aligned_csv = "${specimen_reads_aligned_csv}"
@@ -254,114 +251,6 @@ summary_dict = dict([
     ("dmnd_min_identity", ${params.dmnd_min_identity}),
     ("dmnd_min_coverage", ${params.dmnd_min_coverage})
 ])
-
-# Perform different types of ordination and include them in the output HDF
-def run_ordination(abund_df, ordination_type):
-
-    if ordination_type == "pca":
-        return run_pca(abund_df)
-    elif ordination_type == "tsne":
-        return run_tsne(abund_df)
-    else:
-        assert "No code available to run ordination type: %s" % ordination_type
-
-# Dimensionality reduction with PCA
-def run_pca(abund_df):
-    
-    # Initialize the PCA object
-    pca = PCA()
-    
-    # Fit to the data
-    pca.fit(abund_df)
-
-    # Make an output DataFrame
-    return pd.DataFrame(
-        pca.transform(
-            abund_df
-        ),
-        index=abund_df.index.values,
-        columns=[
-            "PC%d (%s%s)" % (
-                ix + 1,
-                round(100 * r, 1) if r > 0.01 else "%.1E" % (100 * r),
-                '%'
-            )
-            for ix, r in enumerate(
-                pca.explained_variance_ratio_
-            )
-        ]
-    ).reset_index(
-    ).rename(columns=dict([('index', 'specimen')]))
-
-# Dimensionality reduction with t-SNE
-def run_tsne(abund_df, n_components=2):
-    
-    # Initialize the TSNE object
-    tsne = TSNE(
-        n_components=n_components
-    )
-
-    # Make an output DataFrame with the transformed data
-    return pd.DataFrame(
-        tsne.fit_transform(
-            abund_df
-        ),
-        index=abund_df.index.values,
-        columns=[
-            "t-SNE %d" % (
-                ix + 1
-            )
-            for ix in range(n_components)
-        ]
-    ).reset_index(
-    ).rename(columns=dict([('index', 'specimen')]))
-
-# Calculate pairwise distances (input has specimens in rows)
-def calc_pdist(abund_df, metric="euclidean"):
-    print("Calculating pairwise %s distances over %d samples and %d CAGs" % (metric, abund_df.shape[0], abund_df.shape[1]))
-    
-    # Make an output DataFrame with the pairwise distances
-    return pd.DataFrame(
-        squareform(
-            pdist(
-                abund_df if metric != "aitchison" else clr_transform(abund_df),
-                metric=metric if metric != "aitchison" else "euclidean"
-            )
-        ),
-        index=abund_df.index.values,
-        columns=abund_df.index.values
-    ).reset_index(
-    ).rename(columns=dict([('index', 'specimen')]))
-
-# Calculate CLR-transformed abundances (input has specimens in rows)
-def clr_transform(abund_df):
-    print("Calculating CLR over %d samples and %d CAGs" % (abund_df.shape[0], abund_df.shape[1]))
-
-    # Make the input
-    specimen_col_abund_df = abund_df.T
-
-    # Calculate the geometric mean for every specimen
-    specimen_gmean = specimen_col_abund_df.apply(
-        lambda c: gmean(c.loc[c > 0])
-    )
-
-    # Find the global minimum value
-    min_abund = specimen_col_abund_df.apply(
-        lambda c: c.loc[c > 0].min()
-    ).min()
-
-    print("Minimum value is %d" % min_abund)
-
-    # Fill in the minimum value
-    specimen_col_abund_df = specimen_col_abund_df.clip(
-        lower=min_abund
-    )
-
-    # Divide by the geometric mean
-    specimen_col_abund_df = specimen_col_abund_df / specimen_gmean
-    
-    # Take the log and return
-    return specimen_col_abund_df.applymap(np.log10).T
 
 # Read in the table with gene lengths
 gene_length_df = pd.read_csv(gene_length_csv).set_index("gene")["length"]
@@ -430,54 +319,6 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         "/summary/all"
     )
 
-    # Read in the table with the CAG-level abundances across all samples
-    cag_abund_df = pd.read_feather(
-        cag_abund_feather
-    ).rename(
-        columns={"index": "CAG"}
-    )
-    print(
-        "Read in abundances for %d CAGs across %d samples" %
-        (cag_abund_df.shape[0], cag_abund_df.shape[1] - 1)
-    )
-    # Add some descriptive statistics
-    summary_dict["num_cags"] = cag_abund_df.shape[0]
-
-
-    # Write to HDF5
-    cag_abund_df.to_hdf(
-        store, 
-        "/abund/cag/wide",
-        format = "table",
-        data_columns = ["CAG"],
-        complevel = 5
-    )
-
-    # Perform ordination, both PCA and t-SNE and write to store
-    for ordination_type in ["pca", "tsne"]:
-
-        # The ordination methods expect samples to be in rows
-        # and so we need to rotate the /abund/cags/wide object
-        run_ordination(
-            cag_abund_df.set_index("CAG").T,
-            ordination_type
-        ).to_hdf(
-            store,
-            "/ordination/%s" % ordination_type
-        )
-
-    # Calculate pairwise distances and write to store
-    for metric in ["euclidean", "braycurtis", "jaccard", "aitchison"]:
-
-        # Calculate pairwise distances and write to the store
-        calc_pdist(
-            cag_abund_df.set_index("CAG").T,
-            metric
-        ).to_hdf(
-            store,
-            "/distances/%s" % metric
-        )
-
     # Read in the table describing which genes are grouped into which CAGs
     # This is being called 'cag_df', but it's really a table of CAG annotations per-gene,
     # so there is one row per gene.
@@ -490,6 +331,8 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
 
     # Save the total number of genes
     summary_dict["num_genes"] = cag_df.shape[0]
+    # Save the total number of CAGs
+    summary_dict["num_cags"] = cag_df["CAG"].unique().shape[0]
 
     # Write to HDF5
     cag_df.to_hdf(
@@ -511,23 +354,6 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         "/annot/gene/all",
         format = "table",
         data_columns = ["gene", "CAG"]
-    )
-
-    # Make a summary table describing each CAG with size, mean_abundance, and prevalence
-    # Save it in the HDF5 as "/annot/cag/all"
-    cag_abund_df.set_index("CAG", inplace=True)
-    cag_summary_df = pd.DataFrame(dict([
-        ("size", cag_df["CAG"].value_counts()),
-        ("prevalence", (cag_abund_df > 0).mean(axis=1)),
-        ("mean_abundance", cag_abund_df.mean(axis=1)),
-        ("std_abundance", cag_abund_df.std(axis=1)),
-        ("entropy", cag_abund_df.apply(entropy, axis=1)),
-    ])).reset_index(
-    ).rename(
-        columns=dict([("index", "CAG")])
-    ).to_hdf(
-        store,
-        "/annot/cag/all"
     )
 
     # Write out the descriptive statistics
@@ -561,151 +387,244 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
 
 }
 
-
-// Extract a CAG-level counts table from the FAMLI JSON outputs
-// Corncob takes the absolute number of reads from each sample into account
-// and so it needs to have access to those integer values
-process extractCounts {
-    tag "Make CAG ~ sample read-count matrix"
-    container "${container__pandas}"
-    label 'mem_veryhigh'
-    publishDir "${params.output_folder}/abund/", mode: "copy"
+process calcDistances{
     
+    container "${container__experiment_collection}"
+    label 'mem_medium'
+    errorStrategy 'finish'
+
     input:
-    file famli_json_list
-    file cag_csv
+        path results_hdf
 
     output:
-    file "CAG.readcounts.csv.gz"
-
+        path "${results_hdf}"
 
 """
 #!/usr/bin/env python3
 
-from collections import defaultdict
 import gzip
 import json
-import logging
-import os
+import numpy as np
 import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+from scipy.spatial.distance import pdist, squareform
+from scipy.stats import entropy
+from scipy.stats.mstats import gmean
+import pickle
+pickle.HIGHEST_PROTOCOL = 4
 
-# Set up logging
-logFormatter = logging.Formatter(
-    '%(asctime)s %(levelname)-8s [extractCounts] %(message)s'
-)
-rootLogger = logging.getLogger()
-rootLogger.setLevel(logging.INFO)
 
-# Write logs to STDOUT
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(logFormatter)
-rootLogger.addHandler(consoleHandler)
+# Calculate pairwise distances (input has specimens in rows)
+def calc_pdist(abund_df, metric="euclidean"):
+    print("Calculating pairwise %s distances over %d samples and %d CAGs" % (metric, abund_df.shape[0], abund_df.shape[1]))
+    
+    # Make an output DataFrame with the pairwise distances
+    return pd.DataFrame(
+        squareform(
+            pdist(
+                abund_df if metric != "aitchison" else clr_transform(abund_df),
+                metric=metric if metric != "aitchison" else "euclidean"
+            )
+        ),
+        index=abund_df.index.values,
+        columns=abund_df.index.values
+    ).reset_index(
+    ).rename(columns=dict([('index', 'specimen')]))
 
-# Read in the CAG assignment for each gene
-logging.info("Reading in CAG assignments")
-cags = pd.read_csv(
-    "${cag_csv}"
-).set_index(
-    "gene"
-)["CAG"]
+# Calculate CLR-transformed abundances (input has specimens in rows)
+def clr_transform(abund_df):
+    print("Calculating CLR over %d samples and %d CAGs" % (abund_df.shape[0], abund_df.shape[1]))
 
-# Make an object to hold the number of reads per CAG, per sample
-cag_counts = dict()
+    # Make the input
+    specimen_col_abund_df = abund_df.T
 
-# Read in each of the FAMLI output objects
-for fp in "${famli_json_list}".split(" "):
+    # Calculate the geometric mean for every specimen
+    specimen_gmean = specimen_col_abund_df.apply(
+        lambda c: gmean(c.loc[c > 0])
+    )
 
-    logging.info("Processing %s" % fp)
+    # Find the global minimum value
+    min_abund = specimen_col_abund_df.apply(
+        lambda c: c.loc[c > 0].min()
+    ).min()
 
-    # Get the sample name
-    assert fp.endswith(".json.gz"), fp
-    sample_name = fp[:-len(".json.gz")]
+    print("Minimum value is %d" % min_abund)
 
-    # Make sure the file was staged correctly
-    assert os.path.exists(fp), "%s not found" % fp
+    # Fill in the minimum value
+    specimen_col_abund_df = specimen_col_abund_df.clip(
+        lower=min_abund
+    )
 
-    # Add the counts
-    cag_counts[sample_name] = defaultdict(int)
+    # Divide by the geometric mean
+    specimen_col_abund_df = specimen_col_abund_df / specimen_gmean
+    
+    # Take the log and return
+    return specimen_col_abund_df.applymap(np.log10).T
 
-    for i in json.load(
-        gzip.open(
-            fp,
-            "rt"
-        )
-    ):
 
-        # Get the CAG ID assigned for this gene
-        cag_id = cags.get(i["id"])
+# Perform different types of ordination and include them in the output HDF
+def run_ordination(abund_df, ordination_type, **kwargs):
 
-        # If no CAG was assigned
-        if cag_id is None:
+    if ordination_type == "pca":
+        return run_pca(abund_df, **kwargs)
+    elif ordination_type == "tsne":
+        return run_tsne(abund_df, **kwargs)
+    else:
+        assert "No code available to run ordination type: %s" % ordination_type
 
-            # Skip it
-            continue
 
-        # Otherwise
+# Dimensionality reduction with PCA
+def run_pca(abund_df):
+    
+    # Initialize the PCA object
+    pca = PCA()
+    
+    # Fit to the data
+    pca.fit(abund_df)
 
-        # Add the value in 'nreads' to the CAG assigned to this gene
-        cag_counts[sample_name][cag_id] += i["nreads"]
+    # Make an output DataFrame
+    return pd.DataFrame(
+        pca.transform(
+            abund_df
+        ),
+        index=abund_df.index.values,
+        columns=[
+            "PC%d (%s%s)" % (
+                ix + 1,
+                round(100 * r, 1) if r > 0.01 else "%.1E" % (100 * r),
+                '%'
+            )
+            for ix, r in enumerate(
+                pca.explained_variance_ratio_
+            )
+        ]
+    ).reset_index(
+    ).rename(columns=dict([('index', 'specimen')]))
 
-# Format as a DataFrame
-logging.info("Making a DataFrame")
-cag_counts = pd.DataFrame(
-    cag_counts
-).fillna(
-    0
-).applymap(
-    int
-)
 
-# Transform so that samples are rows
-cag_counts = cag_counts.T
+# Dimensionality reduction with t-SNE
+def run_tsne(abund_df, n_components=2, perplexity=30):
+    
+    # Initialize the TSNE object
+    tsne = TSNE(
+        n_components=n_components,
+        perplexity=perplexity
+    )
 
-# Add a "total" column
-cag_counts["total"] = cag_counts.sum(axis=1)
+    # Make an output DataFrame with the transformed data
+    return pd.DataFrame(
+        tsne.fit_transform(
+            abund_df
+        ),
+        index=abund_df.index.values,
+        columns=[
+            "t-SNE %d" % (
+                ix + 1
+            )
+            for ix in range(n_components)
+        ]
+    ).reset_index(
+    ).rename(columns=dict([('index', 'specimen')]))
 
-# Reset the index and add a name indicating that the rows 
-# correspond to specimens from the manifest
-cag_counts = cag_counts.reset_index(
-).rename(
-    columns=dict([("index", "specimen")])
-)
 
-# Save to a file
-logging.info("Writing to disk")
-cag_counts.to_csv(
-    "CAG.readcounts.csv.gz",
-    compression="gzip",
-    index=None
-)
+# Open a connection to the results HDF
+with pd.HDFStore("${results_hdf}", "a") as store:
 
-logging.info("Done")
+    # Iterate over every key
+    for hdf_key in store.keys():
+
+        # If this is an abundance table
+        if hdf_key.startswith("/abund/") and hdf_key.endswith("/wide"):
+
+            # Parse the name of the gene grouping
+            group_name = hdf_key[len("/abund/"):-len("/wide")]
+
+            print("Reading in %s" % group_name)
+
+            abund_df = pd.read_hdf(store, hdf_key)
+
+            # Make sure that there is a specimen column
+            assert 'specimen' in abund_df.columns.values
+
+            # Set the index by specimen
+            abund_df.set_index('specimen', inplace=True)
+
+            # Remove the 'UNASSIGNED' column
+            abund_df = abund_df.drop(columns='UNASSIGNED')
+
+            # Calculate pairwise distances and write those to the store as well
+            for metric in ["euclidean", "braycurtis", "jaccard", "aitchison"]:
+
+                # Calculate pairwise distances and write to the store
+                calc_pdist(
+                    abund_df,
+                    metric
+                ).to_hdf(
+                    store,
+                    "/distances/%s/%s" % (group_name, metric)
+                )
+
+            # Calculate various ordinations and save them
+            for ordination_type, kwargs in [
+                ('pca', dict()),
+                ('tsne', dict(perplexity=10)),
+                ('tsne', dict(perplexity=20)),
+                ('tsne', dict(perplexity=30)),
+                ('tsne', dict(perplexity=40)),
+                ('tsne', dict(perplexity=50)),
+            ]:
+                # Save the ordination to a table
+                run_ordination(
+                    abund_df,
+                    ordination_type,
+                    **kwargs
+                ).to_hdf(
+                    store,
+                    "/ordination/%s/%s" % (
+                        group_name, 
+                        ordination_type if kwargs.get('perplexity') is None else "%s-%s" % (
+                            ordination_type, 
+                            kwargs.get('perplexity')
+                        )
+                    )
+                )
+
+            # Get the number of genes assigned to each group
+            gene_annot_df = pd.read_hdf(store, "/annot/gene/all")
+
+            # Get the column to read
+            gene_annot_col = dict(
+                cag = "CAG",
+                func = "eggNOG_desc_ix",
+                taxa = "tax_id"
+            ).get(group_name)
+
+            assert gene_annot_col is not None, "Could not find column for %s" % group_name
+
+            # Count up the number of genes assigned to each group
+            group_size = gene_annot_df[gene_annot_col].dropna().apply(int).value_counts()
+
+            # Make a summary table describing each gene group with size, mean_abundance, and prevalence
+            # Save it in the HDF5 as "/annot/<>/all"
+            cag_summary_df = pd.DataFrame(dict([
+                ("size", group_size),
+                ("prevalence", (abund_df > 0).mean()),
+                ("mean_abundance", abund_df.mean()),
+                ("std_abundance", abund_df.std()),
+                ("entropy", abund_df.apply(entropy)),
+            ])).reset_index(
+            ).rename(
+                columns=dict([("index", group_name)])
+            ).to_hdf(
+                store,
+                "/annot/%s/all" % group_name
+            )
+
 """
+
 }
 
-
-process addCorncobResults{
-    tag "Add statistical analysis to HDF"
-    container "${container__pandas}"
-    label 'mem_veryhigh'
-    errorStrategy 'retry'
-
-    input:
-        path results_hdf
-        path corncob_csv
-
-    output:
-        path "${results_hdf}"
-        path "corncob.for.betta.*.csv.gz" optional true
-
-"""
-#!/bin/bash
-
-add_corncob_results.py "${results_hdf}" "${corncob_csv}" "${params.fdr_method}"
-
-"""
-
-}
 
 process joinHDF{
     container "${container__pandas}"
@@ -888,6 +807,34 @@ print(
     eggnog_df.shape[0]
 )
 
+# Because the "eggNOG free text desc." is so long, we will make an index
+eggnog_desc_ix = pd.DataFrame(dict(
+    eggnog_desc = eggnog_df[
+        "eggNOG free text desc."
+    ].unique()
+)).reset_index(
+).rename(
+    columns=dict(index="eggnog_desc_ix")
+)
+
+# Make a dict to map the eggNOG description field to the index
+eggnog_desc_ix_dict = eggnog_desc_ix.set_index(
+    "eggnog_desc"
+)[
+    "eggnog_desc_ix"
+]
+
+# Replace the free text field in eggnog_df
+eggnog_df = eggnog_df.assign(
+    eggnog_desc_ix = eggnog_df[
+        'eggNOG free text desc.'
+    ].apply(
+        eggnog_desc_ix_dict.get
+    )
+).drop(
+    columns='eggNOG free text desc.'
+)
+
 # Read in the existing set of gene annotations
 with pd.HDFStore("${results_hdf}", "r") as store:
 
@@ -899,17 +846,22 @@ with pd.HDFStore("${results_hdf}", "r") as store:
 
 # Add in a subset of the eggnog results
 gene_annot = gene_annot.assign(
-    eggNOG_ortholog = eggnog_df["seed_eggNOG_ortholog"]
-).assign(
-    eggNOG_tax = eggnog_df["best_tax_level"]
-).assign(
-    eggNOG_desc = eggnog_df["eggNOG free text desc."]
+    eggNOG_ortholog = eggnog_df["seed_eggNOG_ortholog"],
+    eggNOG_tax = eggnog_df["best_tax_level"],
+    eggNOG_desc_ix = eggnog_df["eggnog_desc_ix"]
 ).sort_values(
     by="CAG"
 ).reset_index()
 
 # Open a connection to the HDF5
 with pd.HDFStore("${results_hdf}", "a") as store:
+
+    # Write out the index linking the eggnog_desc_ix to
+    # the full text description
+    eggnog_desc_ix.to_hdf(
+        store,
+        "/ref/eggnog_desc"
+    )
 
     # Write eggnog results to HDF5
     eggnog_df.reset_index().reindex(
@@ -922,7 +874,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
             'KEGG_ko', 
             'best eggNOG OG', 
             'COG Functional cat.', 
-            'eggNOG free text desc.'
+            'eggnog_desc_ix'
         ]
     ).to_hdf(
         store,
@@ -1213,3 +1165,41 @@ echo "Publishing ${input_fp}"
 
 }
 
+process buildRedis {
+
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    label "mem_medium"
+    errorStrategy "finish"
+    publishDir "${params.output_folder}", mode: "copy", overwrite: true
+    
+
+    input:
+    file results_hdf5
+    file details_hdf5
+        
+    output:
+    file "${params.output_prefix}.redis"
+
+    """
+#!/bin/bash
+
+set Eeuo pipefail
+
+# Start a redis server in the background
+redis-server &
+
+# Set the savepoint
+redis-cli config set dbfilename ${params.output_prefix}.redis
+
+buildRedis.py \
+    --results ${results_hdf5} \
+    --details ${details_hdf5}
+
+# Save the redis store
+redis-cli save
+
+# Shutdown the redis server
+redis-cli shutdown
+
+    """
+}

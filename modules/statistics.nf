@@ -1,7 +1,7 @@
 // // Processes to perform statistical analysis
 
 // Container versions
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.2.1_pyarrow"
 
 // Workflow to test out the provided formula and manifest CSV in a dry run
 // This is intended to catch the case early on where the provided formula
@@ -9,32 +9,45 @@ container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 workflow validation_wf {
     take: 
         manifest_csv
-        formula_ch
+
     main: 
 
+    // Set up a channel with the strings of the formula(s) provided
+    formula_ch = Channel.of(
+        params.formula.split(",")
+    )
+
+    // Generate mock data
     mockData(
         manifest_csv
     )
 
+    // Split up the mock data to be analyzed in parallel
     splitCorncob(
         mockData.out
     )
 
+    // Run corncob on the mock data
     runCorncob(
         splitCorncob.out.flatten(),
         manifest_csv,
+        "CAG",
         formula_ch
     )
 
+    // Join the results
     joinCorncob(
-        runCorncob.out.toSortedList()
+        runCorncob.out.toSortedList(),
+        "CAG"
     )
 
+    // Make sure that the results conform to the expected format
     validateFormula(
         joinCorncob.out,
         manifest_csv
     )
 
+    // Return the validated manifest
     emit:
     validateFormula.out
 
@@ -43,28 +56,64 @@ workflow validation_wf {
 // Workflow to run corncob on the actual data
 workflow corncob_wf {
     take:
-    countsCSV
+    results_hdf
+    details_hdf
     manifest_csv
-    formula_ch
+    group_name
+    group_col
 
     main:
 
-    splitCorncob(
-        countsCSV
+    // Extract the counts for this grouping of genes
+    // Regardless of whether a --formula is provided,
+    // this will publish the table of readcounts to the output
+    extractCounts(
+        results_hdf,
+        details_hdf,
+        group_name,
+        group_col
     )
 
-    runCorncob(
-        splitCorncob.out.flatten(),
-        manifest_csv,
-        formula_ch
-    )
+    // If a formula has also been provided
+    if ( params.formula ) {
 
-    joinCorncob(
-        runCorncob.out.toSortedList()
-    )
+        // Set up a channel with the strings of the formula(s) provided
+        formula_ch = Channel.of(
+            params.formula.split(",")
+        )
+
+        splitCorncob(
+            extractCounts.out[0]
+        )
+
+        runCorncob(
+            splitCorncob.out.flatten(),
+            manifest_csv,
+            group_name,
+            formula_ch
+        )
+
+        joinCorncob(
+            runCorncob.out.toSortedList(),
+            group_name
+        )
+
+        addCorncobResults(
+            extractCounts.out[2],
+            joinCorncob.out,
+            group_name
+        )
+
+        output_hdf = addCorncobResults.out
+
+    } else {
+
+        output_hdf = extractCounts.out[2]
+
+    }
 
     emit:
-    joinCorncob.out
+    output_hdf
 }
 
 process mockData {
@@ -163,6 +212,199 @@ for cag_id, cag_df in df.groupby("CAG"):
 }
 
 
+// Extract a table with the number of reads per gene group
+// This can be used to extract the counts for CAGs, tax IDs, or any
+// other grouping of genes
+// Corncob takes the absolute number of reads from each sample into account
+// and so it needs to have access to those integer values
+process extractCounts {
+    container "${container__pandas}"
+    label 'mem_veryhigh'
+    publishDir "${params.output_folder}/abund/", mode: "copy"
+    
+    input:
+    file results_hdf
+    file details_hdf
+    val group_name
+    val group_col
+
+    output:
+    file "${group_name}.readcounts.csv.gz"
+    file "${group_name}.abundance.csv.gz"
+    file "${results_hdf}"
+
+
+"""
+#!/usr/bin/env python3
+
+from collections import defaultdict
+import gzip
+import json
+import logging
+import os
+import pandas as pd
+
+# Set up logging
+logFormatter = logging.Formatter(
+    '%(asctime)s %(levelname)-8s [Extract Counts ${group_name}] %(message)s'
+)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
+
+# Write logs to STDOUT
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
+
+# Read in the group assignments for each gene
+
+logging.info("Reading in gene groupings from ${results_hdf}")
+logging.info("Reading in ${group_name} assignments")
+gene_group_df = pd.read_hdf("${results_hdf}", "/annot/gene/all")
+
+# Make sure that the expected columns are present
+
+msg = "Expected column 'gene' to be present"
+assert "gene" in gene_group_df.columns.values, msg
+
+msg = "Expected column '${group_col}' to be present"
+assert "${group_col}" in gene_group_df.columns.values, msg
+
+# Format the gene groups as a Series (of integers)
+gene_groups = gene_group_df.set_index(
+    "gene"
+)[
+    "${group_col}"
+].dropna(    
+).apply(
+    int
+)
+
+# Make an object to hold the number of reads per group, per sample
+group_counts = defaultdict(lambda: defaultdict(int))
+
+# Make an object to hold the depth-based relative abundance per group, per sample
+group_abund = defaultdict(lambda: defaultdict(int))
+
+# Read in each of the FAMLI output objects from the details HDF
+
+logging.info("Reading in gene abundances from ${details_hdf}")
+
+# Open the HDF store
+with pd.HDFStore("${details_hdf}", "r") as store:
+
+    # Iterate over all keys
+    for hdf_key in store.keys():
+
+        # If the key holds detailed abundances
+        if hdf_key.startswith("/abund/gene/long/"):
+
+            # Parse the specimen name
+            specimen = hdf_key[len('/abund/gene/long/'):]
+
+            logging.info(
+                "Reading in %s" % specimen
+            )
+
+            # Read the complete table of abundances
+            df = pd.read_hdf(store, hdf_key).set_index("id")
+
+            # Compute the relative depth
+            df = df.assign(rel_depth = df['depth'] / df['depth'].sum())
+
+            # Iterate over every gene
+            for gene_id, r in df.iterrows():
+
+                # Add the number of reads to the count for the group
+                # If the gene does not have any group assigned, then
+                # the count will go to "UNASSIGNED", to preserve
+                # the appropriate total read counts per specimen
+
+                # First key is specimen
+                group_counts[
+                    specimen
+                ][  # Second key is gene group
+                    gene_groups.get(
+                        gene_id,
+                        "UNASSIGNED"
+                    )
+                ] += r['nreads']
+
+                # Saving the relative abundance based on depth
+                group_abund[
+                    specimen
+                ][  # Second key is gene group
+                    gene_groups.get(
+                        gene_id,
+                        "UNASSIGNED"
+                    )
+                ] += r['rel_depth']
+
+# Function to save a dict of dicts as a CSV, and to HDF
+def save_data(
+    group_dict,
+    file_path,
+    store,
+    hdf_key,
+    data_type
+):
+
+    # Format as a DataFrame
+    df = pd.DataFrame(
+        group_dict
+    ).fillna(
+        0
+    ).applymap(
+        data_type
+    )
+
+    # Transform so that specimens are rows
+    df = df.T
+
+    # Reset the index and add a name indicating that the rows 
+    # correspond to specimens from the manifest
+    df = df.reset_index(
+    ).rename(
+        columns=dict([("index", "specimen")])
+    )
+
+    # Save to a file
+    logging.info("Writing to %s" % file_path)
+    df.to_csv(
+        file_path,
+        compression="gzip",
+        index=None
+    )
+
+    # Save to HDF
+    df.to_hdf(store, hdf_key, format='fixed')
+
+# Open the results HDF for writing
+with pd.HDFStore("${results_hdf}", 'a') as store:
+
+    logging.info("Making a DataFrame of ${group_name} counts")
+    save_data(
+        group_counts,
+        "${group_name}.readcounts.csv.gz",
+        store,
+        "/counts/${group_name}/wide",
+        int
+    )
+
+    save_data(
+        group_abund,
+        "${group_name}.abundance.csv.gz",
+        store,
+        "/abund/${group_name}/wide",
+        float
+    )
+
+
+logging.info("Done")
+"""
+}
+
+
 process splitCorncob {
     container "${container__pandas}"
     label "mem_veryhigh"
@@ -182,6 +424,11 @@ import pandas as pd
 print("Reading in ${readcounts_csv_gz}")
 df = pd.read_csv("${readcounts_csv_gz}")
 print("Read in %d rows and %d columns" % (df.shape[0], df.shape[1]))
+
+# Add in a 'total' column
+df = df.assign(
+    total = df.drop(columns='specimen').sum(axis=1)
+)
 
 # Write out shards of the data
 for shard_ix in range(${params.corncob_batches}):
@@ -218,6 +465,7 @@ process runCorncob {
     input:
     file readcounts_csv_gz
     file metadata_csv
+    val group_name
     each formula
 
     output:
@@ -274,8 +522,8 @@ print("Merging total counts with metadata")
 total_and_meta <- metadata %>% 
   left_join(total_counts, by = c("specimen" = "specimen"))
 
-#### Run the analysis for every individual CAG (in this shard)
-print(sprintf("Starting to process %s columns (CAGs)", length(c(2:(dim(counts)[2] - 1)))))
+#### Run the analysis for every individual ${group_name} (in this shard)
+print(sprintf("Starting to process %s columns (${group_name})", length(c(2:(dim(counts)[2] - 1)))))
 corn_tib <- do.call(rbind, mclapply(
     c(2:(dim(counts)[2] - 1)),
     function(i){
@@ -307,7 +555,7 @@ corn_tib <- do.call(rbind, mclapply(
             ) %>%
             select(-`t value`) %>%
             gather(key = type, ...=estimate:p_value) %>%
-            mutate("CAG" = names(counts)[i])
+            mutate("${group_name}" = names(counts)[i])
         )
       } else {
           return(
@@ -315,7 +563,7 @@ corn_tib <- do.call(rbind, mclapply(
                   "parameter" = "all",
                   "type" = "failed", 
                   "value" = NA, 
-                  "CAG" = names(counts)[i]
+                  "${group_name}" = names(counts)[i]
               )
           )
       }   
@@ -450,6 +698,7 @@ process joinCorncob {
     
     input:
     file "corncob.results.*.csv"
+    val group_name
 
     output:
     file "corncob.results.csv"
@@ -473,7 +722,9 @@ print("Reading in corncob results for %d formula(s)" % len(fp_list))
 df = pd.concat([
     pd.read_csv(fp)
     for fp in fp_list
-])
+]).query(  # Filter out the unassigned groups
+    "${group_name} != 'UNASSIGNED'"
+)
 
 print("Writing out to corncob.results.csv")
 df.to_csv("corncob.results.csv", index=None)
@@ -483,183 +734,24 @@ print("Done")
 }
 
 
-// Run meta-analysis on corncob results grouped by annotation label
-// Each input will have the results from a single type of annotation:
-// species, genus, family, or eggNOG_desc
-// The column `label` gives the label, and there is a row for every 
-// CAG which has at least one gene with that label
-// Other columns include CAG, parameter, estimate, and std_error
-process runBetta {
-    container "quay.io/fhcrc-microbiome/breakaway:latest"
-    label "mem_medium"
-    errorStrategy "retry"
-    
-    input:
-    path labelled_corncob_csv
-
-    output:
-    file "${labelled_corncob_csv}.betta.csv.gz"
-
-
-"""
-#!/usr/bin/env Rscript
-library(tidyverse)
-library(magrittr)
-library(reshape2)
-library(breakaway)
-
-# Use vroom to read in the table
-Sys.setenv("VROOM_CONNECTION_SIZE" = 131072 * 20)
-
-# Read in all of the data for a single covariate
-print("Reading in $labelled_corncob_csv")
-df <- vroom::vroom("$labelled_corncob_csv", delim=",")
-df <- as.tibble(df)
-
-print(head(df))
-
-# Make a function which will trim off the trailing digit
-options(scipen=999)
-num_decimal_places <- function(v){nchar(strsplit(as.character(v), "\\\\.")[[1]][2])}
-trim_trailing <- function(v){round(v, num_decimal_places(v) - 1)}
-
-# Make a function to run betta while tolerating faults
-fault_tolerant_betta <- function(df, f){
-    if(nrow(df) == 1){
-        return(
-            data.frame(
-                estimate=df[1,"estimate"],
-                std_error=df[1,"std_error"],
-                p_value=df[1,"p_value"]
-            )
-        )
-    }
-    chats <- df\$estimate
-    ses <- df\$std_error
-    r <- NULL
-    for(ix in c(1:10)){
-        r <- tryCatch({
-            breakaway::betta(chats=chats, ses=ses)\$table
-            },
-            error=function(cond) {
-                print("We have encountered an error:")
-                print(cond)
-                print("The input data which caused the error was:")
-                print(chats)
-                print(ses)
-                return(NULL)
-            })
-        if(!is.null(r)){
-            return(
-                data.frame(
-                    estimate=r[1,"Estimates"],
-                    std_error=r[1,"Standard Errors"],
-                    p_value=r[1,"p-values"]
-                )
-            )
-        } else {
-            print("Trimming down the input data")
-            chats <- trim_trailing(chats)
-            ses <- trim_trailing(ses)
-            print(chats)
-            print(ses)
-        }
-    }
-}
-
-# If there is a single dummy row, skip the entire process
-if(nrow(df) == 1){
-
-    write.table(df, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
-
-} else{
-
-    # Perform meta-analysis combining the results for each label, and each parameter
-    results <- df %>% group_by(annotation, label, parameter) %>% group_modify(fault_tolerant_betta)
-
-    # Write out to a CSV
-    write.table(results, file=gzfile("${labelled_corncob_csv}.betta.csv.gz"), sep=",", row.names=FALSE)
-
-}
-
-"""
-
-}
-
-
-process addBetta{
-    tag "Add meta-analysis to HDF"
+process addCorncobResults{
+    tag "Add statistical analysis to HDF"
     container "${container__pandas}"
-    label 'mem_medium'
-    errorStrategy 'retry'
+    label 'mem_veryhigh'
+    errorStrategy 'finish'
 
     input:
         path results_hdf
-        path betta_csv_list
+        path corncob_csv
+        val group_name
 
     output:
         path "${results_hdf}"
 
 """
-#!/usr/bin/env python3
+#!/bin/bash
 
-import os
-import pandas as pd
-from statsmodels.stats.multitest import multipletests
-import pickle
-pickle.HIGHEST_PROTOCOL = 4
-
-betta_csv_list = "${betta_csv_list}".split(" ")
-
-for betta_csv in betta_csv_list:
-    if len(betta_csv) > 1:
-        assert os.path.exists(betta_csv)
-
-# Read in from the flat file
-df = pd.concat([
-    pd.read_csv(betta_csv)
-    for betta_csv in betta_csv_list
-    if len(betta_csv) > 1
-])
-
-print("Read in {:,} lines from {}".format(
-    df.shape[0],
-    betta_csv
-))
-
-# If there are real results (not just a dummy file), write to HDF5
-if df.shape[0] > 1:
-
-    # Add the q-values
-    df = df.assign(
-        q_value = multipletests(
-            df["p_value"],
-            0.2,
-            "${params.fdr_method}"
-        )[1]
-    )
-
-    # Add the wald
-    df = df.assign(
-        wald = df["estimate"] / df["std_error"],
-    )
-
-    # Open a connection to the HDF5
-    with pd.HDFStore("${results_hdf}", "a") as store:
-
-        # Write to HDF5
-        key = "/stats/enrichment/betta"
-        print("Writing to %s" % key)
-        
-        # Write to HDF
-        df.to_hdf(store, key)
-
-        print("Closing store")
-
-    print("Done")
-
-else:
-    print("No betta results found -- returning unopened results HDF")
+add_corncob_results.py "${results_hdf}" "${corncob_csv}" "${params.fdr_method}" "${group_name}"
 
 """
 
