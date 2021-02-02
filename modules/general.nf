@@ -1178,28 +1178,39 @@ process buildRedis {
     file details_hdf5
         
     output:
-    file "${params.output_prefix}.redis"
+    file "${params.output_prefix}.rdb"
 
     """
 #!/bin/bash
 
 set Eeuo pipefail
 
-# Start a redis server in the background
-redis-server &
+# Set up the redis config
+echo bind 127.0.0.1 >> redis.config
+echo port 6379 >> redis.config
+echo timeout 0 >> redis.config
+echo rdbcompression yes >> redis.config
+echo dbfilename ${params.output_prefix}.rdb >> redis.config
+echo dir \$PWD/ >> redis.config
 
-# Set the savepoint
-redis-cli config set dbfilename ${params.output_prefix}.redis
+# Start a redis server in the background
+redis-server redis.config &
 
 buildRedis.py \
     --results ${results_hdf5} \
-    --details ${details_hdf5}
+    --details ${details_hdf5} \
+    --port 6379 \
+    --host 127.0.0.1
 
 # Save the redis store
+echo "Saving the redis store"
 redis-cli save
 
 # Shutdown the redis server
+echo "Shutting down the redis server"
 redis-cli shutdown
+
+echo "Done"
 
     """
 }
