@@ -79,6 +79,13 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 # cag_taxonomic_layout
 #   DataFrame with node, parent, terminal, x, y
 
+# MEAN ABUNDANCES
+# mean_abundance_cags
+#   Series with <cag_id>:<mean abundance> in descending order
+# mean_abundance_taxa
+#   Series with <tax_id>:<mean abundance> in descending order
+# mean_abundance_func
+#   Series with <func_id>:<mean abundance> in descending order
 
 ##################
 # SET UP LOGGING #
@@ -202,12 +209,26 @@ def save_expt_data(r, results_store, details_store):
     # Save the number of reads per specimen
     copy_table(r, "specimen_nreads", results_store, "/summary/all")
 
+    # Read the abundance of each CAG across all specimens
+    cag_abund_df = pd.read_hdf(
+        results_store, 
+        "/abund/cag/wide"
+    ).set_index(
+        "specimen"
+    ).drop(
+        columns="UNASSIGNED"
+    )
+
+    # Save the mean abundance across all specimens
+    r.set(
+        "mean_abundance_cags",
+        cag_abund_df.mean().sort_values(ascending=False)
+    )
+
     # Save the abundance of every CAG across every specimen
     save_sparse_abund(
         r,
-        results_store,
-        "/abund/cag/wide",
-        "specimen",
+        cag_abund_df,
         "cag_abundance_specimen",
         "specimen_abundance_cag"
     )
@@ -218,18 +239,8 @@ def save_expt_data(r, results_store, details_store):
         pd.read_hdf(results_store, "/ordination/cag/pca").set_index("specimen")
     )
 
-def save_sparse_abund(r, store, hdf_key, col_name, group_key, specimen_key):
+def save_sparse_abund(r, abund_df, group_key, specimen_key):
     """Save the abundances of every gene group across every specimen in sparse dicts."""
-
-    logger.info(f"Reading {hdf_key}")
-    abund_df = pd.read_hdf(
-        store,
-        hdf_key
-    ).set_index(
-        col_name
-    ).drop(
-        columns="UNASSIGNED"
-    )
 
     # For every specimen
     for specimen, c in abund_df.items():
@@ -290,12 +301,26 @@ def save_tax_data(r, results_store, details_store):
     # Save the taxonomy
     copy_table(r, "taxonomy", results_store, "/ref/taxonomy")
 
+    # Read the abundance of each CAG across all specimens
+    taxa_abund_df = pd.read_hdf(
+        results_store, 
+        "/abund/taxa/wide"
+    ).set_index(
+        "specimen"
+    ).drop(
+        columns="UNASSIGNED"
+    )
+
+    # Save the mean abundance across all specimens
+    r.set(
+        "mean_abundance_taxa",
+        taxa_abund_df.mean().sort_values(ascending=False)
+    )
+
     # Save the abundance of every taxon across every specimen
     save_sparse_abund(
         r,
-        results_store,
-        "/abund/taxa/wide",
-        "specimen",
+        taxa_abund_df,
         "tax_abundance_specimen",
         "specimen_abundance_tax"
     )
@@ -460,7 +485,7 @@ def layout_cags_by_taxonomy(results_store, cag_tax_spectra, metric="euclidean", 
     )
 
     # Use that linkage matrix to build a set of coordinates
-    logging.info("Mapping linkage clusters to x-y coordinates")
+    logger.info("Mapping linkage clusters to x-y coordinates")
     pm = PartitionMap(Z, cag_tax_spectra_df.index.values, cag_size)
     coords = pm.get_coords()
 
@@ -479,7 +504,7 @@ class PartitionMap:
         n_missing = np.sum(list(map(lambda n: size_dict.get(n) is None, leaf_names)))
         assert n_missing == 0, f"Missing {n_missing:,}/{len(leaf_names):,} node sizes"
 
-        logging.info(f"Number of leaves: {len(leaf_names):,}")
+        logger.info(f"Number of leaves: {len(leaf_names):,}")
         
         # Make a DataFrame with the nodes which were joined at each iteration
         Z = pd.DataFrame(
@@ -513,8 +538,8 @@ class PartitionMap:
             try:
                 Z.loc[node_ix, 'size'] = self.node_size(r.childA) + self.node_size(r.childB)
             except:
-                logging.info(f"Problem updating size: {node_ix} / {r.childA} / {r.childB}")
-                logging.info(f"Unexpected error: {sys.exc_info()[0]}")
+                logger.info(f"Problem updating size: {node_ix} / {r.childA} / {r.childB}")
+                logger.info(f"Unexpected error: {sys.exc_info()[0]}")
                 raise
 
         # Reverse the order
@@ -522,7 +547,7 @@ class PartitionMap:
         
         # Create the map, assigning the entire range to the final node which was created
         root_node = Z.index.values[0]
-        logging.info(f"Root node {root_node} contains {self.node_size(root_node):,} genes")
+        logger.info(f"Root node {root_node} contains {self.node_size(root_node):,} genes")
         self.partition_map = {
             root_node: Partition(root_node, self.node_size(root_node))
         }
@@ -691,12 +716,26 @@ def save_func_data(r, results_store, details_store):
         ].to_dict()
     )
 
+    # Read the abundance of each functional group across all specimens
+    func_abund_df = pd.read_hdf(
+        results_store, 
+        "/abund/func/wide"
+    ).set_index(
+        "specimen"
+    ).drop(
+        columns="UNASSIGNED"
+    )
+
+    # Save the mean abundance across all specimens
+    r.set(
+        "mean_abundance_func",
+        func_abund_df.mean().sort_values(ascending=False)
+    )
+
     # Save the abundance of every functional group across every specimen
     save_sparse_abund(
         r,
-        results_store,
-        "/abund/func/wide",
-        "specimen",
+        func_abund_df,
         "specimen_abundance_func",
         "func_abundance_specimen"
     )
