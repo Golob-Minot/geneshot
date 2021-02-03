@@ -29,7 +29,7 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 
 # CAG METRICS
 # cag_summary_metrics
-#   DataFrame with cag_id, cag_size, prevalence, mean_abundance, std_abundance, entropy
+#   DataFrame with cag, size, prevalence, mean_abundance, std_abundance, entropy
 
 #  TAXONOMIC ANNOTATION
 # taxonomy
