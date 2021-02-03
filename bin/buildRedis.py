@@ -777,7 +777,7 @@ def save_stat_data(r, results_store, details_store):
 
         # Skip the "(Intercept)"
         stat_df = stat_df.query(
-            "parameter == '(Intercept)'"
+            "parameter != '(Intercept)'"
         )
 
         # For each parameter
