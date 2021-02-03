@@ -1183,18 +1183,15 @@ process buildRedis {
     """
 #!/bin/bash
 
-set Eeuo pipefail
-
-# Set up the redis config
-echo bind 127.0.0.1 >> redis.config
-echo port 6379 >> redis.config
-echo timeout 0 >> redis.config
-echo rdbcompression yes >> redis.config
-echo dbfilename ${params.output_prefix}.rdb >> redis.config
-echo dir \$PWD/ >> redis.config
+set -Eeuo pipefail
 
 # Start a redis server in the background
-redis-server redis.config &
+redis-server \
+    --port 6379 \
+    --bind 127.0.0.1 \
+    --rdbcompression yes \
+    --dbfilename ${params.output_prefix}.rdb \
+    --dir \$PWD
 
 buildRedis.py \
     --results ${results_hdf5} \
