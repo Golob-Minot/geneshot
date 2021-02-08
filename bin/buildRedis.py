@@ -32,8 +32,12 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 #   DataFrame with cag, size, prevalence, mean_abundance, std_abundance, entropy
 
 #  TAXONOMIC ANNOTATION
-# taxonomy
+# taxonomy_df
 #   DataFrame with tax_id, name, rank, parent
+# taxonomy_name
+#   Dict with <tax_id>:<tax_name>
+# taxonomy_rank
+#   Dict with <tax_id>:<tax_rank>
 # cag_majority_taxon <phylum | class | order | family | genus | species>
 #   Dict with <cag_id>:<name of majority taxon at the indicated rank>
 # cag_tax_assignments <cag_id>
@@ -298,8 +302,18 @@ def save_tax_data(r, results_store, details_store):
         # then stop any further processing
         return
 
+    # Read the taxonomy
+    taxonomy = pd.read_hdf(results_store, "/ref/taxonomy")
+    # Format the taxonomy
+    taxonomy = taxonomy.apply(
+        lambda c: c.apply(int) if c.name == "tax_id" else c
+    ).set_index(
+        "tax_id"
+    )
     # Save the taxonomy
-    copy_table(r, "taxonomy", results_store, "/ref/taxonomy")
+    r.set("taxonomy_df", taxonomy)
+    r.set("taxonomy_name", taxonomy["name"].to_dict())
+    r.set("taxonomy_rank", taxonomy["rank"].to_dict())
 
     # Read the abundance of each CAG across all specimens
     taxa_abund_df = pd.read_hdf(
