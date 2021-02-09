@@ -30,6 +30,8 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 # CAG METRICS
 # cag_summary_metrics
 #   DataFrame with cag, size, prevalence, mean_abundance, std_abundance, entropy
+# cag_size_dict
+#   Dict with <cag_id>:<number of genes in CAG>
 
 #  TAXONOMIC ANNOTATION
 # taxonomy_df
@@ -44,6 +46,8 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 #   DataFrame with the number of genes assigned to each tax ID
 # tax_cag_assignments <TAX_ID>
 #   Dict with <cag_id>:<number of genes from CAG assigned to TAX_ID>
+# taxa_size_dict
+#   Dict with <tax_id>:<number of genes assigned to taxon>
 
 # FUNCTIONAL ANNOTATION
 # func_index
@@ -52,6 +56,8 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 #   Dict with <func_ix>:<n_genes>
 # func_cag_set <func_id>
 #   Set of {all <cag_id> which contain at least one gene assigned}
+# func_size_dict
+#   Dict with <func_id>:<number of genes assigned to function>
 
 # ASSOCIATIONS (CORNCOB)
 # available_parameters
@@ -81,7 +87,7 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 # specimen_ordination_pca <cag | taxa | func>
 #   DataFrame with specimen, PC1 (X%), PC1 (X%), etc. 
 # cag_taxonomic_layout
-#   DataFrame with node, parent, terminal, x, y
+#   DataFrame with node, parent, is_leaf, x, y
 
 # MEAN ABUNDANCES
 # mean_abundance_cags
@@ -302,6 +308,12 @@ def save_tax_data(r, results_store, details_store):
         # then stop any further processing
         return
 
+    # Save a dict with the number of genes assigned to each tax ID
+    r.set(
+        "taxa_size_dict",
+        tax_df["tax_id"].dropna().apply(int).value_counts().to_dict()
+    )
+
     # Read the taxonomy
     taxonomy = pd.read_hdf(results_store, "/ref/taxonomy")
     # Format the taxonomy
@@ -358,6 +370,9 @@ def save_tax_data(r, results_store, details_store):
 
     # Get the number of genes assigned to each CAG
     cag_size = gene_cag_df["CAG"].value_counts()
+
+    # Save a dict with the number of genes for each CAG
+    r.set("cag_size_dict", cag_size.to_dict())
 
     # Create a Taxonomy object
     logger.info("Creating taxonomy object")
@@ -717,6 +732,12 @@ def save_func_data(r, results_store, details_store):
         # then stop any further processing
         return
 
+    # Save a dict mapping each function to the number of genes assigned
+    r.set(
+        "func_size_dict",
+        func_df["eggnog_desc_ix"].dropna().apply(int).value_counts().to_dict()
+    )
+
     # Save a dict mapping each `eggnog_desc_ix` integer to an `eggnog_desc` string
     r.set(
         "func_index",
@@ -844,6 +865,9 @@ def save_stat_data(r, results_store, details_store):
                 f"{group_name}_association {parameter}",
                 parameter_df.drop(
                     columns="parameter"
+                ).assign(
+                    neg_log10_pvalue=lambda d: calc_neg_log10(parameter_df['p_value']),
+                    neg_log10_qvalue=lambda d: calc_neg_log10(parameter_df['q_value']),
                 ).set_index(
                     group_name
                 )
@@ -854,6 +878,13 @@ def save_stat_data(r, results_store, details_store):
         "available_parameters",
         list(available_parameters)
     )
+
+# Calculate the negative log10 p-(or q-)value
+def calc_neg_log10(v):
+    # Get the smallest non-zero value
+    min_val = v.loc[v > 0].min()
+
+    return -1 * v.clip(lower=min_val).apply(np.log10)
 
 class Taxonomy:
 
