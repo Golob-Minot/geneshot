@@ -309,9 +309,10 @@ def save_tax_data(r, results_store, details_store):
         return
 
     # Save a dict with the number of genes assigned to each tax ID
+    taxa_size_dict = tax_df["tax_id"].dropna().apply(int).value_counts().to_dict()
     r.set(
         "taxa_size_dict",
-        tax_df["tax_id"].dropna().apply(int).value_counts().to_dict()
+        taxa_size_dict
     )
 
     # Read the taxonomy
@@ -467,6 +468,13 @@ def save_tax_data(r, results_store, details_store):
         "cag_taxonomic_layout",
         layout_cags_by_taxonomy(results_store, cag_tax_spectra)
     )
+
+    # Lay out the taxa radially (sized by the number of genes assigned)
+    r.set(
+        "taxa_taxonomic_layout",
+        layout_taxa_by_taxonomy(tax, taxa_size_dict)
+    )
+
     
 def layout_cags_by_taxonomy(results_store, cag_tax_spectra, metric="euclidean", method="complete"):
     """Use the spectrum of taxonomic assignments to perform hierarchical clustering on CAGs."""
@@ -520,12 +528,62 @@ def layout_cags_by_taxonomy(results_store, cag_tax_spectra, metric="euclidean", 
 
     return coords
 
+
+def layout_taxa_by_taxonomy(tax, taxa_size_dict, metric="euclidean", method="complete"):
+    """Use the spectrum of ancestors to perform hierarchical clustering on taxa."""
+
+    # Get the vector of ancestors for each tax ID
+    logger.info("Building table of ancestors for all tax IDs")
+    ancestors_df = dict()
+
+    # Iterate over each observed taxon
+    for tax_id in taxa_size_dict.keys():
+
+        # Populate a dict for this taxon
+        ancestors_df[tax_id] = dict()
+
+        # Iterate over its ancestors (including itself)
+        for anc in tax.path_to_root(tax_id):
+
+            # Set the value to 1
+            ancestors_df[tax_id][anc] = 1
+
+    # Make a binary matrix
+    ancestors_df = pd.DataFrame(ancestors_df).fillna(0)
+
+    # Rotate so that the observed taxa are in the index
+    ancestors_df = ancestors_df.T
+
+    print(ancestors_df)
+
+    # Perform linkage clustering on CAGs (columns)
+    logger.info("Performing linkage clustering on the taxonomy")
+    Z = linkage(
+        ancestors_df,
+        method=method,
+        metric=metric,
+    )
+
+    # Compute the optimal leaf ordering
+    Z = optimal_leaf_ordering(
+        Z,
+        ancestors_df,
+        metric
+    )
+
+    # Use that linkage matrix to build a set of coordinates
+    logger.info("Mapping linkage clusters to x-y coordinates")
+    pm = PartitionMap(Z, list(ancestors_df.index.values), taxa_size_dict)
+    coords = pm.get_coords()
+
+    return coords
+
         
 class PartitionMap:
     
     def __init__(self, Z, leaf_names, size_dict):
         """Input is a linkage matrix, and a list of the names of all leaves"""
-        
+
         # Save the dictionary with the number of genes in each subnetwork
         self.size_dict = size_dict
 
@@ -558,7 +616,7 @@ class PartitionMap:
 
         # Function to get the size of a node / leaf
         # based on the indexing system used by `linkage`
-        self.node_size = lambda i: Z.loc[int(i), 'size'] if i >= self.nleaves else size_dict[leaf_names[int(i)]]
+        self.node_size = lambda i: Z.loc[int(i), 'size'] if i >= self.nleaves else self.size_dict[leaf_names[int(i)]]
         
         # Use the number of genes per subnetwork to update the size of each node
         for node_ix, r in Z.iterrows():
@@ -578,14 +636,17 @@ class PartitionMap:
         root_node = Z.index.values[0]
         logger.info(f"Root node {root_node} contains {self.node_size(root_node):,} genes")
         self.partition_map = {
-            root_node: Partition(root_node, self.node_size(root_node))
+            root_node: Partition(root_node, 'root', self.node_size(root_node))
         }
 
         # Save the entire linkage matrix
         self.Z = Z
         
         # Save the leaf names
-        self.leaf_names = leaf_names
+        self.leaf_names = dict(zip(
+            range(self.nleaves),
+            map(str, leaf_names)
+        ))
         
         # Expand each node in turn
         for parent_node_ix, r in Z.iterrows():
@@ -595,7 +656,8 @@ class PartitionMap:
         
         return {
             "size": self.node_size(node_ix),
-            "name": node_ix,
+            "ix": node_ix,
+            "name": self.leaf_names[int(node_ix)] if node_ix < self.nleaves else None,
             "is_leaf": node_ix < self.nleaves
         }
             
@@ -619,8 +681,8 @@ class PartitionMap:
             r.distance
         )
         
-        self.partition_map[childA['name']] = nodeA
-        self.partition_map[childB['name']] = nodeB
+        self.partition_map[childA['ix']] = nodeA
+        self.partition_map[childB['ix']] = nodeB
         
     def get_coords(self):
         """Return the x-y coordinates of all leaf nodes."""
@@ -628,6 +690,7 @@ class PartitionMap:
         return pd.DataFrame(
             [
                 {
+                    'ix': node.ix,
                     'name': node.name,
                     'size': node.size,
                     'is_leaf': node.is_leaf,
@@ -638,23 +701,26 @@ class PartitionMap:
             ]
         ).astype(
             dict(
-                name=int,
+                ix=int,
+                name=str,
                 size=int,
                 is_leaf=bool,
                 parent=int,
                 x=float,
                 y=float,
             )
+        ).sort_values(
+            by="ix"
         ).set_index(
-            "name"
+            "ix"
         )
-
 
 
 class Partition:
 
     def __init__(
-        self, 
+        self,
+        ix,
         name,
         size,
         theta_min=0, 
@@ -663,6 +729,7 @@ class Partition:
         is_leaf=False,
         parent=-1
     ):
+        self.ix = ix
         self.name = name
         self.size = size
         self.theta_min = theta_min
@@ -686,23 +753,25 @@ class Partition:
         thetaB = theta_range * childB['size'] / self.size
         
         nodeA = Partition(
+            childA['ix'],
             childA['name'],
             childA['size'],
             theta_min = self.theta_min,
             theta_max = self.theta_min + thetaA,
             radius = self.radius + radius_delta,
             is_leaf = childA['is_leaf'],
-            parent = self.name
+            parent = self.ix
         )
 
         nodeB = Partition(
+            childB['ix'],
             childB['name'],
             childB['size'],
             theta_min = self.theta_max - thetaB,
             theta_max = self.theta_max,
             radius = self.radius + radius_delta,
             is_leaf = childB['is_leaf'],
-            parent = self.name
+            parent = self.ix
         )
 
         return nodeA, nodeB
@@ -712,6 +781,7 @@ class Partition:
         theta = np.mean([self.theta_min, self.theta_max])
         
         return {
+            "ix": self.ix,
             "name": self.name,
             "x": self.radius * math.cos(theta),
             "y": self.radius * math.sin(theta),
