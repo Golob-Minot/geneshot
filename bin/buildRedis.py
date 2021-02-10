@@ -841,8 +841,8 @@ def save_func_data(r, results_store, details_store):
     save_sparse_abund(
         r,
         func_abund_df,
-        "specimen_abundance_func",
         "func_abundance_specimen"
+        "specimen_abundance_func",
     )
 
     # Save the ordination
