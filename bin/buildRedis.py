@@ -70,18 +70,18 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 #   DataFrame with func_id, estimate, p_value, std_error, q_value, wald
 
 # ABUNDANCES
-# cag_abundance_specimen <specimen>
+# specimen_abundance_cag <specimen>
 #   Dict with <cag_id>:<relative abundance of CAG>
-# specimen_abundance_cag <cag_id>
+# cag_abundance_specimen <cag_id>
 #   Dict with <specimen>:<relative abundance of CAG>
-# specimen_abundance_func <func_id>
-#   Dict with <specimen>:<relative abundance>
-# func_abundance_specimen <specimen>
+# specimen_abundance_func <specimen>
 #   Dict with <func_id>:<relative abundance>
-# specimen_abundance_tax <tax_id>
+# func_abundance_specimen <func_id>
 #   Dict with <specimen>:<relative abundance>
-# tax_abundance_specimen <specimen>
+# specimen_abundance_tax <specimen>
 #   Dict with <tax_id>:<relative abundance>
+# tax_abundance_specimen <tax_id>
+#   Dict with <specimen>:<relative abundance>
 
 # ORDINATION
 # specimen_ordination_pca <cag | taxa | func>
