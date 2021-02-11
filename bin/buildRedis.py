@@ -26,6 +26,8 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 # EXPERIMENT
 # manifest
 #   DataFrame with specimen, and additional user-provided metadata columns
+# specimen_nreads
+#   DataFrame with specimen, n_reads, aligned_reads, n_genes_aligned, etc.
 
 # CAG METRICS
 # cag_summary_metrics
@@ -51,9 +53,9 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 
 # FUNCTIONAL ANNOTATION
 # func_index
-#   Dict with <func_ix>:<long name of eggNOG function>
+#   Dict with <func_id>:<long name of eggNOG function>
 # cag_func_assignments <cag_id>
-#   Dict with <func_ix>:<n_genes>
+#   Dict with <func_id>:<n_genes>
 # func_cag_set <func_id>
 #   Set of {all <cag_id> which contain at least one gene assigned}
 # func_size_dict
@@ -64,7 +66,7 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 #   List with all <PARAM> values available
 # cag_association <PARAM>
 #   DataFrame with cag_id, estimate, p_value, std_error, q_value, wald
-# tax_association <PARAM>
+# taxa_association <PARAM>
 #   DataFrame with tax_id, estimate, p_value, std_error, q_value, wald
 # func_association <PARAM>
 #   DataFrame with func_id, estimate, p_value, std_error, q_value, wald
