@@ -52,6 +52,13 @@ workflow assembly_wf {
                 it -> [it.name.replaceAll(/.faa.gz/, ''), it]
             }
 
+            // Point to the outputs of parseGeneAnnotations
+            gene_annotations_ch = Channel.fromPath(
+                "${optional_assembly_folder}**.gene_annotations.csv.gz"
+            ).map {
+                it -> [it.name.replaceAll(/.gene_annotations.csv.gz/, ''), it]
+            }
+
         }
 
     } else {
@@ -64,6 +71,13 @@ workflow assembly_wf {
                 "${optional_assembly_folder}**.faa.gz"
             ).map {
                 it -> [it.name.replaceAll(/.faa.gz/, ''), it]
+            }
+
+            // Point to the outputs of parseGeneAnnotations
+            gene_annotations_ch = Channel.fromPath(
+                "${optional_assembly_folder}**.gene_annotations.csv.gz"
+            ).map {
+                it -> [it.name.replaceAll(/.gene_annotations.csv.gz/, ''), it]
             }
 
         } else {
@@ -92,6 +106,8 @@ workflow assembly_wf {
         parseGeneAnnotations(
             prodigal_ch
         )
+
+        gene_annotations_ch = parseGeneAnnotations.out
 
         // Combine genes by amino acid identity in five rounds
         // Each round will include both linclust- and DIAMOND-based deduplication
@@ -150,7 +166,7 @@ workflow assembly_wf {
 
     // Join the gene annotation tables with the gene assignments
     annotateAssemblies(
-        parseGeneAnnotations.out.join(
+        gene_annotations_ch.join(
             alignAlleles.out
         )
     )
