@@ -45,6 +45,30 @@ workflow alignment_wf {
         gene_length_csv = assembleAbundances.out[2]
 }
 
+workflow import_alignments_wf {
+    take:
+        famli_json_folder
+        output_prefix
+
+    main:
+
+    // Make a channel containing all FAMLI outputs from the specified folder
+    famli_ch = Channel.fromPath("${famli_json_folder}**json.gz")
+
+    // Make a single table with the abundance of every gene across every sample
+    assembleAbundances(
+        famli_ch.toSortedList(),
+        output_prefix
+    )
+
+    emit:
+        famli_json_list = famli_ch.toSortedList()
+        specimen_gene_count_csv = assembleAbundances.out[0]
+        specimen_reads_aligned_csv = assembleAbundances.out[3]
+        detailed_hdf = assembleAbundances.out[1]
+        gene_length_csv = assembleAbundances.out[2]
+}
+
 // Align each sample against the reference database of genes using DIAMOND
 process diamondDB {
     tag "Make a DIAMOND database"
