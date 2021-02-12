@@ -5,6 +5,8 @@ container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collecti
 // Default parameters
 params.output_prefix = "geneshot"
 params.tax_evalue = 0.00001
+params.gene_fasta = false
+params.assembly_folder = false
 
 // Containers
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
@@ -32,29 +34,27 @@ include {
 workflow assembly_wf {
     take:
         combined_reads_ch
-        optional_gene_fasta
-        optional_assembly_folder
 
     main:
 
     // If the user provided an existing gene fasta
-    if ( optional_gene_fasta ) {
+    if ( params.gene_fasta ) {
 
-        gene_fasta = file(optional_gene_fasta)
+        gene_fasta = file(params.gene_fasta)
 
         // If the user provided an assembly folder
-        if ( optional_assembly_folder ) {
+        if ( params.assembly_folder ) {
 
             // Point to the outputs of prodigal
             prodigal_ch = Channel.fromPath(
-                "${optional_assembly_folder}**.faa.gz"
+                "${params.assembly_folder}**.faa.gz"
             ).map {
                 it -> [it.name.replaceAll(/.faa.gz/, ''), it]
             }
 
             // Point to the outputs of parseGeneAnnotations
             gene_annotations_ch = Channel.fromPath(
-                "${optional_assembly_folder}**.gene_annotations.csv.gz"
+                "${params.assembly_folder}**.gene_annotations.csv.gz"
             ).map {
                 it -> [it.name.replaceAll(/.gene_annotations.csv.gz/, ''), it]
             }
@@ -64,18 +64,18 @@ workflow assembly_wf {
     } else {
 
         // If the user provided an assembly folder
-        if ( optional_assembly_folder ) {
+        if ( params.assembly_folder ) {
 
             // Point to the outputs of prodigal
             prodigal_ch = Channel.fromPath(
-                "${optional_assembly_folder}**.faa.gz"
+                "${params.assembly_folder}**.faa.gz"
             ).map {
                 it -> [it.name.replaceAll(/.faa.gz/, ''), it]
             }
 
             // Point to the outputs of parseGeneAnnotations
             gene_annotations_ch = Channel.fromPath(
-                "${optional_assembly_folder}**.gene_annotations.csv.gz"
+                "${params.assembly_folder}**.gene_annotations.csv.gz"
             ).map {
                 it -> [it.name.replaceAll(/.gene_annotations.csv.gz/, ''), it]
             }
@@ -159,11 +159,11 @@ workflow assembly_wf {
     )
 
     // If the user provided an assembly folder
-    if ( optional_assembly_folder ) {
+    if ( params.assembly_folder ) {
 
         // Point to the outputs of alignAlleles
         aligned_alleles_ch = Channel.fromPath(
-            "${optional_assembly_folder}**.gene_alignments.tsv.gz"
+            "${params.assembly_folder}**.gene_alignments.tsv.gz"
         ).map {
             it -> [it.name.replaceAll(/.gene_alignments.tsv.gz/, ''), it]
         }

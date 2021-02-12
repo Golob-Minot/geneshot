@@ -41,6 +41,7 @@ params.min_hg_align_score = 30
 
 // Assembly options
 params.gene_fasta = false
+params.assembly_folder = false
 params.phred_offset = 33 // spades
 params.min_identity = 90 // linclust and reference genome alignment
 params.min_coverage = 50 // linclust and reference genome alignment
@@ -233,6 +234,8 @@ include {
     taxonomic_dmnd: params.taxonomic_dmnd,
     gencode: params.gencode,
     tax_evalue: params.tax_evalue,
+    gene_fasta: params.gene_fasta,
+    assembly_folder: params.assembly_folder,
 )
 
 // Import the workflows used for alignment-based analysis
@@ -368,8 +371,6 @@ workflow {
     // Run the assembly and annotation workflow (in modules/assembly.nf)
     assembly_wf(
         combineReads.out,
-        params.gene_fasta,
-        params.assembly_folder,
     )
 
     // Run the annotation steps on the gene catalog
