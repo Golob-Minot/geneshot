@@ -52,13 +52,6 @@ workflow assembly_wf {
                 it -> [it.name.replaceAll(/.faa.gz/, ''), it]
             }
 
-            // Point to the outputs of parseGeneAnnotations
-            gene_annotations_ch = Channel.fromPath(
-                "${params.assembly_folder}**.gene_annotations.csv.gz"
-            ).map {
-                it -> [it.name.replaceAll(/.gene_annotations.csv.gz/, ''), it]
-            }
-
         }
 
     } else {
@@ -71,13 +64,6 @@ workflow assembly_wf {
                 "${params.assembly_folder}**.faa.gz"
             ).map {
                 it -> [it.name.replaceAll(/.faa.gz/, ''), it]
-            }
-
-            // Point to the outputs of parseGeneAnnotations
-            gene_annotations_ch = Channel.fromPath(
-                "${params.assembly_folder}**.gene_annotations.csv.gz"
-            ).map {
-                it -> [it.name.replaceAll(/.gene_annotations.csv.gz/, ''), it]
             }
 
         } else {
@@ -96,18 +82,10 @@ workflow assembly_wf {
 
         }
 
-
         // Extract rRNA alleles from all contigs
         barrnap(
             assembly.out
         )
-
-        // Calculate summary metrics for every assembled gene in each sample
-        parseGeneAnnotations(
-            prodigal_ch
-        )
-
-        gene_annotations_ch = parseGeneAnnotations.out
 
         // Combine genes by amino acid identity in five rounds
         // Each round will include both linclust- and DIAMOND-based deduplication
@@ -180,15 +158,14 @@ workflow assembly_wf {
 
     }
 
-    gene_annotations_ch.take(5).view()
-    aligned_alleles_ch.take(5).view()
-    gene_annotations_ch.join(
-        aligned_alleles_ch
-    ).take(5).view()
+    // Calculate summary metrics for every assembled gene in each sample
+    parseGeneAnnotations(
+        prodigal_ch
+    )
 
     // Join the gene annotation tables with the gene assignments
     annotateAssemblies(
-        gene_annotations_ch.join(
+        parseGeneAnnotations.out.join(
             aligned_alleles_ch
         )
     )
