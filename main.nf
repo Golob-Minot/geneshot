@@ -51,6 +51,7 @@ params.dmnd_min_score = 20 // DIAMOND
 params.gencode = 11 //DIAMOND
 params.sd_mean_cutoff = 3.0 // FAMLI
 params.famli_batchsize = 10000000 // FAMLI
+params.famli_folder = false // Import FAMLI-filtered alignments
 
 // Annotation options
 params.noannot = false
@@ -131,6 +132,7 @@ def helpMessage() {
       --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
       --sd_mean_cutoff      Ratio of standard deviation / mean depth of sequencing used to filter genes (default: 3.0) (FAMLI)
       --famli_batchsize     Number of alignments to deduplicate in batches (default: 10000000) (FAMLI)
+      --famli_folder        Optional: Specify a folder containing previously-computed FAMLI outputs
 
     For CAGs:
       --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
@@ -231,7 +233,10 @@ include {
 )
 
 // Import the workflows used for alignment-based analysis
-include { alignment_wf } from './modules/alignment' params(
+include { 
+    alignment_wf;
+    import_alignments_wf
+} from './modules/alignment' params(
     output_folder: output_folder,
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
@@ -383,30 +388,54 @@ workflow {
     // # ALIGNMENT-BASED ANALYSIS #
     // ############################
 
-    // Run the alignment-based analysis steps (in modules/alignment.nf)
-    alignment_wf(
-        gene_fasta,
-        combineReads.out,
-        params.output_prefix
-    )
+    // If the user specified a folder of existing FAMLI results
+    if ( params.famli_folder ) {
+
+        // Import those results directly
+        import_alignments_wf(
+            params.famli_folder,
+            params.output_prefix
+        )
+
+        // Point to the output of that sub-workflow
+        alignments_output = import_alignments_wf.out
+
+    // Otherwise
+    } else {
+
+        // Run the alignment-based analysis steps (in modules/alignment.nf)
+        alignment_wf(
+            gene_fasta,
+            combineReads.out,
+            params.output_prefix
+        )
+
+        // Point to the output of the alignment sub-workflow
+        alignments_output = alignment_wf.out
+        
+    }
 
     // #############
     // # MAKE CAGS #
     // #############
 
-    // If a gene catalog was provided
-    if ( params.gene_fasta ) {
+    // If a set of CAG assignments were provided
+    if ( params.cags_csv ) {
 
-        // Point to the CAG assignments which were also provided
+        // Point to that file
         cags_csv = file(params.cags_csv)
 
+    // Otherwise
     } else {
 
         // Make CAGs using both co-assembly and co-abundance information
         makeCAGs(
             assembly_wf.out.detailed_hdf,
-            alignment_wf.out.detailed_hdf,
+            alignments_output.detailed_hdf,
         )
+
+        // Point to the outputs from that process
+        cags_csv = makeCAGs.out[0]
 
     }
 
@@ -416,7 +445,7 @@ workflow {
 
     // Calculate the richness of each sample using the breakaway algorithm
     breakaway(
-        alignment_wf.out.famli_json_list.flatten()
+        alignments_output.famli_json_list.flatten()
     )
     collectBreakaway(
         breakaway.out.toSortedList()
@@ -433,16 +462,16 @@ workflow {
     // Join the detailed results from assembly and annotation
     joinDetailedHDF(
         assembly_wf.out.detailed_hdf,
-        alignment_wf.out.detailed_hdf,
+        alignments_output.detailed_hdf,
     )
 
     collectResults(
-        makeCAGs.out[0],
+        cags_csv,
         countReadsSummary.out,
         manifest_file,
-        alignment_wf.out.specimen_gene_count_csv,
-        alignment_wf.out.specimen_reads_aligned_csv,
-        alignment_wf.out.gene_length_csv,
+        alignments_output.specimen_gene_count_csv,
+        alignments_output.specimen_reads_aligned_csv,
+        alignments_output.gene_length_csv,
         collectBreakaway.out,
         assembly_wf.out.n_genes_assembled_csv
     )
