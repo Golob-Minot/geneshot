@@ -371,14 +371,16 @@ def save_tax_data(r, results_store, details_store):
         specimen_tax_df = tax.make_cag_tax_df(
             taxa_abund.loc[taxa_abund > 0]
         ).sort_values(
-            by="total",
+            by="count",
             ascending=False
         )
 
         # Save to redis
         r.set(
             f"specimen_abundance_tax {specimen}",
-            specimen_tax_df
+            specimen_tax_df.drop(
+                columns=['rank', 'name', 'total']
+            )
         )
 
     # Save the ordination
@@ -438,14 +440,16 @@ def save_tax_data(r, results_store, details_store):
         cag_tax_df = tax.make_cag_tax_df(
             cag_df["tax_id"].value_counts()
         ).sort_values(
-            by="total",
+            by="count",
             ascending=False
         )
 
         # Save the table
         r.set(
             f"cag_tax_assignments {cag_id}", 
-            cag_tax_df
+            cag_tax_df.drop(
+                columns=['rank', 'name', 'total']
+            )
         )
 
         # Save the taxonomic spectra
@@ -1094,6 +1098,7 @@ class Taxonomy:
             parent=self.taxonomy_df["parent"],
             rank=self.taxonomy_df["rank"],
             name=self.taxonomy_df["name"],
+            total=total_genes_assigned,
         ).reset_index(
             drop=True
         )
