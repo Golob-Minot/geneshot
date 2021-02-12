@@ -180,6 +180,12 @@ workflow assembly_wf {
 
     }
 
+    gene_annotations_ch.take(5).view()
+    aligned_alleles_ch.take(5).view()
+    gene_annotations_ch.join(
+        aligned_alleles_ch
+    ).take(5).view()
+
     // Join the gene annotation tables with the gene assignments
     annotateAssemblies(
         gene_annotations_ch.join(
