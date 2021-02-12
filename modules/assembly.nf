@@ -32,77 +32,107 @@ include {
 workflow assembly_wf {
     take:
         combined_reads_ch
+        optional_gene_fasta
+        optional_assembly_folder
 
     main:
 
-    // Perform de novo assembly
-    assembly(
-        combined_reads_ch
-    )
+    // If the user provided an existing gene fasta
+    if ( optional_gene_fasta ) {
 
-    // Annotate those contigs with Prokka
-    prodigal(
-        assembly.out
-    )
+        gene_fasta = file(optional_gene_fasta)
 
-    // Extract rRNA alleles from all contigs
-    barrnap(
-        assembly.out
-    )
+    } else {
 
-    // Calculate summary metrics for every assembled gene in each sample
-    parseGeneAnnotations(
-        prodigal.out[0]
-    )
+        // If the user provided an assembly folder
+        if ( optional_assembly_folder ) {
 
-    // Combine genes by amino acid identity in five rounds
-    // Each round will include both linclust- and DIAMOND-based deduplication
-    // linclust provides fast symmetrical overlap search, while
-    // DIAMOND performs slower, asymmetrical overlap search
-    linclustRound1(
-        prodigal.out[0].map{ r -> r[1]}.toSortedList().flatten().collate(4)
-    )
-    dedupRound1(
-        linclustRound1.out
-    )
-    linclustRound2(
-        dedupRound1.out.toSortedList().flatten().collate(4)
-    )
-    dedupRound2(
-        linclustRound2.out
-    )
-    linclustRound3(
-        dedupRound2.out.toSortedList().flatten().collate(4)
-    )
-    dedupRound3(
-        linclustRound3.out
-    )
-    linclustRound4(
-        dedupRound3.out.toSortedList().flatten().collate(4)
-    )
-    dedupRound4(
-        linclustRound4.out
-    )
-    linclustRound5(
-        dedupRound4.out.toSortedList()
-    )
-    dedupRound5(
-        linclustRound5.out
-    )
+            // Point to the outputs of prodigal
+            prodigal_ch = Channel.fromPath(
+                "${optional_assembly_folder}**.faa.gz"
+            ).map {
+                it -> [it.name.replaceAll(/.faa.gz/, ''), it]
+            }
 
-    // Make new, shorter names for each gene
-    renameGenes(
-        dedupRound5.out
-    )
+        } else {
+
+            // Perform de novo assembly
+            assembly(
+                combined_reads_ch
+            )
+
+            // Annotate those contigs with Prokka
+            prodigal(
+                assembly.out
+            )
+
+            prodigal_ch = prodigal.out[0]
+
+        }
+
+
+        // Extract rRNA alleles from all contigs
+        barrnap(
+            assembly.out
+        )
+
+        // Calculate summary metrics for every assembled gene in each sample
+        parseGeneAnnotations(
+            prodigal_ch
+        )
+
+        // Combine genes by amino acid identity in five rounds
+        // Each round will include both linclust- and DIAMOND-based deduplication
+        // linclust provides fast symmetrical overlap search, while
+        // DIAMOND performs slower, asymmetrical overlap search
+        linclustRound1(
+            prodigal_ch.map{ r -> r[1]}.toSortedList().flatten().collate(4)
+        )
+        dedupRound1(
+            linclustRound1.out
+        )
+        linclustRound2(
+            dedupRound1.out.toSortedList().flatten().collate(4)
+        )
+        dedupRound2(
+            linclustRound2.out
+        )
+        linclustRound3(
+            dedupRound2.out.toSortedList().flatten().collate(4)
+        )
+        dedupRound3(
+            linclustRound3.out
+        )
+        linclustRound4(
+            dedupRound3.out.toSortedList().flatten().collate(4)
+        )
+        dedupRound4(
+            linclustRound4.out
+        )
+        linclustRound5(
+            dedupRound4.out.toSortedList()
+        )
+        dedupRound5(
+            linclustRound5.out
+        )
+
+        // Make new, shorter names for each gene
+        renameGenes(
+            dedupRound5.out
+        )
+
+        gene_fasta = renameGenes.out
+
+    }
 
     // Index the assembled alleles for alignment
     diamondDB(
-        renameGenes.out
+        gene_fasta
     )
 
     // Align the assembled alleles against the gene centroids
     alignAlleles(
-        prodigal.out[0],
+        prodigal_ch,
         diamondDB.out
     )
 
@@ -119,7 +149,7 @@ workflow assembly_wf {
     )
 
     emit:
-        gene_fasta = renameGenes.out
+        gene_fasta = gene_fasta
         n_genes_assembled_csv = joinAssemblyData.out[0]
         detailed_hdf = joinAssemblyData.out[1]
 
@@ -209,7 +239,7 @@ process assembly {
         tuple val(specimen), file("${specimen}.contigs.fasta.gz"), file("${specimen}.megahit.log")
     
 """
-set -e 
+set -Eeuo pipefail 
 
 date
 echo -e "Running Megahit\\n"
@@ -253,7 +283,7 @@ process prodigal {
         file "${specimen}.gff.gz"
     
 """
-set -e 
+set -Eeuo pipefail 
 
 gunzip -c ${contigs} > ${specimen}.contigs.fasta
 
@@ -484,7 +514,7 @@ process shard_genes {
 """
 #!/bin/bash
 
-set -e
+set -Eeuo pipefail
 
 split --additional-suffix .fasta -l 1000000 <(gunzip -c ${fasta_gz}) genes.shard.
 
@@ -507,7 +537,7 @@ process diamond_tax {
 
     
 """
-set -e
+set -Eeuo pipefail
 
 diamond \
     blastp \
@@ -541,7 +571,7 @@ process join_tax {
 
     
 """
-set -e
+set -Eeuo pipefail
 
 for fp in genes.tax.aln.*.gz; do
 
@@ -569,7 +599,7 @@ process eggnog {
 
     
     """
-set -e
+set -Eeuo pipefail
 
 mkdir data
 mkdir TEMP
@@ -647,7 +677,7 @@ process alignAlleles {
     tuple val(specimen), file("${specimen}.gene_alignments.tsv.gz") optional true
 
     """
-    set -e
+    set -Eeuo pipefail
 
     echo "Aligning ${alleles_fasta}"
 

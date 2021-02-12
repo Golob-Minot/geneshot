@@ -103,7 +103,9 @@ def helpMessage() {
 
     For Assembly:
       --gene_fasta          (optional) Compressed FASTA with pre-generated catalog of microbial genes.
-                            If provided, then the entire de novo assembly process will be skipped entirely.
+                            If provided, along with --assembly_folder then the entire de novo assembly process will be omitted.
+      --assembly_folder     (optional) Folder containing de novo assemblies of every specimen.
+                            If provided along with --gene_fasta, then the entire de novo assembly process will be omitted.
       --cags_csv            (optional) If a pre-generated --gene_fasta is provided, CAG groups must be provided
                             in "*.csv.gz" format from the geneshot run which generated that gene catalog.
       --phred_offset        for spades. Default 33.
@@ -362,26 +364,16 @@ workflow {
     // # DE NOVO ASSEMBLY AND ANNOTATION #
     // ###################################
 
-    // A gene catalog was provided, so skip de novo assembly
-    if ( params.gene_fasta ) {
-
-        // Point to the gene catalog provided
-        gene_fasta = file(params.gene_fasta)
-
-    } else {
-
-        // Run the assembly and annotation workflow (in modules/assembly.nf)
-        assembly_wf(
-            combineReads.out
-        )
-        // Point to the output of that workflow
-        gene_fasta = assembly_wf.out.gene_fasta
-
-    }
+    // Run the assembly and annotation workflow (in modules/assembly.nf)
+    assembly_wf(
+        combineReads.out,
+        params.gene_fasta,
+        params.assembly_folder,
+    )
 
     // Run the annotation steps on the gene catalog
     annotation_wf(
-        gene_fasta
+        assembly_wf.out.gene_fasta
     )
 
     // ############################
@@ -405,7 +397,7 @@ workflow {
 
         // Run the alignment-based analysis steps (in modules/alignment.nf)
         alignment_wf(
-            gene_fasta,
+            assembly_wf.out.gene_fasta,
             combineReads.out,
             params.output_prefix
         )
