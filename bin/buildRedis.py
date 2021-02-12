@@ -583,8 +583,6 @@ def layout_taxa_by_taxonomy(tax, taxa_size_dict, metric="euclidean", method="com
     # Rotate so that the observed taxa are in the index
     ancestors_df = ancestors_df.T
 
-    print(ancestors_df)
-
     # Perform linkage clustering on CAGs (columns)
     logger.info("Performing linkage clustering on the taxonomy")
     Z = linkage(
@@ -610,7 +608,7 @@ def layout_taxa_by_taxonomy(tax, taxa_size_dict, metric="euclidean", method="com
         
 class PartitionMap:
     
-    def __init__(self, Z, leaf_names, size_dict):
+    def __init__(self, Z, leaf_names, size_dict, size_weighting=False):
         """Input is a linkage matrix, and a list of the names of all leaves"""
 
         # Save the dictionary with the number of genes in each subnetwork
@@ -668,19 +666,16 @@ class PartitionMap:
             root_node: Partition(root_node, 'root', self.node_size(root_node))
         }
 
-        # Save the entire linkage matrix
-        self.Z = Z
-        
         # Save the leaf names
         self.leaf_names = dict(zip(
             range(self.nleaves),
             map(str, leaf_names)
         ))
-        
+
         # Expand each node in turn
         for parent_node_ix, r in Z.iterrows():
-            self.add_children(parent_node_ix, r)
-            
+            self.add_children(parent_node_ix, r, size_weighting=size_weighting)
+
     def annotate(self, node_ix):
         
         return {
@@ -691,7 +686,7 @@ class PartitionMap:
         }
             
         
-    def add_children(self, parent_node_ix, r):
+    def add_children(self, parent_node_ix, r, size_weighting=False):
         
         # Make sure that the parent node has a partition assigned
         assert parent_node_ix in self.partition_map
@@ -707,9 +702,11 @@ class PartitionMap:
         ].split(
             childA,
             childB,
-            r.distance
+            r.distance,
+            size_weighting=size_weighting
         )
-        
+
+        p = self.partition_map[parent_node_ix]
         self.partition_map[childA['ix']] = nodeA
         self.partition_map[childB['ix']] = nodeB
         
@@ -758,6 +755,7 @@ class Partition:
         is_leaf=False,
         parent=-1
     ):
+        assert theta_min < theta_max
         self.ix = ix
         self.name = name
         self.size = size
@@ -767,7 +765,7 @@ class Partition:
         self.is_leaf = is_leaf
         self.parent = parent
         
-    def split(self, childA, childB, radius_delta):
+    def split(self, childA, childB, radius_delta, size_weighting=False):
         """Split a node, weighted by child size."""
         # Make sure that the child size adds up to the node size
         assert childA['size'] + childB['size'] == self.size, (childA['size'], childB['size'], self.size)
@@ -778,8 +776,15 @@ class Partition:
         theta_range = self.theta_max - self.theta_min
         
         # Compute the proportion of that arc which is assigned to each child
-        thetaA = theta_range * childA['size'] / self.size
-        thetaB = theta_range * childB['size'] / self.size
+
+        # If we are using size weighting
+        if size_weighting:
+            thetaA = theta_range * childA['size'] / self.size
+            thetaB = theta_range * childB['size'] / self.size
+        # If we are NOT using size weighting:
+        else:
+            thetaA = theta_range / 2
+            thetaB = theta_range / 2
         
         nodeA = Partition(
             childA['ix'],
