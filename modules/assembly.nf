@@ -158,16 +158,32 @@ workflow assembly_wf {
         gene_fasta
     )
 
-    // Align the assembled alleles against the gene centroids
-    alignAlleles(
-        prodigal_ch,
-        diamondDB.out
-    )
+    // If the user provided an assembly folder
+    if ( optional_assembly_folder ) {
+
+        // Point to the outputs of alignAlleles
+        aligned_alleles_ch = Channel.fromPath(
+            "${optional_assembly_folder}**.gene_alignments.tsv.gz"
+        ).map {
+            it -> [it.name.replaceAll(/.gene_alignments.tsv.gz/, ''), it]
+        }
+
+    } else {
+
+        // Align the assembled alleles against the gene centroids
+        alignAlleles(
+            prodigal_ch,
+            diamondDB.out
+        )
+
+        aligned_alleles_ch = alignAlleles.out
+
+    }
 
     // Join the gene annotation tables with the gene assignments
     annotateAssemblies(
         gene_annotations_ch.join(
-            alignAlleles.out
+            aligned_alleles_ch
         )
     )
 
