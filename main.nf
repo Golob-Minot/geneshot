@@ -67,6 +67,7 @@ params.distance_threshold = 0.25
 params.distance_metric = "cosine"
 params.min_contig_size = 3
 params.min_contig_depth = 5
+params.cags_csv = false
 
 // Statistical analysis options
 params.formula = false
