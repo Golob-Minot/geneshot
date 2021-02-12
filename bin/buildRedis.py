@@ -81,7 +81,7 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 # func_abundance_specimen <func_id>
 #   Dict with <specimen>:<relative abundance>
 # specimen_abundance_tax <specimen>
-#   Dict with <tax_id>:<relative abundance>
+#   DataFrame with the relative abundance of each tax ID and its ancestors
 # tax_abundance_specimen <tax_id>
 #   Dict with <specimen>:<relative abundance>
 
@@ -254,23 +254,29 @@ def save_expt_data(r, results_store, details_store):
 def save_sparse_abund(r, abund_df, group_key, specimen_key):
     """Save the abundances of every gene group across every specimen in sparse dicts."""
 
-    # For every specimen
-    for specimen, c in abund_df.items():
+    # If the group key was provided
+    if group_key is not None:
 
-        # Save the abundance of every gene group
-        r.set(
-            f"{group_key} {specimen}", 
-            c.loc[c > 0].to_dict()
-        )
+        # For every specimen
+        for specimen, c in abund_df.items():
 
-    # For every gene group
-    for group_id, group_r in abund_df.iterrows():
+            # Save the abundance of every gene group
+            r.set(
+                f"{group_key} {specimen}", 
+                c.loc[c > 0].to_dict()
+            )
 
-        # Save the abundance across every specimen
-        r.set(
-            f"{specimen_key} {group_id}", 
-            group_r.loc[group_r > 0].to_dict()
-        )
+    # If the specimen key was provided
+    if specimen_key is not None:
+
+        # For every gene group
+        for group_id, group_r in abund_df.iterrows():
+
+            # Save the abundance across every specimen
+            r.set(
+                f"{specimen_key} {group_id}", 
+                group_r.loc[group_r > 0].to_dict()
+            )
 
 
 def read_manifest(store):
@@ -330,6 +336,10 @@ def save_tax_data(r, results_store, details_store):
     r.set("taxonomy_name", taxonomy["name"].to_dict())
     r.set("taxonomy_rank", taxonomy["rank"].to_dict())
 
+    # Create a Taxonomy object
+    logger.info("Creating taxonomy object")
+    tax = Taxonomy(results_store)
+
     # Read the abundance of each CAG across all specimens
     taxa_abund_df = pd.read_hdf(
         results_store, 
@@ -351,8 +361,25 @@ def save_tax_data(r, results_store, details_store):
         r,
         taxa_abund_df,
         "tax_abundance_specimen",
-        "specimen_abundance_tax"
+        None
     )
+
+    # For the specimen-level abundances, save and format a full taxonomic table
+    for specimen, taxa_abund in taxa_abund_df.iterrows():
+
+        # Use the Taxonomy object to format the taxonomic assignment DF
+        specimen_tax_df = tax.make_cag_tax_df(
+            taxa_abund.loc[taxa_abund > 0]
+        ).sort_values(
+            by="total",
+            ascending=False
+        )
+
+        # Save to redis
+        r.set(
+            f"specimen_abundance_tax {specimen}",
+            specimen_tax_df
+        )
 
     # Save the ordination
     r.set(
@@ -376,10 +403,6 @@ def save_tax_data(r, results_store, details_store):
 
     # Save a dict with the number of genes for each CAG
     r.set("cag_size_dict", cag_size.to_dict())
-
-    # Create a Taxonomy object
-    logger.info("Creating taxonomy object")
-    tax = Taxonomy(results_store)
 
     # Make a combined DF with the genes that have both
     df = pd.DataFrame(dict(
@@ -1022,6 +1045,7 @@ class Taxonomy:
     def make_cag_tax_df(
         self,
         taxa_vc,
+        dtype=int
     ):
         """Return a nicely formatted taxonomy table from a list of tax IDs and the number of assignments for each."""
 
@@ -1033,7 +1057,7 @@ class Taxonomy:
         # The ID of the parent of that taxon
 
         # The number of genes found at that taxon or in its decendents
-        counts = defaultdict(int)
+        counts = defaultdict(dtype)
 
         # Keep track of the total number of genes with a valid tax ID
         total_genes_assigned = 0
@@ -1070,7 +1094,6 @@ class Taxonomy:
             parent=self.taxonomy_df["parent"],
             rank=self.taxonomy_df["rank"],
             name=self.taxonomy_df["name"],
-            total=total_genes_assigned,
         ).reset_index(
             drop=True
         )
