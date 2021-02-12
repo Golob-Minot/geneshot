@@ -42,6 +42,18 @@ workflow assembly_wf {
 
         gene_fasta = file(optional_gene_fasta)
 
+        // If the user provided an assembly folder
+        if ( optional_assembly_folder ) {
+
+            // Point to the outputs of prodigal
+            prodigal_ch = Channel.fromPath(
+                "${optional_assembly_folder}**.faa.gz"
+            ).map {
+                it -> [it.name.replaceAll(/.faa.gz/, ''), it]
+            }
+
+        }
+
     } else {
 
         // If the user provided an assembly folder
