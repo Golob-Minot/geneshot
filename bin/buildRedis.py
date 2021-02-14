@@ -56,7 +56,7 @@ from scipy.cluster.hierarchy import cophenet, optimal_leaf_ordering
 #   Dict with <func_id>:<long name of eggNOG function>
 # cag_func_assignments <cag_id>
 #   Dict with <func_id>:<n_genes>
-# func_cag_set <func_id>
+# func_cag_set <func_id> [disabled]
 #   Set of {all <cag_id> which contain at least one gene assigned}
 # func_size_dict
 #   Dict with <func_id>:<number of genes assigned to function>
@@ -922,14 +922,14 @@ def save_func_data(r, results_store, details_store):
             cag_df["func"].value_counts().to_dict()
         )
 
-    # For each function
-    for func_ix, func_df in df.groupby("func"):
+    # # For each function [disabled]
+    # for func_ix, func_df in df.groupby("func"):
 
-        # Save the set of CAGs which contain any gene with this assignment
-        r.set(
-            f"func_cag_set {func_ix}",
-            set(func_df["CAG"].tolist())
-        )
+    #     # Save the set of CAGs which contain any gene with this assignment
+    #     r.set(
+    #         f"func_cag_set {func_ix}",
+    #         set(func_df["CAG"].tolist())
+    #     )
 
 
 def save_stat_data(r, results_store, details_store):
