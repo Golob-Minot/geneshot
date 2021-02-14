@@ -1191,14 +1191,12 @@ redis-server \
     --bind 127.0.0.1 \
     --rdbcompression yes \
     --dbfilename ${params.output_prefix}.rdb \
-    --dir \$PWD &
-
+    --dir \$PWD && \
 buildRedis.py \
     --results ${results_hdf5} \
     --details ${details_hdf5} \
     --port 6379 \
-    --host 127.0.0.1 || \
-    redis-cli shutdown  # In case of failure
+    --host 127.0.0.1
 
 # Save the redis store
 echo "Saving the redis store"
