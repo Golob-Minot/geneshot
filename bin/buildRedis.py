@@ -413,6 +413,8 @@ def save_tax_data(r, results_store, details_store):
     )).dropna(
     ).applymap(
         int
+    ).query(
+        "tax_id != 0"
     )
     logger.info(f"Number of genes with both taxonomic and CAG annotations: {df.shape[0]:,}")
 
