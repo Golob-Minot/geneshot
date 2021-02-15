@@ -757,7 +757,7 @@ class Partition:
         is_leaf=False,
         parent=-1
     ):
-        assert theta_min < theta_max
+        assert theta_min < theta_max, parent
         self.ix = ix
         self.name = name
         self.size = size
