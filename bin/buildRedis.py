@@ -757,7 +757,7 @@ class Partition:
         is_leaf=False,
         parent=-1
     ):
-        assert theta_min < theta_max, parent
+        assert theta_min <= theta_max, (theta_min, theta_max)
         self.ix = ix
         self.name = name
         self.size = size
@@ -785,8 +785,8 @@ class Partition:
             thetaB = theta_range * childB['size'] / self.size
         # If we are NOT using size weighting:
         else:
-            thetaA = theta_range / 2
-            thetaB = theta_range / 2
+            thetaA = theta_range / 2.
+            thetaB = theta_range / 2.
         
         nodeA = Partition(
             childA['ix'],
