@@ -111,7 +111,6 @@ process barcodecop {
     tag "Validate barcode demultiplexing for WGS reads"
     container "${container__barcodecop}"
     label 'mem_medium'
-    errorStrategy 'finish'
     maxRetries 10
 
     input:
@@ -154,7 +153,6 @@ process cutadapt {
     tag "Trim adapters from WGS reads"
     container "${container__cutadapt}"
     label 'mem_medium'
-    errorStrategy 'finish'
     maxRetries 10
 
     input:
@@ -178,7 +176,6 @@ ${R1} ${R1} > ${R1.getSimpleName()}.cutadapt.log
 process download_hg_index {
     tag "Download human reference genome"
     container "${container__bwa}"
-    errorStrategy "retry"
     label 'io_limited'
 
     output:
@@ -196,7 +193,6 @@ wget --quiet ${params.hg_index_url} -O hg_index.tar.gz
 process bwa {
     tag "Remove human reads"
     container "${container__bwa}"
-    errorStrategy 'finish'
     maxRetries 10
     label 'mem_veryhigh'
 

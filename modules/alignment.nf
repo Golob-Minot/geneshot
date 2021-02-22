@@ -74,7 +74,6 @@ process diamondDB {
     tag "Make a DIAMOND database"
     container "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6-biopython"
     label 'mem_veryhigh'
-    errorStrategy 'finish'
     publishDir "${params.output_folder}/ref/", mode: "copy"
     
     input:
@@ -100,7 +99,6 @@ process diamond {
     tag "Align to the gene catalog"
     container "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6-biopython"
     label 'mem_veryhigh'
-    errorStrategy 'finish'
     
     input:
     tuple val(sample_name), file(R1), file(R2)
@@ -148,7 +146,6 @@ process famli {
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
     publishDir "${params.output_folder}/abund/details/", mode: "copy"
-    errorStrategy 'finish'
     
     input:
     tuple val(sample_name), file(input_aln)
@@ -176,7 +173,6 @@ process assembleAbundances {
     tag "Make gene ~ sample abundance matrix"
     container "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
     label "mem_veryhigh"
-    errorStrategy 'finish'
 
     input:
     file sample_jsons
@@ -395,7 +391,6 @@ process calcCAGabund {
     tag "Make CAG ~ sample abundance matrix"
     container "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
     label "mem_veryhigh"
-    errorStrategy 'finish'
     publishDir "${params.output_folder}/abund/", mode: "copy"
 
     input:

@@ -52,9 +52,7 @@ workflow combineReads {
 process joinFASTQ {
     tag "Join FASTQ files per-specimen"
     container "${container__fastatools}"
-    label = 'mem_medium'
-    errorStrategy 'finish'
-    maxRetries 10
+    label 'mem_medium'
 
     // If the user sets --preprocess_output, write out the combined reads to that folder
     publishDir path: "${params.output_folder}qc/", enabled: params.savereads, mode: "copy"
@@ -127,7 +125,6 @@ process countReads {
     container "${container__fastatools}"
     cpus 1
     memory "4 GB"
-    errorStrategy "retry"
 
     input:
     tuple val(sample_name), file(R1), file(R2)
@@ -156,7 +153,6 @@ process countReadsSummary {
     container "${container__fastatools}"
     // The output from this process will be copied to the --output_folder specified by the user
     publishDir "${params.output_folder}/qc/", mode: 'copy'
-    errorStrategy "retry"
 
     input:
     // Because the input channel has been collected into a single list, this process will only be run once
@@ -180,7 +176,6 @@ process concatenateFiles {
     tag "Directly combine a group of files"
     container "${container__ubuntu}"
     label "mem_medium"
-    errorStrategy "retry"
     
     input:
     file "__INPUT*"
@@ -201,7 +196,6 @@ process collectResults{
     
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
-    errorStrategy 'finish'
 
     input:
         path cag_csv
@@ -391,7 +385,6 @@ process calcDistances{
     
     container "${container__experiment_collection}"
     label 'mem_medium'
-    errorStrategy 'finish'
 
     input:
         path results_hdf
@@ -629,7 +622,6 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 process joinHDF{
     container "${container__pandas}"
     label 'mem_veryhigh'
-    errorStrategy 'finish'
 
     input:
         file "inputA/${params.output_prefix}.details.hdf5"
@@ -670,7 +662,6 @@ process addMetaPhlAn2Results{
     tag "Add composition analysis to HDF"
     container "${container__pandas}"
     label 'mem_medium'
-    errorStrategy 'finish'
 
     input:
         path results_hdf
@@ -724,7 +715,6 @@ process addEggnogResults {
     tag "Add functional predictions to HDF"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
-    errorStrategy 'finish'
 
     input:
         path results_hdf
@@ -898,7 +888,6 @@ process readTaxonomy {
     tag "Read the NCBI taxonomy"
     container "${container__experiment_collection}"
     label 'mem_medium'
-    errorStrategy 'finish'
 
     input:
         path taxdump_tar_gz
@@ -1013,7 +1002,6 @@ process addTaxResults {
     tag "Add taxonomic annotations to HDF"
     container "${container__experiment_collection}"
     label 'mem_veryhigh'
-    errorStrategy 'finish'
 
     input:
         path results_hdf
@@ -1126,7 +1114,6 @@ process repackHDF {
     container "${container__pandas}"
     tag "Compress HDF store"
     label "mem_veryhigh"
-    errorStrategy "retry"
     publishDir "${params.output_folder}", mode: "copy", overwrite: true
     
     input:
@@ -1169,7 +1156,6 @@ process buildRedis {
 
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label "mem_medium"
-    errorStrategy "finish"
     publishDir "${params.output_folder}", mode: "copy", overwrite: true
     
 
