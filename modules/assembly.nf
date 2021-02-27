@@ -7,6 +7,7 @@ params.output_prefix = "geneshot"
 params.tax_evalue = 0.00001
 params.gene_fasta = false
 params.assembly_folder = false
+params.gene_shard_size = 100000
 
 // Containers
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
@@ -521,7 +522,7 @@ process shard_genes {
 
 set -Eeuo pipefail
 
-split --additional-suffix .fasta -l 1000000 <(gunzip -c ${fasta_gz}) genes.shard.
+split --additional-suffix .fasta -l ${params.gene_shard_size} <(gunzip -c ${fasta_gz}) genes.shard.
 
 gzip genes.shard.*.fasta
 """

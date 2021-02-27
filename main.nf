@@ -55,6 +55,7 @@ params.famli_batchsize = 10000000 // FAMLI
 params.famli_folder = false // Import FAMLI-filtered alignments
 
 // Annotation options
+params.gene_shard_size = 100000
 params.noannot = false
 params.taxonomic_dmnd = false
 params.tax_evalue = 0.00001
@@ -117,6 +118,7 @@ def helpMessage() {
     For Annotation:
       --noannot             If specified, disable annotation for taxonomy or function.
                             Individual annotations can also be disabled by, e.g., setting --eggnog_db false
+      --gene_shard_size     How many genes to include in a shard for annotation. (default: 100000)
       --taxonomic_dmnd      Database used for taxonomic annotation (default: false)
                             (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
       --tax_evalue          Maximum E-value threshold for taxonomic annotation by DIAMOND alignment
