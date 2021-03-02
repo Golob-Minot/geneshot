@@ -1087,7 +1087,12 @@ gene_annot = gene_annot.assign(
 with pd.HDFStore("${results_hdf}", "a") as store:
 
     # Write taxonomic results to HDF5
-    tax_df.to_hdf(store, "/annot/gene/tax")
+    tax_df.apply(
+        lambda c: c.fillna("").apply(str) if c.name == "tax_id" else c
+    ).to_hdf(
+        store, 
+        "/annot/gene/tax"
+    )
 
     # Write summary gene annotation table to HDF5
     gene_annot.to_hdf(
