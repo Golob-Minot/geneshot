@@ -33,6 +33,7 @@ make_cags.py \
     --threshold ${params.distance_threshold} \
     --min-contig-size ${params.min_contig_size} \
     --min-contig-depth ${params.min_contig_depth} \
+    --min-specimens ${params.min_specimens} \
     --output-folder ./ \
     --output-prefix CAGs
 

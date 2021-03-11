@@ -59,6 +59,12 @@ parser.add_argument(
     help='Minimum depth of sequencing per contig'
 )
 parser.add_argument(
+    '--min-specimens',
+    type=int,
+    default=2,
+    help='Only cluster genes which are detected by alignment in at least this number of specimens'
+)
+parser.add_argument(
     '--max-n-cags',
     type=int,
     default=250000,
@@ -113,6 +119,7 @@ logging.info(f"Metric: {args.metric}")
 logging.info(f"Threshold: {args.threshold}")
 logging.info(f"Minimum Contig Size: {args.min_contig_size}")
 logging.info(f"Minimum Contig Depth: {args.min_contig_depth}")
+logging.info(f"Minimum Specimens per Gene: {args.min_specimens}")
 logging.info(f"Output Folder: {args.output_folder}")
 logging.info(f"Output Prefix: {args.output_prefix}")
 
@@ -403,8 +410,8 @@ def co_assembly_boosted_clustering(
         # Get the index of this gene
         gene_ix = gene_abund.gene_ix.get(r.catalog_gene)
 
-        # If this gene doesn't have any depths measured
-        if len(gene_abund.abund[gene_ix]) == 0:
+        # If this gene does not meet the --min-specimens prevalence threshold
+        if len(gene_abund.abund[gene_ix]) < args.min_specimens:
 
             # Skip it
             continue
