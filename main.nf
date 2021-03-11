@@ -69,6 +69,7 @@ params.distance_threshold = 0.25
 params.distance_metric = "cosine"
 params.min_contig_size = 3
 params.min_contig_depth = 5
+params.min_specimens = 1
 params.cags_csv = false
 
 // Statistical analysis options
@@ -143,8 +144,9 @@ def helpMessage() {
     For CAGs:
       --distance_metric     Distance metric used to group genes by co-abundance (default: cosine)
       --distance_threshold  Distance threshold used to group genes by co-abundance (default: 0.25)
-      --min_contig_size     Only cluster genes which are found on contigs with at least this number of genes
-      --min_contig_depth    Minimum depth of sequencing per contig
+      --min_contig_size     Only cluster genes which are found on contigs with at least this number of genes (default: 3; 0 to disable)
+      --min_contig_depth    Minimum depth of sequencing per contig (default: 5; 0 to disable)
+      --min_specimens       Only cluster genes which are detected by alignment in at least this number of specimens (default: 1)
       
     For Statistical Analysis:
       --formula             Optional formula used to estimate associations with CAG relative abundance
@@ -261,6 +263,7 @@ include { makeCAGs } from './modules/make_cags' params(
     distance_threshold: params.distance_threshold,
     min_contig_size: params.min_contig_size,
     min_contig_depth: params.min_contig_depth,
+    min_specimens: params.min_specimens,
 )
 
 // Import the workflows used for statistical analysis
