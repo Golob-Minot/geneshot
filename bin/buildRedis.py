@@ -495,15 +495,25 @@ def save_tax_data(r, results_store, details_store):
         )
 
     # Process the tax spectra
+    coords, Z = layout_cags_by_taxonomy(results_store, cag_tax_spectra)
     r.set(
+        coords,
         "cag_taxonomic_layout",
-        layout_cags_by_taxonomy(results_store, cag_tax_spectra)
+    )
+    r.set(
+        Z,
+        "cag_taxonomic_linkage",
     )
 
     # Lay out the taxa radially (sized by the number of genes assigned)
+    coords, Z = layout_taxa_by_taxonomy(tax, taxa_size_dict)
     r.set(
+        coords,
         "taxa_taxonomic_layout",
-        layout_taxa_by_taxonomy(tax, taxa_size_dict)
+    )
+    r.set(
+        Z,
+        "taxa_taxonomic_linkage",
     )
 
     
@@ -557,7 +567,7 @@ def layout_cags_by_taxonomy(results_store, cag_tax_spectra, metric="euclidean", 
     pm = PartitionMap(Z, cag_tax_spectra_df.index.values, cag_size)
     coords = pm.get_coords()
 
-    return coords
+    return coords, Z
 
 
 def layout_taxa_by_taxonomy(tax, taxa_size_dict, metric="euclidean", method="complete"):
@@ -605,7 +615,7 @@ def layout_taxa_by_taxonomy(tax, taxa_size_dict, metric="euclidean", method="com
     pm = PartitionMap(Z, list(ancestors_df.index.values), taxa_size_dict)
     coords = pm.get_coords()
 
-    return coords
+    return coords, Z
 
         
 class PartitionMap:
