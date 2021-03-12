@@ -467,7 +467,7 @@ def save_tax_data(r, results_store, details_store):
         for tax_rank, tax_rank_df in cag_tax_df.groupby("rank"):
 
             # If the top taxon was assigned the majority of genes
-            if tax_rank_df["total"].values[0] >= (cag_size[cag_id] / 2):
+            if tax_rank_df["count"].values[0] >= (cag_size[cag_id] / 2):
 
                 # Save this taxon as the majority taxon
                 cag_majority_tax[
