@@ -495,37 +495,21 @@ def save_tax_data(r, results_store, details_store):
         )
 
     # Process the tax spectra
-    coords, Z, leaf_names = layout_cags_by_taxonomy(results_store, cag_tax_spectra)
-    r.set(
-        coords,
-        "cag_taxonomic_layout",
-    )
-    r.set(
-        Z,
-        "cag_taxonomic_linkage",
-    )
-    r.set(
-        leaf_names,
-        "cag_taxonomic_linkage_names",
+    layout_cags_by_taxonomy(
+        results_store,
+        cag_tax_spectra,
+        r
     )
 
     # Lay out the taxa radially (sized by the number of genes assigned)
-    coords, Z, leaf_names = layout_taxa_by_taxonomy(tax, taxa_size_dict)
-    r.set(
-        coords,
-        "taxa_taxonomic_layout",
-    )
-    r.set(
-        Z,
-        "taxa_taxonomic_linkage",
-    )
-    r.set(
-        leaf_names,
-        "taxa_taxonomic_linkage_names",
+    layout_taxa_by_taxonomy(
+        tax,
+        taxa_size_dict,
+        r
     )
 
     
-def layout_cags_by_taxonomy(results_store, cag_tax_spectra, metric="euclidean", method="complete"):
+def layout_cags_by_taxonomy(results_store, cag_tax_spectra, r, metric="euclidean", method="complete"):
     """Use the spectrum of taxonomic assignments to perform hierarchical clustering on CAGs."""
 
     # Get the size of each CAG
@@ -570,15 +554,20 @@ def layout_cags_by_taxonomy(results_store, cag_tax_spectra, metric="euclidean", 
         metric
     )
 
-    # Use that linkage matrix to build a set of coordinates
-    logger.info("Mapping linkage clusters to x-y coordinates")
-    pm = PartitionMap(Z, cag_tax_spectra_df.index.values, cag_size)
-    coords = pm.get_coords()
+    # Save to redis
+    logger.info(f"Saving 'cag_taxonomic_linkage' for {len(Z):,} nodes")
+    r.set(
+        Z,
+        "cag_taxonomic_linkage",
+    )
+    logger.info(f"Saving 'cag_taxonomic_linkage_names' for {cag_tax_spectra_df.shape[0]:,} CAGs")
+    r.set(
+        list(cag_tax_spectra_df.index.values),
+        "cag_taxonomic_linkage_names",
+    )
 
-    return coords, Z, cag_tax_spectra_df.index.values
 
-
-def layout_taxa_by_taxonomy(tax, taxa_size_dict, metric="euclidean", method="complete"):
+def layout_taxa_by_taxonomy(tax, taxa_size_dict, r, metric="euclidean", method="complete"):
     """Use the spectrum of ancestors to perform hierarchical clustering on taxa."""
 
     # Get the vector of ancestors for each tax ID
@@ -618,12 +607,17 @@ def layout_taxa_by_taxonomy(tax, taxa_size_dict, metric="euclidean", method="com
         metric
     )
 
-    # Use that linkage matrix to build a set of coordinates
-    logger.info("Mapping linkage clusters to x-y coordinates")
-    pm = PartitionMap(Z, list(ancestors_df.index.values), taxa_size_dict)
-    coords = pm.get_coords()
-
-    return coords, Z, list(ancestors_df.index.values)
+    # Save to redis
+    logger.info(f"Saving 'taxa_taxonomic_linkage' for {len(Z):,} nodes")
+    r.set(
+        Z,
+        "taxa_taxonomic_linkage",
+    )
+    logger.info(f"Saving 'taxa_taxonomic_linkage_names' for {ancestors_df.shape[0]:,} CAGs")
+    r.set(
+        list(ancestors_df.index.values),
+        "taxa_taxonomic_linkage_names",
+    )
 
         
 class PartitionMap:
