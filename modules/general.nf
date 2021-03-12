@@ -1181,7 +1181,7 @@ redis-server \
     --port 6379 \
     --bind 127.0.0.1 \
     --rdbcompression yes \
-    --dbfilename ${params.output_prefix}.rdb \
+    --dbfilename "${params.output_prefix}.rdb" \
     --dir \$PWD &
 
 buildRedis.py \
