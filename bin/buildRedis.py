@@ -557,13 +557,13 @@ def layout_cags_by_taxonomy(results_store, cag_tax_spectra, r, metric="euclidean
     # Save to redis
     logger.info(f"Saving 'cag_taxonomic_linkage' for {len(Z):,} nodes")
     r.set(
-        Z,
         "cag_taxonomic_linkage",
+        Z,
     )
     logger.info(f"Saving 'cag_taxonomic_linkage_names' for {cag_tax_spectra_df.shape[0]:,} CAGs")
     r.set(
-        list(cag_tax_spectra_df.index.values),
         "cag_taxonomic_linkage_names",
+        list(cag_tax_spectra_df.index.values),
     )
 
 
@@ -610,13 +610,13 @@ def layout_taxa_by_taxonomy(tax, taxa_size_dict, r, metric="euclidean", method="
     # Save to redis
     logger.info(f"Saving 'taxa_taxonomic_linkage' for {len(Z):,} nodes")
     r.set(
-        Z,
         "taxa_taxonomic_linkage",
+        Z,
     )
     logger.info(f"Saving 'taxa_taxonomic_linkage_names' for {ancestors_df.shape[0]:,} CAGs")
     r.set(
-        list(ancestors_df.index.values),
         "taxa_taxonomic_linkage_names",
+        list(ancestors_df.index.values),
     )
 
         
