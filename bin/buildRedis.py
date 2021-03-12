@@ -495,7 +495,7 @@ def save_tax_data(r, results_store, details_store):
         )
 
     # Process the tax spectra
-    coords, Z = layout_cags_by_taxonomy(results_store, cag_tax_spectra)
+    coords, Z, leaf_names = layout_cags_by_taxonomy(results_store, cag_tax_spectra)
     r.set(
         coords,
         "cag_taxonomic_layout",
@@ -504,9 +504,13 @@ def save_tax_data(r, results_store, details_store):
         Z,
         "cag_taxonomic_linkage",
     )
+    r.set(
+        leaf_names,
+        "cag_taxonomic_linkage_names",
+    )
 
     # Lay out the taxa radially (sized by the number of genes assigned)
-    coords, Z = layout_taxa_by_taxonomy(tax, taxa_size_dict)
+    coords, Z, leaf_names = layout_taxa_by_taxonomy(tax, taxa_size_dict)
     r.set(
         coords,
         "taxa_taxonomic_layout",
@@ -514,6 +518,10 @@ def save_tax_data(r, results_store, details_store):
     r.set(
         Z,
         "taxa_taxonomic_linkage",
+    )
+    r.set(
+        leaf_names,
+        "taxa_taxonomic_linkage_names",
     )
 
     
@@ -567,7 +575,7 @@ def layout_cags_by_taxonomy(results_store, cag_tax_spectra, metric="euclidean", 
     pm = PartitionMap(Z, cag_tax_spectra_df.index.values, cag_size)
     coords = pm.get_coords()
 
-    return coords, Z
+    return coords, Z, cag_tax_spectra_df.index.values
 
 
 def layout_taxa_by_taxonomy(tax, taxa_size_dict, metric="euclidean", method="complete"):
@@ -615,7 +623,7 @@ def layout_taxa_by_taxonomy(tax, taxa_size_dict, metric="euclidean", method="com
     pm = PartitionMap(Z, list(ancestors_df.index.values), taxa_size_dict)
     coords = pm.get_coords()
 
-    return coords, Z
+    return coords, Z, list(ancestors_df.index.values)
 
         
 class PartitionMap:
