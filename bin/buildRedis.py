@@ -566,6 +566,16 @@ def layout_cags_by_taxonomy(results_store, cag_tax_spectra, r, metric="euclidean
         list(cag_tax_spectra_df.index.values),
     )
 
+    # Compuate the coordinates in radial layout
+    logger.info("Computing radial taxonomic layout")
+    pm = PartitionMap(Z, cag_tax_spectra_df.index.values, cag_size)
+    coords = pm.get_coords()
+    logger.info("Saving 'cag_taxonomic_layout'")
+    r.set(
+        "cag_taxonomic_layout",
+        coords,
+    )
+
 
 def layout_taxa_by_taxonomy(tax, taxa_size_dict, r, metric="euclidean", method="complete"):
     """Use the spectrum of ancestors to perform hierarchical clustering on taxa."""
@@ -606,7 +616,7 @@ def layout_taxa_by_taxonomy(tax, taxa_size_dict, r, metric="euclidean", method="
         ancestors_df,
         metric
     )
-
+    
     # Save to redis
     logger.info(f"Saving 'taxa_taxonomic_linkage' for {len(Z):,} nodes")
     r.set(
@@ -617,6 +627,15 @@ def layout_taxa_by_taxonomy(tax, taxa_size_dict, r, metric="euclidean", method="
     r.set(
         "taxa_taxonomic_linkage_names",
         list(ancestors_df.index.values),
+    )
+
+    logger.info("Computing radial taxonomic layout")
+    pm = PartitionMap(Z, list(ancestors_df.index.values), taxa_size_dict)
+    coords = pm.get_coords()
+    logger.info("Saving 'taxa_taxonomic_layout'")
+    r.set(
+        "taxa_taxonomic_layout",
+        coords,
     )
 
         
