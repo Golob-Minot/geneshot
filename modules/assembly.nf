@@ -38,55 +38,43 @@ workflow assembly_wf {
 
     main:
 
-    // If the user provided an existing gene fasta
-    if ( params.gene_fasta ) {
+    // If the user provided an assembly folder
+    if ( params.assembly_folder ) {
 
-        gene_fasta = file(params.gene_fasta)
-
-        // If the user provided an assembly folder
-        if ( params.assembly_folder ) {
-
-            // Point to the outputs of prodigal
-            prodigal_ch = Channel.fromPath(
-                "${params.assembly_folder}**.faa.gz"
-            ).map {
-                it -> [it.name.replaceAll(/.faa.gz/, ''), it]
-            }
-
+        // Point to the outputs of prodigal
+        prodigal_ch = Channel.fromPath(
+            "${params.assembly_folder}**.faa.gz"
+        ).map {
+            it -> [it.name.replaceAll(/.faa.gz/, ''), it]
         }
 
     } else {
 
-        // If the user provided an assembly folder
-        if ( params.assembly_folder ) {
+        // Perform de novo assembly
+        assembly(
+            combined_reads_ch
+        )
 
-            // Point to the outputs of prodigal
-            prodigal_ch = Channel.fromPath(
-                "${params.assembly_folder}**.faa.gz"
-            ).map {
-                it -> [it.name.replaceAll(/.faa.gz/, ''), it]
-            }
-
-        } else {
-
-            // Perform de novo assembly
-            assembly(
-                combined_reads_ch
-            )
-
-            // Annotate those contigs with Prokka
-            prodigal(
-                assembly.out
-            )
-
-            prodigal_ch = prodigal.out[0]
-
-        }
+        // Annotate those contigs with Prokka
+        prodigal(
+            assembly.out
+        )
 
         // Extract rRNA alleles from all contigs
         barrnap(
             assembly.out
         )
+
+        prodigal_ch = prodigal.out[0]
+
+    }
+
+    // If the user provided an existing gene fasta
+    if ( params.gene_fasta ) {
+
+        gene_fasta = file(params.gene_fasta)
+
+    } else {
 
         // Combine genes by amino acid identity in five rounds
         // Each round will include both linclust- and DIAMOND-based deduplication
