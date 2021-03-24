@@ -396,7 +396,8 @@ process downloadSRA {
     tuple val(accession), file("*fastq.gz")
 
 
-"""#!/bin/sh
+"""
+#!/bin/bash
 
 set -euo pipefail
 
