@@ -398,7 +398,7 @@ process downloadSRA {
 
 """#!/bin/sh
 
-set -Eeuo pipefail
+set -euo pipefail
 
 echo "Downloading {accession}"
 
