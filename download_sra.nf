@@ -77,18 +77,13 @@ workflow {
         r -> r.name.replaceAll(/.metadata.json.gz/, "")
     }
 
-    // Fetch the SRA files for each accession
+    // Download the FASTQ files for each accession
     downloadSRA(
         sra_acc_ch
     )
 
-    // Extract the FASTQ files for each accession
-    extractSRA(
-        downloadSRA.out
-    )
-
     // Make a comma-separated string with all of the files which were downloaded
-    manifestStr = extractSRA.out.reduce(
+    manifestStr = downloadSRA.out.reduce(
         'specimen,R1,R2\n'
     ){ csvStr, row ->
         return  csvStr += "${row[0]},${output_folder}${row[1][0].name},${output_folder}${row[1][1].name}\n";
@@ -388,9 +383,9 @@ metadata_df.to_csv("${params.accession}.metadata.csv", index=None)
 """
 }
 
-// Download the .sra file for each SRR accession
+// Download the FASTQ files for each SRR accession
 process downloadSRA {
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "ncbi/sra-tools:2.11.0"
     label "io_limited"
     errorStrategy 'finish'
     
@@ -398,64 +393,34 @@ process downloadSRA {
     val accession
 
     output:
-    path "${accession}", optional: true
+    tuple val(accession), file("*fastq.gz")
 
 
 """
-set -e
+set -Eeuo pipefail
 
-echo "Getting the URL for the SRA file"
-ACC=$accession
-curl -o \${ACC}.json -s -X POST "https://www.ncbi.nlm.nih.gov/Traces/sdl/1/retrieve?acc=\${ACC}&location=s3.us-west-2"
+echo "Downloading {accession}"
 
-sra_url="\$(cat \${ACC}.json | jq '.[0] | .files | .[0] | .link' | tr -d '"')"
-echo "Download URL is \$sra_url"
+fasterq-dump \
+    ${accession} \
+    -t \$PWD/tmp/ \
+    -e ${task.cpus} \
+    --split-file
 
-if [[ \$sra_url == null ]]; then
-    cat \${ACC}.json
-    echo "Stopping"
-else
-    echo "Downloading"
-    wget -O \${ACC} \${sra_url}
+echo "Done downloading"
 
-    echo "Done"
-fi
+ls -lahtr
+
+echo "Compressing files"
+
+gzip *fastq
+
+ls -lahtr
+
+echo "Done compressing"
 """
 
 }
-
-// Extract the FASTQ files from the SRA file
-process extractSRA {
-    container "quay.io/fhcrc-microbiome/get_sra:v0.4"
-    label "io_limited"
-    errorStrategy 'finish'
-    publishDir "${output_folder}", mode: "copy", overwrite: "true"
-    
-    input:
-    file accession
-
-    output:
-    tuple val("${accession.name}"), file("*fastq.gz")
-
-
-    """
-    set -e
-
-    fastq-dump \
-        --split-files \
-        --outdir ./ \
-        ${accession}
-
-    rm ${accession}
-
-    echo "Compressing downloaded FASTQ files"
-    gzip ${accession.name}*
-
-    echo "Done"
-    """
-
-}
-
 
 process gatherReadnames {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
