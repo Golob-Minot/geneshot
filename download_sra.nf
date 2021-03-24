@@ -385,7 +385,7 @@ metadata_df.to_csv("${params.accession}.metadata.csv", index=None)
 
 // Download the FASTQ files for each SRR accession
 process downloadSRA {
-    container "ncbi/sra-tools:2.11.0"
+    container "quay.io/hdc-workflows/sratools:2.11.0"
     label "io_limited"
     errorStrategy 'finish'
     
