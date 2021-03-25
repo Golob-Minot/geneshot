@@ -400,7 +400,7 @@ process downloadSRA {
 set -e
 
 echo "Loading the configuration"
-vdb-config --cfg-dir /etc/ncbi/
+vdb-config --cfg-dir /etc/ncbi/config/
 
 echo "Downloading ${accession}"
 fasterq-dump --split-files -e ${task.cpus} ${accession}
