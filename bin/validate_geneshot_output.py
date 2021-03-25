@@ -28,12 +28,11 @@ def validate_results_hdf(results_hdf, check_corncob = False):
         "/annot/gene/all",
         "/annot/cag/all",
         "/abund/cag/wide",
-        "/ordination/pca",
-        "/ordination/tsne",
-        "/distances/euclidean",
-        "/distances/braycurtis",
-        "/distances/jaccard",
-        "/distances/aitchison",
+        "/ordination/cag/pca",
+        "/distances/cag/euclidean",
+        "/distances/cag/braycurtis",
+        "/distances/cag/jaccard",
+        "/distances/cag/aitchison",
     ]:
         # Try to read the table
         df = read_table_from_hdf(results_hdf, key_name)
