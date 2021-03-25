@@ -82,8 +82,13 @@ workflow {
         sra_acc_ch
     )
 
+    // Extract the FASTQ files for each accession
+    extractSRA(
+        downloadSRA.out
+    )
+
     // Make a comma-separated string with all of the files which were downloaded
-    manifestStr = downloadSRA.out.reduce(
+    manifestStr = extractSRA.out.reduce(
         'specimen,R1,R2\n'
     ){ csvStr, row ->
         return  csvStr += "${row[0]},${output_folder}${row[1][0].name},${output_folder}${row[1][1].name}\n";
@@ -385,7 +390,7 @@ metadata_df.to_csv("${params.accession}.metadata.csv", index=None)
 
 // Download the .sra file for each SRR accession
 process downloadSRA {
-    container "quay.io/hdc-workflows/sratools:latest"
+    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_limited"
     errorStrategy 'finish'
     
@@ -393,26 +398,28 @@ process downloadSRA {
     val accession
 
     output:
-    tuple val("${accession}"), file("*fastq.gz")
+    path "${accession}", optional: true
 
 
 """
 set -e
 
-echo "Loading the configuration"
-vdb-config --cfg-dir /etc/ncbi/config/
+echo "Getting the URL for the SRA file"
+ACC=$accession
+curl -o \${ACC}.json -s -X POST "https://www.ncbi.nlm.nih.gov/Traces/sdl/1/retrieve?acc=\${ACC}&location=s3.us-west-2"
 
-echo "Downloading ${accession}"
-fasterq-dump --split-files -e ${task.cpus} ${accession}
+sra_url="\$(cat \${ACC}.json | jq '.[0] | .files | .[0] | .link' | tr -d '"')"
+echo "Download URL is \$sra_url"
 
-ls -lahtr
+if [[ \$sra_url == null ]]; then
+    cat \${ACC}.json
+    echo "Stopping"
+else
+    echo "Downloading"
+    wget -O \${ACC} \${sra_url}
 
-echo "Compressing"
-gzip *fastq
-
-ls -lahtr
-
-echo "Done"
+    echo "Done"
+fi
 """
 
 }
