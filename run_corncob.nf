@@ -12,8 +12,8 @@
 nextflow.enable.dsl=2
 
 // Parameters
-params.input_hdf = false
-params.input_folder = false
+params.results_hdf = false
+params.details_hdf = false
 params.output_folder = false
 params.output_prefix = false
 params.formula = false
@@ -36,9 +36,9 @@ def helpMessage() {
     nextflow run Golob-Minot/geneshot/run_corncob.nf <ARGUMENTS>
     
     Options:
-      --input_hdf           Geneshot results HDF5 file to be used for analysis
-      --input_folder        Folder containing geneshot output to be used for analysis (must contain the subfolder "abund/")
-      --output_folder       Folder to place output tile
+      --results_hdf         Geneshot results HDF5 file to be used for analysis
+      --details_hdf         Geneshot details HDF5 file to be used for analysis
+      --output_folder       Folder to place output file
       --output_prefix       Text used as a prefix for summary HDF5 output files (the .corncob.hdf5 suffix will be attached)
       -w                    Working directory. Defaults to `./work`
       
@@ -51,42 +51,41 @@ def helpMessage() {
 }
 
 // Show help message if the user specifies the --help flag at runtime
-if (params.help || params.input_hdf == false || params.input_folder == false || params.output_folder == false || params.output_prefix == false || params.formula == false){
+if (params.help || params.results_hdf == false || params.details_hdf == false || params.output_folder == false || params.output_prefix == false || params.formula == false){
     // Invoke the function above which prints the help message
     helpMessage()
     // Exit out and do not run anything else
     exit 0
 }
 
-// Import the process used from modules/statistics
-include {
-    splitCorncob;
-    runCorncob;
-    joinCorncob;
-    runBetta;
-    addBetta;
- } from './modules/statistics' params(
-    corncob_batches: params.corncob_batches,
+// Import the workflows used for statistical analysis
+// Use separate workflows for corncob, each
+// to analyze either the CAGs, tax IDs, or eggNOG groups
+include { 
+    validation_wf; 
+    corncob_wf as cag_corncob_wf;
+    corncob_wf as tax_corncob_wf;
+    corncob_wf as func_corncob_wf;
+} from './modules/statistics' params(
+    output_folder: output_folder,
     formula: params.formula,
-    output_folder: params.output_folder,
+    corncob_batches: params.corncob_batches,
     fdr_method: params.fdr_method,
+    output_prefix: params.output_prefix,    
 )
 
 
-// Import the process used to add corncob results to the output
+
+// Import the process used to compress the output HDF
 include {
-    extractCounts;
-    repackHDF;
-    addCorncobResults;
+    repackHDF
  } from './modules/general' params(
     output_folder: params.output_folder,
-    fdr_method: params.fdr_method,
 )
 
 // Process to update the formula listed in the summary table
 // Also extract the manifest to reduce the number of times
-// the file is opened, as well as the table listing the genes
-// which make up each CAG.
+// the file is opened
 process updateFormula{
     container "${container__pandas}"
     label 'mem_medium'
@@ -98,7 +97,6 @@ process updateFormula{
     output:
         path "*corncob.hdf5"
         path "manifest.csv"
-        path "CAG.assignments.csv.gz"
 
 """
 #!/usr/bin/env python3
@@ -156,17 +154,6 @@ with pd.HDFStore(new_file_name, "a") as store:
     print("Extracting the manifest")
     pd.read_hdf(store, "/manifest").to_csv("manifest.csv")
 
-    # Extract the table of genes making up each CAG
-    print("Extracting the gene~CAG table")
-    pd.read_hdf(
-        store, 
-        "/annot/gene/all",
-        columns=["gene", "CAG"]
-    ).to_csv(
-        "CAG.assignments.csv.gz",
-        index=None
-    )
-
 print("Done")
 """
 
@@ -175,73 +162,29 @@ print("Done")
 workflow {
 
     // Make sure we can find the input file
-    if(file(params.input_hdf).isEmpty()){
-        log.info"""Cannot find input file ${params.input_hdf}""".stripIndent()
+    if(file(params.results_hdf).isEmpty()){
+        log.info"""Cannot find input file ${params.results_hdf}""".stripIndent()
         exit 0
     }
 
     // First update the formula listed in the geneshot results file,
     // a process which will also extract the manifest CSV
     updateFormula(
-        file(params.input_hdf)
+        file(params.results_hdf)
     )
 
-    // Check to see if `abund/CAG.readcounts.csv.gz` is present in the input folder
-    // For context, this file is only created by geneshot for runs which originally
-    // included a `--formula`. 
-    // If this file cannot be found, then we will run a process to create that file
-    // and also to publish that file back to the input folder.
-    abund_folder = "${params.input_folder.replaceAll(/\/$/, "")}/abund"
-    if(file("${abund_folder}/CAG.readcounts.csv.gz").isEmpty()){
-        extractCounts(
-            Channel.fromPath(
-                "${abund_folder}/details/*json.gz"
-            ).toSortedList(),
-            updateFormula.out[2]
-        )
-        input_csv = extractCounts.out
-    } else {
-        input_csv = file("${abund_folder}/CAG.readcounts.csv.gz")
-    }
-
-    // Set up a channel with the strings of the formula(s) provided
-    formula_ch = Channel.of(
-        params.formula.split(",")
-    )
-
-    splitCorncob(
-        input_csv
-    )
-
-    // Now run corncob on the extracted manifest, as well as the gene counts table
-    runCorncob(
-        splitCorncob.out.flatten(),
-        updateFormula.out[1],
-        formula_ch
-    )
-
-    joinCorncob(
-        runCorncob.out.toSortedList()
-    )
-
-    // Add those results to the output file
-    addCorncobResults(
+    // Calculate the association of individual CAGs with user-provided features
+    cag_corncob_wf(
         updateFormula.out[0],
-        joinCorncob.out
-    )
-
-    runBetta(
-        addCorncobResults.out[1].flatten()
-    )
-
-    addBetta(
-        addCorncobResults.out[0],
-        runBetta.out.toSortedList()
+        file(params.details_hdf),
+        updateFormula.out[1],
+        "cag",
+        "CAG"
     )
 
     // Repack the HDF
     repackHDF(
-        addBetta.out[0]
+        cag_corncob_wf.out
     )
 
 }
