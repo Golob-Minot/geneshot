@@ -67,7 +67,7 @@ include {
     corncob_wf as tax_corncob_wf;
     corncob_wf as func_corncob_wf;
 } from './modules/statistics' params(
-    output_folder: output_folder,
+    output_folder: params.output_folder,
     formula: params.formula,
     corncob_batches: params.corncob_batches,
     fdr_method: params.fdr_method,
