@@ -399,8 +399,23 @@ process downloadSRA {
 """
 set -e
 
+# Make the folder where the SRA Tools config is expected to be found
+mkdir -p \$HOME/.ncbi/
+
+# Copy the config (from the image) into that folder
+cp /etc/ncbi/user-settings.mkfg \$HOME/.ncbi/
+
+echo "Downloading ${accession}"
 fasterq-dump --split-files -e ${task.cpus} ${accession}
+
+ls -lahtr
+
+echo "Compressing"
 gzip *fastq
+
+ls -lahtr
+
+echo "Done"
 """
 
 }
