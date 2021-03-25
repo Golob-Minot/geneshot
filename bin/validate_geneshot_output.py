@@ -49,18 +49,6 @@ def validate_results_hdf(results_hdf, check_corncob = False):
         assert df.shape[0] > 0, "{} in {} has 0 rows".format(key_name, results_hdf)
         
 
-    # Some tables should be indexed -- let's check for that
-    for key_name, where_str in [
-        ("/abund/cag/wide", "CAG == 0"),
-        ("/abund/cag/wide", "CAG == 1"),
-        ("/annot/gene/all", "CAG == 0"),
-        ("/annot/gene/all", "CAG == 1"),
-    ]:
-        df = read_table_from_hdf(results_hdf, key_name, where = where_str)
-        msg = "Could not read index ({}) in {}".format(key_name, where_str)
-        assert df.shape[0] > 0, msg
-
-
 def validate_details_hdf(details_hdf, manifest_df, skip_assembly=False):
     """Validate that the details HDF has all expected data."""
 
