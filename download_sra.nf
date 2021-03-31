@@ -3,6 +3,9 @@
 // Using DSL-2
 nextflow.enable.dsl=2
 
+// Containers to use
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.2.1_latest"
+
 // Script to download FASTQ files from SRA
 
 // Set default values for parameters
@@ -104,7 +107,7 @@ workflow {
 
 // Get the accession for each Run in this BioProject
 process getSRAlist {
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "${container__pandas}"
     label "mem_medium"
     errorStrategy 'finish'
     
@@ -210,7 +213,7 @@ with open("accession_list.txt", "wt") as fo:
 
 // Get the metadata for a single SRA accession
 process getMetadata {
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "${container__pandas}"
     label "mem_medium"
     errorStrategy 'finish'
     
@@ -348,7 +351,7 @@ with gzip.open("%s.metadata.json.gz" % sra_accession, "wt") as fo:
 
 // Collect the metadata from all accessions
 process joinMetadata {
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "${container__pandas}"
     label "mem_medium"
     errorStrategy 'finish'
     
@@ -464,7 +467,7 @@ process extractSRA {
 
 
 process gatherReadnames {
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "${container__pandas}"
     label "io_limited"
     errorStrategy 'finish'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
