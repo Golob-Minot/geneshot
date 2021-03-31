@@ -394,7 +394,7 @@ metadata_df.to_csv("${params.accession}.metadata.csv", index=None)
 
 // Download the .sra file for each SRR accession
 process downloadSRA {
-    container "quay.io/fhcrc-microbiome/curl:latest"
+    container "quay.io/hdc-workflows/curl:latest"
     label "io_limited"
     errorStrategy 'finish'
     
