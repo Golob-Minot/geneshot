@@ -421,7 +421,7 @@ if [[ \$sra_url == null ]]; then
     echo "Stopping"
 else
     echo "Downloading"
-    wget -O \${ACC} \${sra_url}
+    wget --no-check-certificate -O \${ACC} \${sra_url}
 
     echo "Done"
 fi
