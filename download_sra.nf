@@ -405,9 +405,9 @@ process downloadSRA {
     path "${accession}", optional: true
 
 
-"""#!/bin/bash
+"""#!/bin/sh
 
-set -Eeuo pipefail
+set -euo pipefail
 
 echo "Getting the URL for the SRA file"
 ACC=$accession
