@@ -405,7 +405,7 @@ process downloadSRA {
     path "${accession}", optional: true
 
 
-"""#!/bin/sh
+"""#!/bin/bash
 
 set -euo pipefail
 
