@@ -411,7 +411,7 @@ set -euo pipefail
 
 echo "Getting the URL for the SRA file"
 ACC=$accession
-curl -o \${ACC}.json -s -X POST "https://www.ncbi.nlm.nih.gov/Traces/sdl/1/retrieve?acc=\${ACC}&location=s3.us-west-2"
+curl -k -o \${ACC}.json -s -X POST "https://www.ncbi.nlm.nih.gov/Traces/sdl/1/retrieve?acc=\${ACC}&location=s3.us-west-2"
 
 sra_url="\$(cat \${ACC}.json | jq '.[0] | .files | .[0] | .link' | tr -d '"')"
 echo "Download URL is \$sra_url"
