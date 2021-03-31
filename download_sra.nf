@@ -120,6 +120,12 @@ import requests
 from time import sleep
 import xml.etree.ElementTree as ET
 import pandas as pd
+import os
+
+# Set the path to the SSL cert
+cacert_fp = "/usr/local/lib/python3.5/dist-packages/botocore/vendored/requests/cacert.pem"
+assert os.path.exists(cacert_fp), "cacert.pem not found in expected path"
+os.environ["REQUESTS_CA_BUNDLE"] = os.path(cacert_fp)
 
 accession ="${accession}"
 print("Fetching paired-end data from %s" % accession)
