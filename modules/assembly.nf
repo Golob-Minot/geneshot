@@ -496,7 +496,7 @@ assembly_df.to_csv(
 
 process shard_genes {
     tag "Split the gene catalog into smaller shards"
-    container "ubuntu:18.04"
+    container "${container__assembler}"
     label 'mem_medium'
     
     input:
@@ -553,7 +553,7 @@ rm ${diamond_tax_db}
 
 process join_tax {
     tag "Concatenate taxonomy annotation files"
-    container "ubuntu:18.04"
+    container "${container__assembler}"
     label 'mem_medium'
     publishDir "${params.output_folder}/annot/", mode: "copy"
 
