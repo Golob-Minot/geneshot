@@ -1,6 +1,7 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 
 container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
+container__general = "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
 
 // Default parameters
 params.output_prefix = "geneshot"
@@ -496,7 +497,7 @@ assembly_df.to_csv(
 
 process shard_genes {
     tag "Split the gene catalog into smaller shards"
-    container "${container__assembler}"
+    container "${container__general}"
     label 'mem_medium'
     
     input:
@@ -553,7 +554,7 @@ rm ${diamond_tax_db}
 
 process join_tax {
     tag "Concatenate taxonomy annotation files"
-    container "${container__assembler}"
+    container "${container__general}"
     label 'mem_medium'
     publishDir "${params.output_folder}/annot/", mode: "copy"
 
@@ -621,7 +622,7 @@ gzip genes.emapper.annotations
 // Assign a new, shorter name to a set of genes
 process renameGenes {
     tag "Make concise unique gene names"
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "{container__general}"
     label 'io_limited'
     publishDir "${params.output_folder}/ref/", mode: "copy"
 
