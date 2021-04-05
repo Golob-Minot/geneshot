@@ -622,7 +622,7 @@ gzip genes.emapper.annotations
 // Assign a new, shorter name to a set of genes
 process renameGenes {
     tag "Make concise unique gene names"
-    container "{container__general}"
+    container "${container__general}"
     label 'io_limited'
     publishDir "${params.output_folder}/ref/", mode: "copy"
 
