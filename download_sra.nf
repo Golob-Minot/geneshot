@@ -11,6 +11,7 @@ container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.2.1_latest"
 // Set default values for parameters
 params.accession = false
 params.output = false
+params.fasterq = false
 params.help = false
 
 // Function which prints help message text
@@ -25,6 +26,10 @@ def helpMessage() {
     Required Arguments:
       --accession           Accession for NCBI BioProject to download
       --output              Folder to write output files
+
+    Optional Arguments:
+      --fasterq             If specified, use the updated 'fasterq-dump' method for download
+                            Note: This method is not supported for execution by Singularity
 
     Output Files:
 
@@ -80,21 +85,40 @@ workflow {
         r -> r.name.replaceAll(/.metadata.json.gz/, "")
     }
 
-    // Fetch the SRA files for each accession
-    downloadSRA(
-        sra_acc_ch
-    )
+    // If the user specified the --fasterq flag
+    if ( params.fasterq ){
 
-    // Extract the FASTQ files for each accession
-    extractSRA(
-        downloadSRA.out
-    )
+        // Run the method which relies on the updated SRA Toolkit
+        fasterqDump(
+            sra_acc_ch
+        )
 
-    // Make a comma-separated string with all of the files which were downloaded
-    manifestStr = extractSRA.out.reduce(
-        'specimen,R1,R2\n'
-    ){ csvStr, row ->
-        return  csvStr += "${row[0]},${output_folder}${row[1][0].name},${output_folder}${row[1][1].name}\n";
+        // Make a comma-separated string with all of the files which were downloaded
+        manifestStr = fasterqDump.out.reduce(
+            'specimen,R1,R2\n'
+        ){ csvStr, row ->
+            return  csvStr += "${row[0]},${output_folder}${row[1][0].name},${output_folder}${row[1][1].name}\n";
+        }
+
+    } else {
+        // Otherwise (no --fasterq flag)
+
+        // Fetch the SRA files for each accession
+        downloadSRA(
+            sra_acc_ch
+        )
+
+        // Extract the FASTQ files for each accession
+        extractSRA(
+            downloadSRA.out
+        )
+
+        // Make a comma-separated string with all of the files which were downloaded
+        manifestStr = extractSRA.out.reduce(
+            'specimen,R1,R2\n'
+        ){ csvStr, row ->
+            return  csvStr += "${row[0]},${output_folder}${row[1][0].name},${output_folder}${row[1][1].name}\n";
+        }
     }
 
     // Make a single set of readnames joined with the metadata
@@ -461,6 +485,37 @@ process extractSRA {
 
 }
 
+// Alternate approach -- download FASTQ directly with fasterq-dump
+process fasterqDump {
+    container "quay.io/hdc-workflows/sratools:latest"
+    label "io_limited"
+    errorStrategy 'finish'
+    
+    input:
+    val accession
+
+    output:
+    tuple val("${accession}"), file("*fastq.gz")
+
+
+"""#!/bin/bash
+
+set -euo pipefail
+
+echo "Downloading ${accession}"
+fasterq-dump --split-files -e ${task.cpus} ${accession}
+
+ls -lahtr
+
+echo "Compressing"
+gzip *fastq
+
+ls -lahtr
+
+echo "Done"
+"""
+
+}
 
 process gatherReadnames {
     container "${container__pandas}"
