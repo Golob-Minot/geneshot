@@ -330,6 +330,15 @@ class IAC:
             new_gene_set,
             comb_abund
         )
+
+    def items(self):
+        """Yield the members (set) and abundances (array) of the gene groups."""
+
+        # Iterate over each gene group
+        for group_ix, group_set in enumerate(self.groups):
+
+            # Yield the set of genes, and the vector of abundances
+            yield group_set, self.abunds[group_ix]
         
 
 def make_dense_abund(a):
@@ -389,12 +398,16 @@ def co_assembly_boosted_clustering(
 
     # Now let's use the approach where we add genes which are found on the same contig first
 
-    # Set up the IAC object
+    # Set up the IAC object for the overall assembly
     iac = IAC()
     
     # Keep track of what genes have been added
     all_genes = set([])
-    
+
+    # Keep track of which contig we are considering at each round
+    current_contig = None
+    current_contig_iac = None
+
     # Iterate over every gene, starting with the longest contigs (due to previous sorting)
     for _, r in contig_df.iterrows():
     
@@ -423,11 +436,46 @@ def co_assembly_boosted_clustering(
             ]
         )
 
-        # Add this gene to the IAC
-        iac.add(
+        # If this is a new contig
+        if current_contig is None or current_contig != r["contig"]:
+
+            # If we have grouped genes for the previous contig
+            if current_contig_iac is not None:
+
+                # Iterate over the previous set of groups
+                for prev_genes, prev_abund in current_contig_iac.items():
+
+                    # Add them to the global IAC
+                    iac.add(prev_genes, prev_abund)
+
+                    # If we have exceeded the args.max_n_cags threshold
+                    if iac.abunds.shape[0] > args.max_n_cags:
+
+                        # Bail out of the process
+                        logging.info(f"Reached limit of {args.max_n_cags:,}, stopping.")
+                        return
+
+            # Set up an object for the genes in this new contig
+            current_contig = r["contig"]
+            current_contig_iac = IAC()
+
+        # Add this gene to the IAC for this contig
+        current_contig_iac.add(
             set([gene_ix]),
             abund
         )
+
+        # If more than log_interval seconds have passed
+        if (time() - start_time) >= log_interval:
+
+            # Report the progress
+            start_time = report_progress(iac)
+
+    # Iterate over the set of groups from the last contig
+    for prev_genes, prev_abund in current_contig_iac.items():
+
+        # Add them to the global IAC
+        iac.add(prev_genes, prev_abund)
 
         # If we have exceeded the args.max_n_cags threshold
         if iac.abunds.shape[0] > args.max_n_cags:
@@ -435,12 +483,6 @@ def co_assembly_boosted_clustering(
             # Bail out of the process
             logging.info(f"Reached limit of {args.max_n_cags:,}, stopping.")
             return
-
-        # If more than log_interval seconds have passed
-        if (time() - start_time) >= log_interval:
-
-            # Report the progress
-            start_time = report_progress(iac)
 
     # Report the end of the entire process
     logging.info("FINISHED")
@@ -484,11 +526,14 @@ if __name__ == "__main__":
         read_contigs(specimen)
         for specimen in specimen_list()
     ).sort_values(
-        by="n_genes",
+        by=["n_genes", "contig"], # Keep the contig labels sorted within each size rank
         ascending=False
     ).reset_index(
         drop=True
     )
+
+    # Report the total number of genes
+    logging.info(f"Read in {contig_df.catalog_gene.unique().shape[0]:,} unique genes on {contig_df.contig.unique().shape[0]:,} contigs.")
 
     # Record the total time for reading in assembly information
     assembly_elapsed = time() - assembly_start
