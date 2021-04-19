@@ -1203,3 +1203,29 @@ echo "Done"
 
     """
 }
+
+process splitCagFasta{
+    
+    container "${container__experiment_collection}"
+    label 'io_limited'
+    publishDir "${params.output_folder}/ref/", mode: "copy"
+
+    input:
+        path results_hdf
+        path fasta
+
+    output:
+        path "*.fasta.gz"
+
+"""#!/bin/bash
+
+set -Eeuo pipefail
+
+split_fasta_CAGs.py \
+    --results-hdf "${results_hdf}" \
+    --fasta "${fasta}" \
+    --output-folder .
+
+"""
+
+}

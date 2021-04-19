@@ -205,7 +205,8 @@ include {
     joinHDF as joinDetailedHDF;
     repackHDF as repackFullHDF;
     repackHDF as repackDetailedHDF;
-    buildRedis
+    buildRedis;
+    splitCagFasta
 } from './modules/general' params(
     output_folder: output_folder,
     output_prefix: params.output_prefix,
@@ -475,6 +476,15 @@ workflow {
         assembly_wf.out.n_genes_assembled_csv
     )
     resultsHDF = collectResults.out
+
+    // ###################
+    // # SPLIT CAG FASTA #
+    // ###################
+
+    splitCagFasta(
+        resultsHDF,
+        assembly_wf.out.gene_fasta
+    )
 
     // ##################################
     // # STATISTICAL ANALYSIS - FORMULA #
