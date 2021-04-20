@@ -264,105 +264,43 @@ class IAC:
         
         # Keep track of the members of each group
         self.groups = list()
-
-        # Keep track of the index position of the group for each constituent gene
-        self.gene_ix_dict = dict()
-
-    def find_closest(self, gene_abund, ix_list=None):
-        """Find the closest abundance spectra to the query. Optionally query to a list of group indices."""
-
-        # If no list of indices was provided
-        if ix_list is None:
-
-            # Query across all genes
-            query_abunds = self.abunds
-            ix_list = list(range(self.abunds.shape[0]))
-
-        # If a query list was provided
-        else:
-
-            # Query across a subset of genes
-            query_abunds = self.abunds[ix_list,:]
-
-        # Calculate the co-abundance distance to all gene (groups) in the active set
-        dists = 1 - fastdist.vector_to_matrix_distance(
-            gene_abund,
-            query_abunds,
-            fastdist.__dict__[args.metric],
-            args.metric
-        )
-
-        # Find the lowest distance
-        min_dist = None
-        closest_group = None
-        for ix, d in zip(ix_list, dists):
-            if min_dist is None or d < min_dist:
-                closest_group = ix
-                min_dist = d
-
-        return min_dist, closest_group
         
-    def add(self, gene_ix_set, gene_abund, check_first=None):
-        """Add a set of genes to the group, optionally check first with a list of index positions."""
-
-        # Get the list of groups which we should check first, if any
-        if check_first is not None and len(check_first) > 0:
-
-            check_first = list(set([
-                self.gene_ix_dict.get(gene_ix)
-                for gene_ix in check_first
-                if self.gene_ix_dict.get(gene_ix) is not None
-            ]))
-
+    def add(self, gene_ix_set, gene_abund):
+        
         # If genes have already been added to this object
         if len(self.groups) > 0:
         
-            # If `check_first` was provided
-            if check_first is not None and len(check_first) > 0:
+            # Calculate the co-abundance distance to all gene (groups) in the active set
+            dists = 1 - fastdist.vector_to_matrix_distance(
+                gene_abund,
+                self.abunds,
+                fastdist.__dict__[args.metric],
+                args.metric
+            )
 
-                # See if there is a match in that subset
-                min_dist, closest_group = self.find_closest(gene_abund, ix_list=check_first)
+            # Find the lowest distance
+            min_dist = None
+            closest_group = None
+            for ix, d in enumerate(dists):
+                if min_dist is None or d < min_dist:
+                    closest_group = ix
+                    min_dist = d
 
-                # If the distance is not above the threshold (i.e., more similar than required)
-                if min_dist <= args.threshold:
+            # If the distance is not above the threshold
+            if min_dist <= args.threshold:
 
-                    # Combine the new gene with the previous group
-                    self.combine(
-                        gene_ix_set, 
-                        gene_abund, 
-                        closest_group
-                    )
-                    return
-                
-                # If there was no match
-
-                # Then check the complete set
-                min_dist, closest_group = self.find_closest(gene_abund)
-
-                # If the distance is not above the threshold (i.e., more similar than required)
-                if min_dist <= args.threshold:
-
-                    # Combine the new gene with the previous group
-                    self.combine(
-                        gene_ix_set, 
-                        gene_abund, 
-                        closest_group
-                    )
-                    return
+                # Combine the new gene with the previous group
+                self.combine(
+                    gene_ix_set, 
+                    gene_abund, 
+                    closest_group
+                )
+                return
             
-        # Otherwise, if no match is found across the entire dataset
+        # Otherwise
 
-        # Add this gene to the table of abundances
+        # Add this gene to the active set
         self.abunds = np.concatenate((self.abunds, gene_abund[np.newaxis, :]))
-
-        # Get the index position of the new group that will be appended
-        ix = len(self.groups)
-
-        # Set the value in the dictionary for the index position of the group that each gene is assigned to
-        for gene_name in list(gene_ix_set):
-            self.gene_ix_dict[gene_name] = ix
-
-        # Append the group of genes
         self.groups.append(gene_ix_set)
 
     def combine(
@@ -467,22 +405,14 @@ def co_assembly_boosted_clustering(
     all_genes = set([])
 
     # Keep track of which contig we are considering at each round
-    curr_contig = None
-    curr_contig_iac = None
-
-    # If any genes on this contig have already been clustered, keep track of those in a separate list
-    prev_clustered = []
+    current_contig = None
+    current_contig_iac = None
 
     # Iterate over every gene, starting with the longest contigs (due to previous sorting)
     for _, r in contig_df.iterrows():
     
         # If we've already added this gene
         if r.catalog_gene in all_genes:
-
-            # Add it to the list of genes which have already been clustered
-            prev_clustered.append(
-                gene_abund.gene_ix.get(r.catalog_gene)
-            )
 
             # Skip it
             continue
@@ -507,20 +437,16 @@ def co_assembly_boosted_clustering(
         )
 
         # If this is a new contig
-        if curr_contig is None or curr_contig != r["contig"]:
+        if current_contig is None or current_contig != r["contig"]:
 
             # If we have grouped genes for the previous contig
-            if curr_contig_iac is not None:
+            if current_contig_iac is not None:
 
                 # Iterate over the previous set of groups
-                for prev_genes, prev_abund in curr_contig_iac.items():
+                for prev_genes, prev_abund in current_contig_iac.items():
 
                     # Add them to the global IAC
-                    iac.add(
-                        prev_genes,
-                        prev_abund,
-                        check_first=prev_clustered
-                    )
+                    iac.add(prev_genes, prev_abund)
 
                     # If we have exceeded the args.max_n_cags threshold
                     if iac.abunds.shape[0] > args.max_n_cags:
@@ -530,12 +456,11 @@ def co_assembly_boosted_clustering(
                         return
 
             # Set up an object for the genes in this new contig
-            curr_contig = r["contig"]
-            curr_contig_iac = IAC()
-            prev_clustered = []
+            current_contig = r["contig"]
+            current_contig_iac = IAC()
 
         # Add this gene to the IAC for this contig
-        curr_contig_iac.add(
+        current_contig_iac.add(
             set([gene_ix]),
             abund
         )
@@ -547,7 +472,7 @@ def co_assembly_boosted_clustering(
             start_time = report_progress(iac)
 
     # Iterate over the set of groups from the last contig
-    for prev_genes, prev_abund in curr_contig_iac.items():
+    for prev_genes, prev_abund in current_contig_iac.items():
 
         # Add them to the global IAC
         iac.add(prev_genes, prev_abund)
