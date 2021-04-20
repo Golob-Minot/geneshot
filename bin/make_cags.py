@@ -347,20 +347,14 @@ def make_dense_abund(a):
     for i, v in a.items():
         abund[i] = v
         
-    # Calculate the mean abundance
-    mean_abund = np.mean(abund)
-    
     # If the mean abundance is 0
-    if mean_abund == 0:
+    if np.sum(abund) == 0:
         
         # Return None
         return
     
-    # Otherwise
-    else:
-        
-        # Divide by the mean
-        return abund / mean_abund
+    # Return the abundance vector
+    return abund
 
 
 def report_progress(iac):
