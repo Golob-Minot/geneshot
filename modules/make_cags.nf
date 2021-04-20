@@ -1,4 +1,4 @@
-container__find_cags = "quay.io/fhcrc-microbiome/python-pandas:v1.2.1_pyarrow"
+container__find_cags = "quay.io/fhcrc-microbiome/python-pandas:sklearn"
 
 // Default options
 params.distance_threshold = 0.15
