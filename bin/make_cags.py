@@ -387,7 +387,7 @@ def report_progress(iac):
 class SpecimenPCA:
     """Run PCA on a subset of genes to generate embeddings on specimens."""
 
-    def __init__(self, gene_abund, max_genes=100000, variance_cutoff=0.01):
+    def __init__(self, gene_abund, max_genes=100000, variance_cutoff=0.05):
 
         # Get the list of genes which will be used
         gene_key_list = list(gene_abund.gene_ix.ix.keys())[:max_genes]
