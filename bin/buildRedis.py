@@ -441,7 +441,16 @@ def save_tax_data(r, results_store, details_store):
         # Use the Taxonomy object to format the taxonomic assignment DF
         cag_tax_df = tax.make_cag_tax_df(
             cag_df["tax_id"].value_counts()
-        ).sort_values(
+        )
+        
+        # If there are no counts for this CAG
+        if 'count' not in cag_tax_df.columns.values:
+
+            # Skip this CAG
+            continue
+            
+        # Otherwise, sort by count
+        cag_tax_df = cag_tax_df.sort_values(
             by="count",
             ascending=False
         )
