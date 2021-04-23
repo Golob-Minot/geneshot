@@ -490,6 +490,7 @@ process fasterqDump {
     container "quay.io/hdc-workflows/sratools:latest"
     label "io_limited"
     errorStrategy 'finish'
+    publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
     val accession
