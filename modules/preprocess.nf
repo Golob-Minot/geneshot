@@ -2,6 +2,7 @@
 container__barcodecop = "quay.io/fhcrc-microbiome/barcodecop:barcodecop_0.5.3"
 container__trimgalore = 'quay.io/biocontainers/trim-galore:0.6.6--0'
 container__bwa = "quay.io/fhcrc-microbiome/bwa:bwa.0.7.17__bcw.0.3.0I"
+container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 
 // Defaults
 // Preprocessing options

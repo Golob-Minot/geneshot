@@ -321,7 +321,7 @@ workflow {
              manifest_qced.valid_paired
         )
 
-        combined_reads = Preprocess_wf.out
+        combined_reads = Preprocess_wf
 
     } else {
         // If the user specified --nopreprocess, then just 
@@ -332,18 +332,18 @@ workflow {
                 r -> [r.specimen, file(r.R1), file(r.R2)]
             }.groupTuple()
         )
-        combined_reads = CombineReads.out
+        combined_reads = CombineReads
         // If the user specified --savereads, write out the manifest
         if (params.savereads) {
             writeManifest(
-                combined_reads
+                combined_reads.out
             )
         }        
     }
 
     // Count the reads for every sample individually (just take the first of the pair of reads)
     countReads(
-        combined_reads.map {
+        combined_reads.out.map {
             r -> [r[0], r[1], r[2]]
         }
     )
@@ -358,7 +358,7 @@ workflow {
     // ##########################
     if (params.composition) {
         metaphlan2_fastq(
-            combined_reads.map {
+            combined_reads.out.map {
                 r -> [r[0], r[1], r[2]]
             }
         )
@@ -378,7 +378,7 @@ workflow {
 
         // Run the assembly and annotation workflow (in modules/assembly.nf)
         assembly_wf(
-            combined_reads
+            combined_reads.out
         )
 
         gene_fasta = assembly_wf.out.gene_fasta
@@ -396,7 +396,7 @@ workflow {
     // Run the alignment-based analysis steps (in modules/alignment.nf)
     alignment_wf(
         gene_fasta,
-        combined_reads,
+        combined_reads.out,
         params.output_prefix
     )
 
