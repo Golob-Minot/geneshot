@@ -1,6 +1,6 @@
 // Container versions
 container__barcodecop = "quay.io/fhcrc-microbiome/barcodecop:barcodecop_0.5.3"
-container__cutadapt = "quay.io/fhcrc-microbiome/cutadapt:cutadapt_2.3_bcw_0.3.1"
+container__trimgalore = 'quay.io/biocontainers/trim-galore:0.6.6--0'
 container__bwa = "quay.io/fhcrc-microbiome/bwa:bwa.0.7.17__bcw.0.3.0I"
 
 // Input to this workflow is a manifest CSV 
@@ -59,15 +59,15 @@ workflow preprocess_wf {
     ]}.set{ to_bcc_ch }
 
     // Run barcodecop
-    barcodecop(to_bcc_ch)
+    Barcodecop(to_bcc_ch)
 
     // Raise an error if any of the samples fail barcodecop
-    barcodecop.out.bcc_empty_ch.filter {
+    Barcodecop.out.bcc_empty_ch.filter {
         r -> (file(r[1]).isEmpty() || file(r[2]).isEmpty())
     }.map { r -> assert false: "Specimen failed barcodecop ${r.specimen}"}
 
-    // Send the files which pass barcodecop to cutadapt
-    bcc_to_cutadapt_ch = barcodecop.out.bcc_to_cutadapt_ch
+    // Send the files which pass barcodecop to trim
+    bcc_to_trim_ch = Barcodecop.out.bcc_to_cutadapt_ch
         .filter { 
                 r -> (!file(r[1]).isEmpty() && !file(r[2]).isEmpty())
         }
@@ -80,26 +80,26 @@ workflow preprocess_wf {
             file(sample.R1),
             file(sample.R2),
         ]}
-        .mix(bcc_to_cutadapt_ch)
+        .mix(bcc_to_trim_ch)
         .set{ demupltiplexed_ch}
 
     // Run catadapt
-    cutadapt(demupltiplexed_ch)
+    TrimGalore(demupltiplexed_ch)
 
     // Download the human index if needed
     if (!params.hg_index) {
         download_hg_index()
-        hg_index_tgz = download_hg_index.out
+        hg_index_tgz = Download_hg_index.out
     } else {
         hg_index_tgz = file(params.hg_index)
     }
 
     // Remove the human reads
-    bwa(hg_index_tgz, cutadapt.out)
+    BWA_remove_human(hg_index_tgz, TrimGalore.out)
 
     // Set the outputs of the workflow
     emit:
-        bwa.out
+        BWA_remove_human.out
 
 }
 
@@ -107,7 +107,7 @@ workflow preprocess_wf {
 
 
 // Run barcodecop to validate the demultiplex
-process barcodecop {
+process Barcodecop {
     tag "Validate barcode demultiplexing for WGS reads"
     container "${container__barcodecop}"
     label 'mem_medium'
@@ -148,32 +148,39 @@ echo "Done"
 """
 }
 
-// Process to run catadapt
-process cutadapt {
-    tag "Trim adapters from WGS reads"
-    container "${container__cutadapt}"
-    label 'mem_medium'
-    errorStrategy 'finish'
+// Use trim_galore to handle adapters / etc
+process TrimGalore {
+    container "${container__trimgalore}"
+    label 'io_limited'
+    errorStrategy 'ignore'
 
     input:
-    tuple sample_name, file(R1), file(R2)
+    tuple val(specimen), file(R1), file(R2)
 
     output:
-    tuple sample_name, file("${R1.getSimpleName()}_R1.noadapt.fq.gz"), file("${R2.getSimpleName()}_R2.noadapt.fq.gz"), file("${R1.getSimpleName()}.cutadapt.log")
+    tuple val(specimen), file("${specimen}.R1.tg.fastq.gz"), file("${specimen}.R2.tg.fastq.gz")
 
-"""
-set -e 
+    """
+    set -e
 
-cutadapt \
--j ${task.cpus} \
--a ${params.adapter_F} -A ${params.adapter_R} \
--o ${R1.getSimpleName()}_R1.noadapt.fq.gz -p ${R2.getSimpleName()}_R2.noadapt.fq.gz \
-${R1} ${R1} > ${R1.getSimpleName()}.cutadapt.log
-"""
+    cp ${R1} R1.fastq.gz
+    cp ${R2} R2.fastq.gz
+
+    trim_galore \
+    --gzip \
+    --cores ${task.cpus} \
+    --paired \
+    R1.fastq.gz R2.fastq.gz
+
+    rm R1.fastq.gz
+    rm R2.fastq.gz
+    mv R1_val_1.fq.gz "${specimen}.R1.tg.fastq.gz"
+    mv R2_val_2.fq.gz "${specimen}.R2.tg.fastq.gz"
+    """
 }
 
 // Process to download the human genome BWA index, already tarballed
-process download_hg_index {
+process Download_hg_index {
     tag "Download human reference genome"
     container "${container__bwa}"
     errorStrategy "finish"
@@ -191,17 +198,16 @@ wget --quiet ${params.hg_index_url} -O hg_index.tar.gz
 
 
 // Process to remove human reads
-process bwa {
+process BWA_remove_human {
     tag "Remove human reads"
     container "${container__bwa}"
     errorStrategy 'finish'
-    maxRetries 10
     label 'mem_veryhigh'
 
 
     input:
         file hg_index_tgz
-        tuple sample_name, file(R1), file(R2), file(cutadapt_log)
+        tuple sample_name, file(R1), file(R2)
 
     output:
         tuple sample_name, file("${R1.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R2.getSimpleName()}.noadapt.nohuman.fq.gz")
