@@ -158,7 +158,7 @@ process TrimGalore {
     tuple val(specimen), file(R1), file(R2)
 
     output:
-    tuple val(specimen), file("${specimen}.R1.tg.fastq.gz"), file("${specimen}.R2.tg.fastq.gz")
+    tuple val(specimen), file("${R1.getSimpleName()}__R1.tg.fastq.gz"), file("${R2.getSimpleName()}__R2.tg.fastq.gz")
 
     """
     set -e
@@ -174,8 +174,8 @@ process TrimGalore {
 
     rm R1.fastq.gz
     rm R2.fastq.gz
-    mv R1_val_1.fq.gz "${specimen}.R1.tg.fastq.gz"
-    mv R2_val_2.fq.gz "${specimen}.R2.tg.fastq.gz"
+    mv R1_val_1.fq.gz "${R1.getSimpleName()}__R1.tg.fastq.gz"
+    mv R2_val_2.fq.gz "${R2.getSimpleName()}__R2.tg.fastq.gz"
     """
 }
 
