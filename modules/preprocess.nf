@@ -226,7 +226,6 @@ process BWA_remove_human {
     output:
         tuple sample_name, file("${R1.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R2.getSimpleName()}.noadapt.nohuman.fq.gz")
 
-    afterScript "rm -rf hg_index/*"
 
 """
 set - e
@@ -255,6 +254,9 @@ samtools fastq alignment.sam \
 -1 ${R1.getSimpleName()}.noadapt.nohuman.fq.gz -2 ${R2.getSimpleName()}.noadapt.nohuman.fq.gz \
 | tee -a ${R1.getSimpleName()}.nohuman.log
 echo Done | tee -a ${R1.getSimpleName()}.nohuman.log
+
+rm -rf hg_index/*
+echo Cleanup Done
 """
 }
 
