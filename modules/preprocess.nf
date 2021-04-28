@@ -3,8 +3,13 @@ container__barcodecop = "quay.io/fhcrc-microbiome/barcodecop:barcodecop_0.5.3"
 container__trimgalore = 'quay.io/biocontainers/trim-galore:0.6.6--0'
 container__bwa = "quay.io/fhcrc-microbiome/bwa:bwa.0.7.17__bcw.0.3.0I"
 
-// Input to this workflow is a manifest CSV 
-
+// Defaults
+// Preprocessing options
+params.hg_index_url = 'https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
+params.hg_index = false
+params.min_hg_align_score = 30
+params.savereads = false
+params.output = 'results/'
 
 
 // Function to filter a manifest to those rows which 
@@ -43,7 +48,7 @@ def filter_valid_index(manifest_ch){
     }
 }
 
-workflow preprocess_wf {
+workflow Preprocess_wf {
     take: indexed_ch
     take: paired_ch
 
@@ -88,7 +93,7 @@ workflow preprocess_wf {
 
     // Download the human index if needed
     if (!params.hg_index) {
-        download_hg_index()
+        Download_hg_index()
         hg_index_tgz = Download_hg_index.out
     } else {
         hg_index_tgz = file(params.hg_index)
@@ -97,9 +102,19 @@ workflow preprocess_wf {
     // Remove the human reads
     BWA_remove_human(hg_index_tgz, TrimGalore.out)
 
+    // Combine the reads by specimen name
+    CombineReads(BWA_remove_human.out.groupTuple())
+
+    // If the user specified --savereads, write out the manifest
+    if (params.savereads) {
+        WriteManifest(
+            CombineReads.out
+        )
+    }
+
     // Set the outputs of the workflow
     emit:
-        BWA_remove_human.out
+        CombineReads.out
 
 }
 
@@ -163,8 +178,8 @@ process TrimGalore {
     """
     set -e
 
-    cp ${R1} R1.fastq.gz
-    cp ${R2} R2.fastq.gz
+    ln -s ${R1} R1.fastq.gz
+    ln -s ${R2} R2.fastq.gz
 
     trim_galore \
     --gzip \
@@ -172,8 +187,6 @@ process TrimGalore {
     --paired \
     R1.fastq.gz R2.fastq.gz
 
-    rm R1.fastq.gz
-    rm R2.fastq.gz
     mv R1_val_1.fq.gz "${R1.getSimpleName()}__R1.tg.fastq.gz"
     mv R2_val_2.fq.gz "${R2.getSimpleName()}__R2.tg.fastq.gz"
     """
@@ -243,3 +256,103 @@ samtools fastq alignment.sam \
 echo Done | tee -a ${R1.getSimpleName()}.nohuman.log
 """
 }
+
+process JoinFASTQ {
+    tag "Join FASTQ files per-specimen"
+    container "${container__fastatools}"
+    label = 'mem_medium'
+    errorStrategy 'finish'
+    maxRetries 10
+
+    // If the user sets --preprocess_output, write out the combined reads to that folder
+    publishDir path: "${params.output}qc/", enabled: params.savereads, mode: "copy"
+
+    input:
+    tuple val(sample), file("R1.*.fastq.gz"), file("R2.*.fastq.gz")
+    
+    output:
+    tuple val(sample), file("${sample}.R1.fastq.gz"), file("${sample}.R2.fastq.gz")
+
+"""
+set -e
+
+ls -lah *
+
+combine_fastq_pairs.py \
+-1 R1*fastq.gz \
+-2 R2*fastq.gz \
+--normalize-ids \
+-o1 "${sample}.R1.fastq.gz" \
+-o2 "${sample}.R2.fastq.gz"
+
+(( \$(gunzip -c "${sample}.R1.fastq.gz" | head | wc -l) > 1 ))
+(( \$(gunzip -c "${sample}.R2.fastq.gz" | head | wc -l) > 1 ))
+
+"""
+}
+
+
+process OutputManifest {
+    container "${container__ubuntu}"
+
+    publishDir path: "${params.output}qc/", enabled: params.savereads, mode: "copy"
+
+    input:
+        val manifestStr
+    
+    output:
+        file 'manifest.qc.csv'
+
+    """
+        echo "${manifestStr}" > manifest.qc.csv
+    """
+}
+
+// Workflow to publish a set of reads to a folder, along with a manifest
+workflow WriteManifest {
+    take:
+        reads_ch
+
+    main:
+        // Make a manifest for the files in reads_ch
+        // Output the final reads and manifest
+
+        
+        manifestStr = reads_ch.reduce(
+            'specimen,R1,R2\n'
+        ){ csvStr, row ->
+            return  csvStr += "${row[0]},${params.output_folder}qc/${row[1].name},${params.output_folder}qc/${row[2].name}\n";
+        }
+
+        // Write the manifest CSV to a file
+        OutputManifest(manifestStr)
+        
+}
+
+workflow CombineReads {
+    take:
+
+        fastq_ch
+
+    main:
+
+        fastq_ch.branch {  // Split up the samples which have multiple FASTQ files
+            single: it[1].size() == 1
+            multiple: it[1].size() > 1
+        }.set {
+            grouped_fastq
+        }
+
+        JoinFASTQ(
+            grouped_fastq.multiple
+        )
+
+    emit:
+        grouped_fastq.single.map {
+            r -> [r[0], r[1][0], r[2][0]]
+        }.mix(
+            JoinFASTQ.out
+        )
+
+}
+
