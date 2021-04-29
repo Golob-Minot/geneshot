@@ -91,9 +91,6 @@ def helpMessage() {
     For preprocessing:
       --hg_index_url        URL for human genome index, defaults to current HG
       --hg_index            Cached copy of the bwa indexed human genome, TGZ format
-      --adapter_F           Forward sequencing adapter sequence (to be removed)
-      --adapter_R           Reverse sequencing adapter sequence (to be removed)
-                              (Adapter sequences default to nextera adapters)
       --min_hg_align_score  Minimum alignment score for human genome (default 30)
 
     For Assembly:
@@ -180,7 +177,7 @@ include { WriteManifest} from './modules/preprocess' params(
     output: output_folder
 )
 // Import some general tasks, such as CombineReads and writeManifest
-include { read_manifest } from './modules/general'
+include { Read_manifest } from './modules/general'
 include { countReads } from './modules/general'
 include { countReadsSummary } from './modules/general' params(
     output_folder: output_folder
@@ -310,7 +307,7 @@ workflow {
         manifest_file = Channel.from(file(params.manifest))
     }
 
-    manifest_qced = read_manifest(manifest_file)
+    manifest_qced = Read_manifest(manifest_file)
 
     // Phase I: Preprocessing
     if (!params.nopreprocess) {

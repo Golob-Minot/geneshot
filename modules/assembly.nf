@@ -209,10 +209,10 @@ process assembly {
     publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
 
     input:
-        tuple specimen, file(R1), file(R2)
+        tuple val(specimen), file(R1), file(R2)
     
     output:
-        tuple specimen, file("${specimen}.contigs.fasta.gz"), file("${specimen}.megahit.log")
+        tuple val(specimen), file("${specimen}.contigs.fasta.gz"), file("${specimen}.megahit.log")
     
 """
 set -e 

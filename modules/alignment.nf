@@ -202,7 +202,7 @@ process diamond {
     file refdb
     
     output:
-    tuple sample_name, file("${sample_name}.aln.gz")
+    tuple val(sample_name), file("${sample_name}.aln.gz")
 
     """
     set -e
@@ -246,7 +246,7 @@ process famli {
     errorStrategy 'finish'
     
     input:
-    tuple sample_name, file(input_aln)
+    tuple val(sample_name), file(input_aln)
     
     output:
     path "${sample_name}.json.gz"
