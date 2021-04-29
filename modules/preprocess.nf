@@ -3,6 +3,7 @@ container__barcodecop = "quay.io/fhcrc-microbiome/barcodecop:barcodecop_0.5.3"
 container__trimgalore = 'quay.io/biocontainers/trim-galore:0.6.6--0'
 container__bwa = "quay.io/fhcrc-microbiome/bwa:bwa.0.7.17__bcw.0.3.0I"
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
+container__ubuntu = "ubuntu:18.04"
 
 // Defaults
 // Preprocessing options
@@ -265,7 +266,6 @@ process JoinFASTQ {
     container "${container__fastatools}"
     label = 'mem_medium'
     errorStrategy 'finish'
-    maxRetries 10
 
     // If the user sets --preprocess_output, write out the combined reads to that folder
     publishDir path: "${params.output}qc/", enabled: params.savereads, mode: "copy"
@@ -301,10 +301,14 @@ process OutputManifest {
     publishDir path: "${params.output}qc/", enabled: params.savereads, mode: "copy"
 
     input:
+        path R1s
+        path R2s
         val manifestStr
     
     output:
-        file 'manifest.qc.csv'
+        path 'manifest.qc.csv'
+        path R1s
+        path R2s
 
     """
         echo "${manifestStr}" > manifest.qc.csv
@@ -319,16 +323,20 @@ workflow WriteManifest {
     main:
         // Make a manifest for the files in reads_ch
         // Output the final reads and manifest
-
         
         manifestStr = reads_ch.reduce(
             'specimen,R1,R2\n'
         ){ csvStr, row ->
-            return  csvStr += "${row[0]},${params.output_folder}qc/${row[1].name},${params.output_folder}qc/${row[2].name}\n";
+            return  csvStr += "${row[0]},${params.output}qc/${row[1].name},${params.output}qc/${row[2].name}\n";
         }
 
+
         // Write the manifest CSV to a file
-        OutputManifest(manifestStr)
+        OutputManifest(
+            reads_ch.collect{ file(it[1]) },
+            reads_ch.collect{ file(it[2]) },
+            manifestStr
+        )
         
 }
 
