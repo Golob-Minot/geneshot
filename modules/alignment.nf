@@ -83,27 +83,31 @@ workflow alignment_wf {
     )
 
     // Align all specimens against the DIAMOND database
-    diamond(
+    Diamond(
         reads_ch,
         DiamondDB.out
     )
 
     // Filter to the most likely single alignment per query
-    famli(
-        diamond.out
+    Famli(
+        Diamond.out
     )
 
     // Make a single table with the abundance of every gene across every sample
-    assembleAbundances(
-        famli.out.toSortedList(),
+    AssembleAbundances(
+        Famli.out.toSortedList(),
         params.cag_batchsize,
         output_prefix
     )
 
+    //
+    //  CAG Stuff starts here
+    //
+
     // Group shards of genes into Co-Abundant Gene Groups (CAGs)
     makeInitialCAGs(
-        assembleAbundances.out[5],
-        assembleAbundances.out[0].flatten()
+        AssembleAbundances.out[5],
+        AssembleAbundances.out[0].flatten()
     )
 
     // Perform multiple rounds of combining shards to make ever-larger CAGs
@@ -157,11 +161,11 @@ workflow alignment_wf {
     emit:
         cag_csv = refineCAGs_final.out[0]
         cag_abund_feather = refineCAGs_final.out[1]
-        famli_json_list = famli.out.toSortedList()
-        specimen_gene_count_csv = assembleAbundances.out[1]
-        specimen_reads_aligned_csv = assembleAbundances.out[4]
-        detailed_hdf = assembleAbundances.out[2]
-        gene_length_csv = assembleAbundances.out[3]
+        famli_json_list = Famli.out.toSortedList()
+        specimen_gene_count_csv = AssembleAbundances.out[1]
+        specimen_reads_aligned_csv = AssembleAbundances.out[4]
+        detailed_hdf = AssembleAbundances.out[2]
+        gene_length_csv = AssembleAbundances.out[3]
 }
 
 // Align each sample against the reference database of genes using DIAMOND
@@ -191,7 +195,7 @@ process DiamondDB {
 
 
 // Align each sample against the reference database of genes using DIAMOND
-process diamond {
+process Diamond {
     tag "Align to the gene catalog"
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
@@ -238,7 +242,7 @@ process diamond {
 
 
 // Filter the alignments with the FAMLI algorithm
-process famli {
+process Famli {
     tag "Deduplicate multi-mapping reads"
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'
@@ -267,7 +271,7 @@ process famli {
 
 
 // Make a single feather file with the abundance of every gene across every sample
-process assembleAbundances {
+process AssembleAbundances {
     tag "Make gene ~ sample abundance matrix"
     container "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
     label "mem_veryhigh"
@@ -303,7 +307,7 @@ pickle.HIGHEST_PROTOCOL = 4
 
 # Set up logging
 logFormatter = logging.Formatter(
-    '%(asctime)s %(levelname)-8s [assembleAbundances] %(message)s'
+    '%(asctime)s %(levelname)-8s [AssembleAbundances] %(message)s'
 )
 rootLogger = logging.getLogger()
 rootLogger.setLevel(logging.INFO)
@@ -432,13 +436,21 @@ for ix, gene_list in enumerate([
     with gzip.open("gene_list.%d.csv.gz" % ix, "wt") as handle:
         handle.write("\\n".join(gene_list))
 
-# Write out the sequencing depth of each gene in each specimen in zarr format
-z = zarr.open(
+# Write out the sequencing depth / rel abund of each gene in each specimen in zarr format
+z_ra = zarr.open(
     "gene_abundance.zarr",
     mode="w",
     shape=(len(all_gene_names), len(sample_names)), 
     chunks=True,
     dtype='f4'
+)
+
+z_nr = zarr.open(
+    "gene_nreads.zarr",
+    mode="w",
+    shape=(len(all_gene_names), len(sample_names)), 
+    chunks=True,
+    dtype='ulonglong'
 )
 
 # Iterate over the list of files
@@ -450,7 +462,7 @@ for fp in sample_jsons:
     logging.info("Reading in %s from %s" % (sample_name, fp))
     df = read_json(fp)
 
-    # Calculate the proportional depth of sequencing per gene
+    # Calculate the depth and rel abund of sequencing per gene
     gene_depth = df.set_index(
         "id"
     ).reindex(
@@ -459,16 +471,22 @@ for fp in sample_jsons:
         "depth"
     ].fillna(
         0
-    ) / df[
+    )
+    gene_ra = gene_depth / df[
         "depth"
     ].sum()
 
     logging.info("Saving %s to gene_abundance.zarr" % sample_name)
     # Save the sequencing depth to zarr
-    z[
+    z_nr[
         :,
         sample_names.index(sample_name)
     ] = gene_depth.values
+
+    z_ra[
+        :,
+        sample_names.index(sample_name)
+    ] = gene_ra.values
 
 # Write out the sample names and gene names
 logging.info("Writing out sample_names.json.gz")
@@ -485,6 +503,7 @@ with tarfile.open("gene_abundance.zarr.tar", "w") as tar:
         "gene_names.json.gz",
         "sample_names.json.gz",
         "gene_abundance.zarr",
+        "gene_nreads.zarr",
     ]:
         logging.info("Adding %s to gene_abundance.zarr.tar" % name)
         tar.add(name)
