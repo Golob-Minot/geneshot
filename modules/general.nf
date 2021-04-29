@@ -9,7 +9,7 @@ container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 params.fdr_method = "fdr_bh"
 
 // Function to read in a CSV and return a Channel
-def read_manifest(manifest_file){
+def Read_manifest(manifest_file){
     manifest_file.splitCsv(
         header: true, 
         sep: ","
@@ -21,104 +21,8 @@ def read_manifest(manifest_file){
     }
 }
 
-workflow combineReads {
-    take:
 
-        fastq_ch
 
-    main:
-
-        fastq_ch.branch {  // Split up the samples which have multiple FASTQ files
-            single: it[1].size() == 1
-            multiple: it[1].size() > 1
-        }.set {
-            grouped_fastq
-        }
-
-        joinFASTQ(
-            grouped_fastq.multiple
-        )
-
-    emit:
-        grouped_fastq.single.map {
-            r -> [r[0], r[1][0], r[2][0]]
-        }.mix(
-            joinFASTQ.out
-        )
-
-}
-
-process joinFASTQ {
-    tag "Join FASTQ files per-specimen"
-    container "${container__fastatools}"
-    label = 'mem_medium'
-    errorStrategy 'finish'
-    maxRetries 10
-
-    // If the user sets --preprocess_output, write out the combined reads to that folder
-    publishDir path: "${params.output_folder}qc/", enabled: params.savereads, mode: "copy"
-
-    input:
-    tuple val(sample), file("R1.*.fastq.gz"), file("R2.*.fastq.gz")
-    
-    output:
-    tuple val(sample), file("${sample}.R1.fastq.gz"), file("${sample}.R2.fastq.gz")
-
-"""
-set -e
-
-ls -lah *
-
-combine_fastq_pairs.py \
--1 R1*fastq.gz \
--2 R2*fastq.gz \
---normalize-ids \
--o1 "${sample}.R1.fastq.gz" \
--o2 "${sample}.R2.fastq.gz"
-
-(( \$(gunzip -c "${sample}.R1.fastq.gz" | head | wc -l) > 1 ))
-(( \$(gunzip -c "${sample}.R2.fastq.gz" | head | wc -l) > 1 ))
-
-"""
-
-}
-
-process outputManifest {
-    container "${container__ubuntu}"
-
-    publishDir path: "${params.output_folder}qc/", enabled: params.savereads, mode: "copy"
-
-    input:
-        val manifestStr
-    
-    output:
-        file 'manifest.qc.csv'
-
-    """
-        echo "${manifestStr}" > manifest.qc.csv
-    """
-}
-
-// Workflow to publish a set of reads to a folder, along with a manifest
-workflow writeManifest {
-    take:
-        reads_ch
-
-    main:
-        // Make a manifest for the files in reads_ch
-        // Output the final reads and manifest
-
-        
-        manifestStr = reads_ch.reduce(
-            'specimen,R1,R2\n'
-        ){ csvStr, row ->
-            return  csvStr += "${row[0]},${params.output_folder}qc/${row[1].name},${params.output_folder}qc/${row[2].name}\n";
-        }
-
-        // Write the manifest CSV to a file
-        outputManifest(manifestStr)
-        
-}
 
 // Count the number of input reads for a single sample
 process countReads {
@@ -129,7 +33,7 @@ process countReads {
     errorStrategy "finish"
 
     input:
-    tuple sample_name, file(R1), file(R2)
+    tuple val(sample_name), file(R1), file(R2)
 
     output:
     file "${sample_name}.countReads.csv"

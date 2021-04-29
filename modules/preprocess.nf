@@ -1,18 +1,11 @@
+nextflow.preview.dsl=2
+
 // Container versions
 container__barcodecop = "quay.io/fhcrc-microbiome/barcodecop:barcodecop_0.5.3"
 container__trimgalore = 'quay.io/biocontainers/trim-galore:0.6.6--0'
 container__bwa = "quay.io/fhcrc-microbiome/bwa:bwa.0.7.17__bcw.0.3.0I"
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 container__ubuntu = "ubuntu:18.04"
-
-// Defaults
-// Preprocessing options
-params.hg_index_url = 'https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
-params.hg_index = false
-params.min_hg_align_score = 30
-params.savereads = false
-params.output = 'results/'
-
 
 // Function to filter a manifest to those rows which 
 // have values for specimen, R1, and R2, but are missing any values in I1 or I2
@@ -127,15 +120,15 @@ workflow Preprocess_wf {
 process Barcodecop {
     tag "Validate barcode demultiplexing for WGS reads"
     container "${container__barcodecop}"
-    label 'mem_medium'
+    label 'multithread'
     errorStrategy 'finish'
 
     input:
-        tuple specimen, file(R1), file(R2), file(I1), file(I2)
+        tuple val(specimen), file(R1), file(R2), file(I1), file(I2)
 
     output:
-        tuple specimen, file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_to_cutadapt_ch
-        tuple specimen, file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_empty_ch
+        tuple val(specimen), file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_to_cutadapt_ch
+        tuple val(specimen), file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_empty_ch
 """
 set -e
 
@@ -222,10 +215,10 @@ process BWA_remove_human {
 
     input:
         file hg_index_tgz
-        tuple sample_name, file(R1), file(R2)
+        tuple val(sample_name), file(R1), file(R2)
 
     output:
-        tuple sample_name, file("${R1.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R2.getSimpleName()}.noadapt.nohuman.fq.gz")
+        tuple val(sample_name), file("${R1.getSimpleName()}.noadapt.nohuman.fq.gz"), file("${R2.getSimpleName()}.noadapt.nohuman.fq.gz")
 
 
 """
@@ -366,4 +359,78 @@ workflow CombineReads {
         )
 
 }
+//
+// Steps to run preprocessing independently.
+//
 
+// Default values for boolean flags
+// If these are not set by the user, then they will be set to the values below
+// This is useful for the if/then control syntax below
+params.nopreprocess = false
+params.savereads = false
+params.help = false
+params.output = './results/'
+params.manifest = null
+
+// Preprocessing options
+params.hg_index_url = 'https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
+params.hg_index = false
+params.min_hg_align_score = 30
+
+// imports
+include { Read_manifest } from './general'
+
+
+// Function which prints help message text
+def helpMessage() {
+    log.info"""
+    Usage:
+
+    nextflow run Golob-Minot/geneshot/preprocess <ARGUMENTS>
+    
+    Required Arguments:
+      --manifest            CSV file listing samples (see below)
+
+    Options:
+      --output              Folder to place analysis outputs (default ./results/)
+      --savereads           If specified, save the preprocessed reads to the output folder (inside qc/)
+      -w                    Working directory. Defaults to `./work`
+
+    For preprocessing:
+      --hg_index_url        URL for human genome index, defaults to current HG
+      --hg_index            Cached copy of the bwa indexed human genome, TGZ format
+      --min_hg_align_score  Minimum alignment score for human genome (default 30)
+
+    Manifest:
+      The manifest is a CSV with a header indicating which samples correspond to which files.
+      The file must contain a column `specimen`. This can be repeated. 
+      Data is only accepted as paired reads.
+      Reads are specified by columns, `R1` and `R2`.
+      If index reads are provided, the column titles should be 'I1' and 'I2'
+
+    """.stripIndent()
+}
+
+
+workflow {
+    main:
+
+ 
+    // Show help message if the user specifies the --help flag at runtime
+    if (params.help || params.manifest == null){
+        // Invoke the function above which prints the help message
+        helpMessage()
+        // Exit out and do not run anything else
+        exit 0
+    }
+    // Read and validate manifest
+    manifest_file = Channel.from(file(params.manifest))
+    manifest_qced = Read_manifest(manifest_file)
+    // Actually preprocess
+
+    Preprocess_wf(
+        manifest_qced.valid_paired_indexed,
+        manifest_qced.valid_paired
+    )
+
+}
