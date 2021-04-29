@@ -1,4 +1,4 @@
-nextflow.enable.dsl=2
+nextflow.preview.dsl=2
 
 // Container versions
 container__barcodecop = "quay.io/fhcrc-microbiome/barcodecop:barcodecop_0.5.3"
