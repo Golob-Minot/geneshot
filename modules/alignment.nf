@@ -73,7 +73,7 @@ include { refineCAGs as refineCAGs_final } from "./make_cags" params(
     linkage_type: params.linkage_type
 )
 
-workflow alignment_wf {
+workflow Alignment_wf {
     take:
         gene_fasta
         reads_ch
@@ -108,14 +108,30 @@ workflow alignment_wf {
     OutputSpecimenGeneAbundance(
         AssembleAbundances.out.abundance_zarr_tar
     )
+    emit:
+        famli_json_list = Famli.out.toSortedList()
+        specimen_gene_count_csv = AssembleAbundances.out.specimen_gene_count_csv
+        specimen_reads_aligned_csv = AssembleAbundances.out.specimen_reads_aligned_csv
+        detailed_hdf = AssembleAbundances.out.detailed_hdf
+        gene_length_csv = AssembleAbundances.out.gene_length_csv
+        gene_abundances_zarr_tar = AssembleAbundances.out.abundance_zarr_tar
+        gene_lists = AssembleAbundances.out.gene_lists
+}
+
+workflow CAG_contig_oriented_wf {
     //
     //  CAG Stuff starts here
+    //    This is for the 'contig oriented'
     //
+    take:
+        gene_abundances_zarr_tar
+        gene_lists
 
+    main: 
     // Group shards of genes into Co-Abundant Gene Groups (CAGs)
     makeInitialCAGs(
-        AssembleAbundances.out[5],
-        AssembleAbundances.out[0].flatten()
+        gene_abundances_zarr_tar,
+        gene_lists
     )
 
     // Perform multiple rounds of combining shards to make ever-larger CAGs
@@ -169,11 +185,6 @@ workflow alignment_wf {
     emit:
         cag_csv = refineCAGs_final.out[0]
         cag_abund_feather = refineCAGs_final.out[1]
-        famli_json_list = Famli.out.toSortedList()
-        specimen_gene_count_csv = AssembleAbundances.out[1]
-        specimen_reads_aligned_csv = AssembleAbundances.out[4]
-        detailed_hdf = AssembleAbundances.out[2]
-        gene_length_csv = AssembleAbundances.out[3]
 }
 
 // Align each sample against the reference database of genes using DIAMOND
@@ -292,10 +303,10 @@ process AssembleAbundances {
 
     output:
     path "gene_list.*.csv.gz", emit: gene_lists
-    path "specimen_gene_count.csv.gz", emit: specimen_gene_count
-    path "${output_prefix}.details.hdf5", emit: details_hdf5
-    path "gene_length.csv.gz", emit: gene_lengths
-    path "specimen_reads_aligned.csv.gz", emit: specimen_reads
+    path "specimen_gene_count.csv.gz", emit: specimen_gene_count_csv
+    path "${output_prefix}.details.hdf5", emit: detailed_hdf
+    path "gene_length.csv.gz", emit: gene_length_csv
+    path "specimen_reads_aligned.csv.gz", emit: specimen_reads_aligned_csv
     path "gene_abundance.zarr.tar", emit: abundance_zarr_tar
 
 

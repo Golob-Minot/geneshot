@@ -237,7 +237,20 @@ include { annotation_wf } from './modules/genecatalog' params(
 )
 
 // Import the workflows used for alignment-based analysis
-include { alignment_wf } from './modules/alignment' params(
+include { Alignment_wf } from './modules/alignment' params(
+    output_folder: output_folder,
+    dmnd_min_identity: params.dmnd_min_identity,
+    dmnd_min_coverage: params.dmnd_min_coverage,
+    dmnd_top_pct: params.dmnd_top_pct,
+    dmnd_min_score: params.dmnd_min_score,
+    gencode: params.gencode,
+    sd_mean_cutoff: params.sd_mean_cutoff,
+    famli_batchsize: params.famli_batchsize,
+    cag_batchsize: params.cag_batchsize
+)
+
+// And for CAG generation
+include { CAG_contig_oriented_wf } from './modules/alignment' params(
     output_folder: output_folder,
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
@@ -391,10 +404,15 @@ workflow {
     // ############################
 
     // Run the alignment-based analysis steps (in modules/alignment.nf)
-    alignment_wf(
+    Alignment_wf(
         gene_fasta,
         combined_reads.out,
         params.output_prefix
+    )
+    // And the CAG generation steps
+    CAG_contig_oriented_wf(
+        Alignment_wf.out.gene_abundances_zarr_tar,
+        Alignment_wf.out.gene_lists
     )
 
     // ########################
@@ -403,7 +421,7 @@ workflow {
 
     // Calculate the richness of each sample using the breakaway algorithm
     breakaway(
-        alignment_wf.out.famli_json_list.flatten()
+        Alignment_wf.out.famli_json_list.flatten()
     )
     collectBreakaway(
         breakaway.out.toSortedList()
@@ -412,8 +430,8 @@ workflow {
     // Calculate the association of individual CAGs with user-provided features
     if ( params.formula ) {
         corncob_wf(
-            alignment_wf.out.famli_json_list,
-            alignment_wf.out.cag_csv,
+            Alignment_wf.out.famli_json_list,
+            CAG_contig_oriented_wf.out.cag_csv,
             file(params.manifest),
             formula_ch
         )
@@ -431,24 +449,24 @@ workflow {
     // NOTE: The code used here is imported from ./modules/general.nf
 
     collectAbundances(
-        alignment_wf.out.cag_csv,
-        alignment_wf.out.cag_abund_feather,
+        CAG_contig_oriented_wf.out.cag_csv,
+        CAG_contig_oriented_wf.out.cag_abund_feather,
         countReadsSummary.out,
         manifest_file,
-        alignment_wf.out.specimen_gene_count_csv,
-        alignment_wf.out.specimen_reads_aligned_csv,
-        alignment_wf.out.gene_length_csv,
+        Alignment_wf.out.specimen_gene_count_csv,
+        Alignment_wf.out.specimen_reads_aligned_csv,
+        Alignment_wf.out.gene_length_csv,
         collectBreakaway.out,
     )
 
     // If we performed de novo assembly, add the gene assembly information
     if ( params.gene_fasta ) {
         resultsHDF = collectAbundances.out
-        detailedHDF = alignment_wf.out.detailed_hdf
+        detailedHDF = Alignment_wf.out.detailed_hdf
     } else {
         addGeneAssembly(
             collectAbundances.out,
-            alignment_wf.out.detailed_hdf,
+            Alignment_wf.out.detailed_hdf,
             Genecatalog_wf.out.allele_assembly_csv_list
         )
         resultsHDF = addGeneAssembly.out[0]
