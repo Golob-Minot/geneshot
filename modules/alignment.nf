@@ -1,3 +1,7 @@
+// containers
+container__FAMLI = 'quay.io/fhcrc-microbiome/famli:v1.5'
+container__collection = 'quay.io/fhcrc-microbiome/experiment-collection:v0.2'
+
 // Processes used for alignment of reads against gene databases
 
 params.cag_batchsize = 10000
@@ -197,7 +201,7 @@ process DiamondDB {
 // Align each sample against the reference database of genes using DIAMOND
 process Diamond {
     tag "Align to the gene catalog"
-    container "quay.io/fhcrc-microbiome/famli:v1.5"
+    container "${container__FAMLI}"
     label 'mem_veryhigh'
     errorStrategy 'finish'
     
@@ -244,7 +248,7 @@ process Diamond {
 // Filter the alignments with the FAMLI algorithm
 process Famli {
     tag "Deduplicate multi-mapping reads"
-    container "quay.io/fhcrc-microbiome/famli:v1.5"
+    container "${container__FAMLI}"
     label 'mem_veryhigh'
     publishDir "${params.output_folder}/abund/details/", mode: "copy"
     errorStrategy 'finish'
@@ -273,7 +277,7 @@ process Famli {
 // Make a single feather file with the abundance of every gene across every sample
 process AssembleAbundances {
     tag "Make gene ~ sample abundance matrix"
-    container "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
+    container "${container__collection}"
     label "mem_veryhigh"
     errorStrategy 'finish'
 
@@ -283,12 +287,12 @@ process AssembleAbundances {
     val output_prefix
 
     output:
-    file "gene_list.*.csv.gz"
-    file "specimen_gene_count.csv.gz"
-    file "${output_prefix}.details.hdf5"
-    path "gene_length.csv.gz"
-    path "specimen_reads_aligned.csv.gz"
-    path "gene_abundance.zarr.tar"
+    path "gene_list.*.csv.gz", emit: gene_lists
+    path "specimen_gene_count.csv.gz", emit: specimen_gene_count
+    path "${output_prefix}.details.hdf5", emit: details_hdf5
+    path "gene_length.csv.gz", emit: gene_lengths
+    path "specimen_reads_aligned.csv.gz", emit: specimen_reads
+    path "gene_abundance.zarr.tar", emit: abundance_zarr_tar
 
 
     """
@@ -518,7 +522,7 @@ logging.info("Done")
 // Summarize the abundance of every CAG across each sample
 process calcCAGabund {
     tag "Make CAG ~ sample abundance matrix"
-    container "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
+    container "${container__collection}"
     label "mem_veryhigh"
     errorStrategy 'finish'
     publishDir "${params.output_folder}/abund/", mode: "copy"
