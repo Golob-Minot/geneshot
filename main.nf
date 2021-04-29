@@ -33,9 +33,7 @@ params.output_prefix = 'geneshot'
 params.manifest = null
 
 // Preprocessing options
-params.adapter_F = "CTGTCTCTTATACACATCT"
-params.adapter_R = "CTGTCTCTTATACACATCT"
-params.hg_index_url = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
+params.hg_index_url = 'https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
 params.hg_index = false
 params.min_hg_align_score = 30
 
@@ -165,21 +163,29 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include preprocess_wf from './modules/preprocess' params(
+include { Preprocess_wf } from './modules/preprocess' params(
     manifest: params.manifest,
-    adapter_F: params.adapter_F,
-    adapter_R: params.adapter_R,
     hg_index: params.hg_index,
     hg_index_url: params.hg_index_url,
     min_hg_align_score: params.min_hg_align_score,
+    savereads: params.savereads,
+    output: output_folder
 )
-// Import some general tasks, such as combineReads and writeManifest
-include read_manifest from './modules/general'
-include countReads from './modules/general'
-include countReadsSummary from './modules/general' params(
+include { CombineReads} from './modules/preprocess' params(
+    savereads: params.savereads,
+    output: output_folder
+)
+include { WriteManifest} from './modules/preprocess' params(
+    savereads: params.savereads,
+    output: output_folder
+)
+// Import some general tasks, such as CombineReads and writeManifest
+include { read_manifest } from './modules/general'
+include { countReads } from './modules/general'
+include { countReadsSummary } from './modules/general' params(
     output_folder: output_folder
 )
-include collectAbundances from './modules/general' params(
+include { collectAbundances } from './modules/general' params(
     output_prefix: params.output_prefix,
     formula: params.formula,
     distance_metric: params.distance_metric,
@@ -191,30 +197,23 @@ include collectAbundances from './modules/general' params(
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage
 )
-include writeManifest from './modules/general' params(
-    savereads: params.savereads,
-    output_folder: output_folder
-)
-include combineReads from './modules/general' params(
-    savereads: params.savereads,
-    output_folder: output_folder
-)
-include addGeneAssembly from './modules/general'
-include readTaxonomy from './modules/general'
-include addEggnogResults from './modules/general'
-include addCorncobResults from './modules/general' params(
+
+include { addGeneAssembly } from './modules/general'
+include { readTaxonomy } from './modules/general'
+include { addEggnogResults } from './modules/general'
+include { addCorncobResults } from './modules/general' params(
     fdr_method: params.fdr_method
 )
-include addTaxResults from './modules/general'
-include repackHDF as repackFullHDF from './modules/general' params(
+include { addTaxResults } from './modules/general'
+include { repackHDF as repackFullHDF } from './modules/general' params(
     output_folder: output_folder
 )
-include repackHDF as repackDetailedHDF from './modules/general' params(
+include { repackHDF as repackDetailedHDF } from './modules/general' params(
     output_folder: output_folder
 )
 
 // Import the workflows used for assembly
-include assembly_wf from './modules/assembly' params(
+include { assembly_wf } from './modules/assembly' params(
     output_folder: output_folder,
     output_prefix: params.output_prefix,
     phred_offset: params.phred_offset,
@@ -228,7 +227,7 @@ include assembly_wf from './modules/assembly' params(
 )
 
 // Import the workflows used for annotation
-include annotation_wf from './modules/assembly' params(
+include { annotation_wf } from './modules/assembly' params(
     output_folder: output_folder,
     phred_offset: params.phred_offset,
     min_identity: params.min_identity,
@@ -241,7 +240,7 @@ include annotation_wf from './modules/assembly' params(
 )
 
 // Import the workflows used for alignment-based analysis
-include alignment_wf from './modules/alignment' params(
+include { alignment_wf } from './modules/alignment' params(
     output_folder: output_folder,
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
@@ -257,35 +256,35 @@ include alignment_wf from './modules/alignment' params(
 )
 
 // Import the workflows used for statistical analysis
-include validation_wf from './modules/statistics' params(
+include { validation_wf } from './modules/statistics' params(
     output_folder: output_folder,
     formula: params.formula,
     corncob_batches: params.corncob_batches
 )
-include corncob_wf from './modules/statistics' params(
+include { corncob_wf } from './modules/statistics' params(
     output_folder: output_folder,
     formula: params.formula,
     corncob_batches: params.corncob_batches
 )
-include runBetta from './modules/statistics'
-include addBetta from './modules/statistics' params(
+include { runBetta } from './modules/statistics'
+include { addBetta } from './modules/statistics' params(
     fdr_method: params.fdr_method
 )
-include breakaway from './modules/statistics'
-include collectBreakaway from './modules/statistics' params(
+include { breakaway } from './modules/statistics'
+include { collectBreakaway } from './modules/statistics' params(
     output_folder: output_folder,
     output_prefix: params.output_prefix
 )
 
 // Import the workflow used for composition analysis
-include metaphlan2_fastq from './modules/composition' params(
+include { metaphlan2_fastq } from './modules/composition' params(
     output_folder: output_folder
 )
 // include join_metaphlan2 from './modules/composition'
-include addMetaPhlAn2Results from './modules/general'
+include { addMetaPhlAn2Results } from './modules/general'
 
 // Process to publish specific output files
-include publish as publishGeneAbundances from './modules/general' params(
+include { publish as publishGeneAbundances } from './modules/general' params(
     output_folder: "${output_folder}/abund/"
 )
 
@@ -317,42 +316,41 @@ workflow {
     if (!params.nopreprocess) {
 
         // Run the entire preprocessing workflow
-        preprocess_wf(
+        Preprocess_wf(
             manifest_qced.valid_paired_indexed,
              manifest_qced.valid_paired
         )
 
-        // Combine the reads by specimen name
-        combineReads(preprocess_wf.out.groupTuple())
+        combined_reads = Preprocess_wf
 
     } else {
         // If the user specified --nopreprocess, then just 
         // read the manifest and combine by specimen
-        combineReads(
+        CombineReads(
             manifest_qced.valid_paired.mix(manifest_qced.valid_paired_indexed)
             .map { 
                 r -> [r.specimen, file(r.R1), file(r.R2)]
             }.groupTuple()
         )
-    }
-
-    // If the user specified --savereads, write out the manifest
-    if (params.savereads) {
-        writeManifest(
-            combineReads.out
-        )
+        combined_reads = CombineReads
+        // If the user specified --savereads, write out the manifest
+        if (params.savereads) {
+            writeManifest(
+                combined_reads.out
+            )
+        }        
     }
 
     // Count the reads for every sample individually (just take the first of the pair of reads)
     countReads(
-        combineReads.out.map {
+        combined_reads.out.map {
             r -> [r[0], r[1], r[2]]
         }
     )
 
     // Make a summary of every sample and write it out to --output
     countReadsSummary(
-        countReads.out.collect()
+        countReads.collect()
     )
 
     // ##########################
@@ -360,7 +358,7 @@ workflow {
     // ##########################
     if (params.composition) {
         metaphlan2_fastq(
-            combineReads.out.map {
+            combined_reads.out.map {
                 r -> [r[0], r[1], r[2]]
             }
         )
@@ -380,7 +378,7 @@ workflow {
 
         // Run the assembly and annotation workflow (in modules/assembly.nf)
         assembly_wf(
-            combineReads.out
+            combined_reads.out
         )
 
         gene_fasta = assembly_wf.out.gene_fasta
@@ -398,7 +396,7 @@ workflow {
     // Run the alignment-based analysis steps (in modules/alignment.nf)
     alignment_wf(
         gene_fasta,
-        combineReads.out,
+        combined_reads.out,
         params.output_prefix
     )
 
