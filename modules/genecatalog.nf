@@ -1,7 +1,25 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
-
+nextflow.preview.dsl=2
 // Default parameters
 params.output_prefix = "geneshot"
+// Assembly options
+params.gene_fasta = false
+params.phred_offset = 33 // spades
+params.min_identity = 90 // linclust and reference genome alignment
+params.min_coverage = 50 // linclust and reference genome alignment
+// Default values for boolean flags
+// If these are not set by the user, then they will be set to the values below
+// This is useful for the if/then control syntax below
+params.help = false
+params.output = './results/'
+params.manifest = null
+
+// Make sure that --output ends with trailing "/" characters
+if (!params.output.endsWith("/")){
+    params.output_folder = params.output.concat("/")
+} else {
+    params.output_folder = params.output
+}
 
 // Containers
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
@@ -710,5 +728,65 @@ process AlignAlleles {
 
     fi
     """
+}
+
+//
+// Steps to run gene-catalog independently.
+//
+
+
+// imports
+include { Read_manifest } from './general'
+
+// Function which prints help message text
+def helpMessage() {
+    log.info"""
+    Usage:
+
+    nextflow run Golob-Minot/geneshot <ARGUMENTS>
+    
+    Required Arguments:
+      --manifest            CSV file listing samples (see below)
+
+    Options:
+      --output              Folder to place analysis outputs (default ./results)
+      --output_prefix       Text used as a prefix for summary HDF5 output files (default: geneshot)
+      -w                    Working directory. Defaults to `./work`
+
+    For Assembly:
+      --gene_fasta          (optional) Compressed FASTA with pre-generated catalog of microbial genes.
+                            If provided, then the entire de novo assembly process will be skipped entirely.
+      --phred_offset        for spades. Default 33.
+      --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90)
+      --min_coverage        Length cutoff used to combine similar genes (default: 50) (linclust)
+
+    Manifest:
+      The manifest is a CSV with a header indicating which samples correspond to which files.
+      The file must contain a column `specimen`. This CANNOT be repeated. One row per specimen
+      Data is only accepted as paired reads.
+      Reads are specified by columns, `R1` and `R2`.
+      These MUST be preprocessed for this workflow.
+    """.stripIndent()
+}
+
+workflow {
+    main:
+
+ 
+    // Show help message if the user specifies the --help flag at runtime
+    if (params.help || params.manifest == null){
+        // Invoke the function above which prints the help message
+        helpMessage()
+        // Exit out and do not run anything else
+        exit 0
+    }
+    // Read and validate manifest
+    manifest_file = Channel.from(file(params.manifest))
+    manifest = Read_manifest(manifest_file).valid_paired
+
+
+    Genecatalog_wf(
+        manifest.map{ [it.specimen, file(it.R1), file(it.R2)] }
+  )
 
 }
