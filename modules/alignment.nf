@@ -104,6 +104,10 @@ workflow alignment_wf {
         output_prefix
     )
 
+    // Output the abundances
+    OutputSpecimenGeneAbundance(
+        AssembleAbundances.out.abundance_zarr_tar
+    )
     //
     //  CAG Stuff starts here
     //
@@ -518,6 +522,76 @@ logging.info("Done")
 
 }
 
+process OutputSpecimenGeneAbundance {
+    tag "Output specimen-gene-abundances"
+    container "${container__collection}"
+    label "mem_veryhigh"
+    errorStrategy 'finish'
+    publishDir "${params.output_folder}/abund/gene/", mode: "copy"
+
+    input:
+        path gene_abundances_zarr_tar
+    
+    output:
+        path gene_abundances_zarr_tar
+        path 'specimen_gene_abundance_long.csv.gz'
+    
+"""
+#!/usr/bin/env python3
+import tarfile
+import zarr
+import gzip
+import csv
+import os
+import json
+
+with tarfile.open("${gene_abundances_zarr_tar}") as tar:
+    tar.extractall()
+
+# Make sure that the expected contents are present
+for fp in [
+    "gene_names.json.gz",
+    "sample_names.json.gz",
+    "gene_abundance.zarr",
+    "gene_nreads.zarr",
+]:
+    assert os.path.exists(fp)
+
+# Read in the gene names and sample names as indexed in the zarr
+with gzip.open("gene_names.json.gz", "rt") as handle:
+    gene_names = json.load(handle)
+with gzip.open("sample_names.json.gz", "rt") as handle:
+    sample_names = json.load(handle)
+
+z_ra = zarr.open("gene_abundance.zarr", mode="r")
+z_rc = zarr.open("gene_nreads.zarr", mode="r")
+
+with gzip.open('specimen_gene_abundance_long.csv.gz', 'wt') as out_h:
+    out_w = csv.writer(out_h)
+    out_w.writerow(
+        (
+            'specimen',
+            'gene',
+            'rel_abd',
+            'nreads'
+        )
+    )
+    for gene_ix, gene_name in enumerate(gene_names):
+        gene_ra = z_ra[gene_ix, :]
+        gene_rc = z_rc[gene_ix, :]
+        out_w.writerows((
+            (
+                sample_names[sam_i],
+                gene_name,
+                sg_ra,
+                sg_rc,
+            )
+            for sam_i, (sg_ra, sg_rc) in enumerate(zip(gene_ra, gene_rc)) 
+            if sg_rc > 0
+        ))
+"""
+
+}
 
 // Summarize the abundance of every CAG across each sample
 process calcCAGabund {
