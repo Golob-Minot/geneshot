@@ -347,6 +347,7 @@ with gzip.open("alleles.faa.gz", 'wt') as allele_h:
 
 with gzip.open("allele_info.csv.gz", 'wt') as allele_info_h:
     allele_w = csv.DictWriter(allele_info_h, fieldnames=['allele', 'specimen_allele', 'specimen', 'contig', 'catalog_gene'])
+    allele_w.writeheader()
     allele_w.writerows(specimen_allele_info.values())
 """
 }
