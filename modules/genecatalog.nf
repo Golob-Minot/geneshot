@@ -7,6 +7,7 @@ params.output_prefix = "geneshot"
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 container__prodigal = 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
+container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 
 include { DiamondDB } from "./alignment" params(
     output_folder: params.output_folder
@@ -125,10 +126,15 @@ workflow Genecatalog_wf {
             AlignAlleles.out
         )
     )
-
+    // Make a dereplicated allele catalog 
+    DereplicateAlleles(
+        AnnotateAssemblies.out.collect{ it[0] }, // specimens
+        AnnotateAssemblies.out.collect{ it[2] }, // specimen allele FAA
+        AnnotateAssemblies.out.collect{ it[1] }, // specimen allele info CSV
+    )
     emit:
         gene_fasta = renameGenes.out
-        allele_assembly_csv_list = AnnotateAssemblies.out.toSortedList()
+        allele_assembly_csv_list = AnnotateAssemblies.out.map{ it[1] }.toSortedList()
 
 }
 
@@ -280,112 +286,68 @@ gzip ${specimen}.fna
 }
 
 
-// Summarize the depth of sequencing and GC content for every assembled gene
-process ParseGeneAnnotations {
-    tag "Summarize every assembled gene"
-    container "${container__pandas}"
+// Dereplicate and output alleles
+process DereplicateAlleles {
+    tag "Dereplicate and output *alleles*"
+    container "${container__fastatools}"
     label 'mem_medium'
     errorStrategy 'finish'
     
     input:
-    tuple val(specimen), file(faa)
+    val(specimens)
+    file(faas)
+    file(specimen_allele_csvs)
     
     output:
-    tuple val(specimen), file("${specimen}.gene_annotations.csv.gz")
+    path "allele_info.csv.gz"
+    path "alleles.faa.gz"
+
+    publishDir "${params.output_folder}/genecatalog/", mode: "copy"
 
 """
 #!/usr/bin/env python3
 import gzip
-import pandas as pd
+from collections import defaultdict
+import fastalite
+import csv
 
-# Function to parse a FASTA file with information encoded by Prodigal and Megahit in the header
-def parse_prodigal_faa(fp):
+# First load in the per_specimen_allele -> contig and catalog_gene
+sp_allele_csvs = "${specimen_allele_csvs.join(';;')}".split(';;')
+specimen_allele_info = {}
+for sac in sp_allele_csvs:
+    sac_r = csv.DictReader(gzip.open(sac, 'rt'))
+    specimen_allele_info.update({
+        r['gene_name']: {
+            'specimen_allele': r['gene_name'],
+            'specimen': r['specimen'],
+            'catalog_gene': r['catalog_gene'],
+            'contig': r['contig']
+        } 
+        for r in sac_r
+    })
+specimens = "${specimens.join(';;')}".split(';;')
+allele_faas = "${faas.join(';;')}".split(';;')
 
-    # Keep track of all of the information for each assembled gene
-    dat = []
+centroid_allele = defaultdict(set)
 
-    # Open a connection to the file
-    with gzip.open(fp, "rt") as f:
+for faa in allele_faas:
+    for sr in fastalite.fastalite(gzip.open(faa, 'rt')):
+        centroid_allele[sr.seq].add(sr.id)
 
-        # Iterate over every line
-        for line in f:
+# Great, now rename and output alleles into fasta format
+with gzip.open("alleles.faa.gz", 'wt') as allele_h:
+    for centroid_n, (centroid_seq, seq_ids) in enumerate(centroid_allele.items()):
+        centroid_id = "allele___{:010X}".format(centroid_n+1)
+        for sID in seq_ids:
+            specimen_allele_info[sID]['allele'] = centroid_id
+        allele_h.write(">{}\\n{}\\n".format(
+            centroid_id,
+            centroid_seq
+        ))
 
-            # Skip the non-header lines
-            if line.startswith(">") is False:
-                continue
-
-            # Add the information for this header
-            dat.append(parse_header(line))
-
-    return pd.DataFrame(dat)
-
-# Function to parse a single header
-def parse_header(line):
-
-    # The header line follows a format somewhat like this:
-    # >Mock__15__GENE__k21_0__flag=1__multi=20.5919__len=48411_1 # 510 # 716 # -1 # ID=1_1;partial=00;start_type=ATG;rbs_motif=GGAG/GAGG;rbs_spacer=5-10bp;gc_cont=0.386
-    #  ------------------------GENE_NAME------------------------   START STOP  STRAND
-    #  SPECIMEN        CONTIG -----------NAME_DETAILS-----------                    -----------------------------------HEADER_DETAILS-----------------------------------
-
-    # First let's just get the gene name
-    gene_name, header = line[1:].rstrip("\\n").lstrip(">").split(" ", 1)
-
-    # The "__GENE__" separator is used to preserve the specimen name within the gene name
-    specimen, gene_remainder = gene_name.split("__GENE__", 1)
-
-    # The contig name is the next field encoded in the gene name
-    contig, gene_remainder = gene_remainder.split("__", 1)
-
-    # The rest of the gene details are encoded in the gene_remainder (delimited by __)
-    # as well as the final string in the header (delimited by ;)
-
-    # We can parse the gene_remainder details with the __ delimiter and the =
-    # We have to make sure to strip off the gene index number
-
-    output_dat = dict([
-        (field.split("=",1)[0], field.split("=",1)[1].split("_", 1)[0])
-        for field in gene_remainder.split("__")
-    ])
-
-    # Now let's add in the details from the header
-    start, stop, strand, header = header.strip(" ").strip("#").split(" # ")
-
-    # Iterate over each of the elements provided
-    for f in header.split(";"):
-        if "=" in f:
-            k, v = f.split("=", 1)
-            output_dat[k] = v
-    assert "gc_cont" in output_dat, (output_dat, line)
-
-    # Add the other metrics to the output
-    output_dat["gene_name"] = gene_name
-    output_dat["start"] = int(start)
-    output_dat["stop"] = int(stop)
-    output_dat["strand"] = strand
-    output_dat["specimen"] = specimen
-    output_dat["contig"] = contig
-
-    # Make some customizations to the data types
-    del output_dat["ID"]
-    for k, t in [
-        ("strand", int), 
-        ("len", int), 
-        ("multi", float), 
-        ("gc_cont", float)
-    ]:
-        assert k in output_dat, (output_dat, line)
-        output_dat[k] = t(output_dat[k])
-
-    return output_dat
-
-# Parse and write out to a file
-parse_prodigal_faa("${faa}").to_csv(
-    "${specimen}.gene_annotations.csv.gz",
-    index = None,
-    compression = "gzip"
-)
-
-
+with gzip.open("allele_info.csv.gz", 'wt') as allele_info_h:
+    allele_w = csv.DictWriter(allele_info_h, fieldnames=['allele', 'specimen_allele', 'specimen', 'contig', 'catalog_gene'])
+    allele_w.writerows(specimen_allele_info.values())
 """
 }
 
@@ -399,10 +361,10 @@ process AnnotateAssemblies {
     publishDir "${params.output_folder}/genecatalog/${specimen}", mode: "copy"
     
     input:
-    tuple val(specimen), file(assembly_csv), file(alignment_tsv)
+    tuple val(specimen), file(faa), file(assembly_csv), file(alignment_tsv)
     
     output:
-    file "${specimen}.csv.gz"
+    tuple val(specimen), path("${specimen}.csv.gz"), path(faa)
 
 """
 #!/usr/bin/env python3
@@ -449,6 +411,92 @@ assembly_df.to_csv(
     compression = "gzip"
 )
 
+"""
+}
+
+// Summarize the depth of sequencing and GC content for every assembled gene
+process ParseGeneAnnotations {
+    tag "Summarize every assembled gene"
+    container "${container__pandas}"
+    label 'mem_medium'
+    errorStrategy 'finish'
+    
+    input:
+    tuple val(specimen), file(faa)
+    
+    output:
+    tuple val(specimen), file(faa), file("${specimen}.gene_annotations.csv.gz")
+
+"""
+#!/usr/bin/env python3
+import gzip
+import pandas as pd
+# Function to parse a FASTA file with information encoded by Prodigal and Megahit in the header
+def parse_prodigal_faa(fp):
+    # Keep track of all of the information for each assembled gene
+    dat = []
+    # Open a connection to the file
+    with gzip.open(fp, "rt") as f:
+        # Iterate over every line
+        for line in f:
+            # Skip the non-header lines
+            if line.startswith(">") is False:
+                continue
+            # Add the information for this header
+            dat.append(parse_header(line))
+    return pd.DataFrame(dat)
+# Function to parse a single header
+def parse_header(line):
+    # The header line follows a format somewhat like this:
+    # >Mock__15__GENE__k21_0__flag=1__multi=20.5919__len=48411_1 # 510 # 716 # -1 # ID=1_1;partial=00;start_type=ATG;rbs_motif=GGAG/GAGG;rbs_spacer=5-10bp;gc_cont=0.386
+    #  ------------------------GENE_NAME------------------------   START STOP  STRAND
+    #  SPECIMEN        CONTIG -----------NAME_DETAILS-----------                    -----------------------------------HEADER_DETAILS-----------------------------------
+    # First let's just get the gene name
+    gene_name, header = line[1:].rstrip("\\n").lstrip(">").split(" ", 1)
+    # The "__GENE__" separator is used to preserve the specimen name within the gene name
+    specimen, gene_remainder = gene_name.split("__GENE__", 1)
+    # The contig name is the next field encoded in the gene name
+    contig, gene_remainder = gene_remainder.split("__", 1)
+    # The rest of the gene details are encoded in the gene_remainder (delimited by __)
+    # as well as the final string in the header (delimited by ;)
+    # We can parse the gene_remainder details with the __ delimiter and the =
+    # We have to make sure to strip off the gene index number
+    output_dat = dict([
+        (field.split("=",1)[0], field.split("=",1)[1].split("_", 1)[0])
+        for field in gene_remainder.split("__")
+    ])
+    # Now let's add in the details from the header
+    start, stop, strand, header = header.strip(" ").strip("#").split(" # ")
+    # Iterate over each of the elements provided
+    for f in header.split(";"):
+        if "=" in f:
+            k, v = f.split("=", 1)
+            output_dat[k] = v
+    assert "gc_cont" in output_dat, (output_dat, line)
+    # Add the other metrics to the output
+    output_dat["gene_name"] = gene_name
+    output_dat["start"] = int(start)
+    output_dat["stop"] = int(stop)
+    output_dat["strand"] = strand
+    output_dat["specimen"] = specimen
+    output_dat["contig"] = contig
+    # Make some customizations to the data types
+    del output_dat["ID"]
+    for k, t in [
+        ("strand", int), 
+        ("len", int), 
+        ("multi", float), 
+        ("gc_cont", float)
+    ]:
+        assert k in output_dat, (output_dat, line)
+        output_dat[k] = t(output_dat[k])
+    return output_dat
+# Parse and write out to a file
+parse_prodigal_faa("${faa}").to_csv(
+    "${specimen}.gene_annotations.csv.gz",
+    index = None,
+    compression = "gzip"
+)
 """
 }
 
