@@ -65,7 +65,7 @@ workflow Genecatalog_wf {
 
     // Calculate summary metrics for every assembled gene in each sample
     ParseGeneAnnotations(
-        Prodigal.out[0]
+        Prodigal.out[0].map{ r -> [r[0], r[1]]}
     )
 
     // Combine genes by amino acid identity in five rounds
@@ -115,7 +115,7 @@ workflow Genecatalog_wf {
 
     // Align the assembled alleles against the gene centroids
     AlignAlleles(
-        Prodigal.out[0],
+        Prodigal.out[0].map{ r -> [r[0], r[1]]},
         DiamondDB.out
     )
 
