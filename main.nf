@@ -210,7 +210,7 @@ include { repackHDF as repackDetailedHDF } from './modules/general' params(
 )
 
 // Import the workflows used for assembly
-include { assembly_wf } from './modules/assembly' params(
+include { Genecatalog_wf } from './modules/genecatalog' params(
     output_folder: output_folder,
     output_prefix: params.output_prefix,
     phred_offset: params.phred_offset,
@@ -224,7 +224,7 @@ include { assembly_wf } from './modules/assembly' params(
 )
 
 // Import the workflows used for annotation
-include { annotation_wf } from './modules/assembly' params(
+include { annotation_wf } from './modules/genecatalog' params(
     output_folder: output_folder,
     phred_offset: params.phred_offset,
     min_identity: params.min_identity,
@@ -374,11 +374,11 @@ workflow {
     } else {
 
         // Run the assembly and annotation workflow (in modules/assembly.nf)
-        assembly_wf(
+        Genecatalog_wf(
             combined_reads.out
         )
 
-        gene_fasta = assembly_wf.out.gene_fasta
+        gene_fasta = Genecatalog_wf.out.gene_fasta
     }
 
     // Run the annotation steps on the gene catalog
@@ -449,7 +449,7 @@ workflow {
         addGeneAssembly(
             collectAbundances.out,
             alignment_wf.out.detailed_hdf,
-            assembly_wf.out.allele_assembly_csv_list
+            Genecatalog_wf.out.allele_assembly_csv_list
         )
         resultsHDF = addGeneAssembly.out[0]
         detailedHDF = addGeneAssembly.out[1]

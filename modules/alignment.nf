@@ -78,14 +78,14 @@ workflow alignment_wf {
     main:
 
     // Make a DIAMOND indexed database from those gene sequences
-    diamondDB(
+    DiamondDB(
         gene_fasta
     )
 
     // Align all specimens against the DIAMOND database
     diamond(
         reads_ch,
-        diamondDB.out
+        DiamondDB.out
     )
 
     // Filter to the most likely single alignment per query
@@ -165,7 +165,7 @@ workflow alignment_wf {
 }
 
 // Align each sample against the reference database of genes using DIAMOND
-process diamondDB {
+process DiamondDB {
     tag "Make a DIAMOND database"
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_veryhigh'

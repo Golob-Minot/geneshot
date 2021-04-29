@@ -6,8 +6,9 @@ params.output_prefix = "geneshot"
 // Containers
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+container__prodigal = 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
 
-include { diamondDB } from "./alignment" params(
+include { DiamondDB } from "./alignment" params(
     output_folder: params.output_folder
 )
 include { linclust as linclustRound1 } from "./mmseqs" params(
@@ -46,25 +47,25 @@ include { diamondDedup as dedupRound5 } from "./mmseqs" params(
     min_identity: params.min_identity
 )
 
-workflow assembly_wf {
+workflow Genecatalog_wf {
     take:
         combined_reads_ch
 
     main:
 
     // Perform de novo assembly
-    assembly(
+    Assembly(
         combined_reads_ch
     )
 
     // Annotate those contigs with Prokka
-    prodigal(
-        assembly.out
+    Prodigal(
+        Assembly.out
     )
 
     // Calculate summary metrics for every assembled gene in each sample
-    parseGeneAnnotations(
-        prodigal.out[0]
+    ParseGeneAnnotations(
+        Prodigal.out[0]
     )
 
     // Combine genes by amino acid identity in five rounds
@@ -72,7 +73,7 @@ workflow assembly_wf {
     // linclust provides fast symmetrical overlap search, while
     // DIAMOND performs slower, asymmetrical overlap search
     linclustRound1(
-        prodigal.out[0].map{ r -> r[1]}.toSortedList().flatten().collate(4)
+        Prodigal.out[0].map{ r -> r[1]}.toSortedList().flatten().collate(4)
     )
     dedupRound1(
         linclustRound1.out
@@ -108,26 +109,26 @@ workflow assembly_wf {
     )
 
     // Index the assembled alleles for alignment
-    diamondDB(
+    DiamondDB(
         renameGenes.out
     )
 
     // Align the assembled alleles against the gene centroids
-    alignAlleles(
-        prodigal.out[0],
-        diamondDB.out
+    AlignAlleles(
+        Prodigal.out[0],
+        DiamondDB.out
     )
 
     // Join the gene annotation tables with the gene assignments
-    annotateAssemblies(
-        parseGeneAnnotations.out.join(
-            alignAlleles.out
+    AnnotateAssemblies(
+        ParseGeneAnnotations.out.join(
+            AlignAlleles.out
         )
     )
 
     emit:
         gene_fasta = renameGenes.out
-        allele_assembly_csv_list = annotateAssemblies.out.toSortedList()
+        allele_assembly_csv_list = AnnotateAssemblies.out.toSortedList()
 
 }
 
@@ -200,13 +201,13 @@ workflow annotation_wf {
 
 
 // De novo assembly
-process assembly {
+process Assembly {
     tag "De novo metagenomic assembly"
     container "${container__assembler}"
     label 'mem_veryhigh'
     errorStrategy "finish"
 
-    publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
+    publishDir "${params.output_folder}/genecatalog/${specimen}", mode: "copy"
 
     input:
         tuple val(specimen), file(R1), file(R2)
@@ -244,18 +245,18 @@ echo -e "\\nDone\\n"
 
 // Annotation of coding sequences with prodigal
 
-process prodigal {
+process Prodigal {
     tag "Identify protein-coding genes"
-    container 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
+    container "${container__prodigal}"
     label 'mem_medium'
     errorStrategy "finish"
-    publishDir "${params.output_folder}/assembly/${specimen}/", mode: "copy"
+    publishDir "${params.output_folder}/genecatalog/${specimen}/", mode: "copy"
 
     input:
         tuple val(specimen), file(contigs), file(spades_log)
     
     output:
-        tuple val(specimen), file("${specimen}.faa.gz")
+        tuple val(specimen), file("${specimen}.faa.gz"), file("${specimen}.fna.gz")
         file "${specimen}.gff.gz"
     
 """
@@ -265,6 +266,7 @@ gunzip -c ${contigs} > ${specimen}.contigs.fasta
 
 prodigal \
     -a ${specimen}.faa \
+    -d ${specimen}.fna \
     -i  ${specimen}.contigs.fasta \
     -f gff \
     -o ${specimen}.gff \
@@ -272,13 +274,14 @@ prodigal \
 
 gzip ${specimen}.gff
 gzip ${specimen}.faa
+gzip ${specimen}.fna
 
 """
 }
 
 
 // Summarize the depth of sequencing and GC content for every assembled gene
-process parseGeneAnnotations {
+process ParseGeneAnnotations {
     tag "Summarize every assembled gene"
     container "${container__pandas}"
     label 'mem_medium'
@@ -387,13 +390,13 @@ parse_prodigal_faa("${faa}").to_csv(
 }
 
 // Combine the assembly table with the assignment of catalog genes
-process annotateAssemblies {
+process AnnotateAssemblies {
     tag "Summarize every assembled gene"
     container "${container__pandas}"
     label 'mem_medium'
     errorStrategy 'finish'
 
-    publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
+    publishDir "${params.output_folder}/genecatalog/${specimen}", mode: "copy"
     
     input:
     tuple val(specimen), file(assembly_csv), file(alignment_tsv)
@@ -613,7 +616,7 @@ with gzip.open("genes.fasta.gz", "wt") as fo:
 }
 
 // Use alignment to figure out which assembled allele was grouped into which gene
-process alignAlleles {
+process AlignAlleles {
     tag "Match alleles to gene centroids"
     container "quay.io/fhcrc-microbiome/famli:v1.5"
     label 'mem_medium'
