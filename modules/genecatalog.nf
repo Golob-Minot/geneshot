@@ -743,7 +743,7 @@ def helpMessage() {
     log.info"""
     Usage:
 
-    nextflow run Golob-Minot/geneshot <ARGUMENTS>
+    nextflow run Golob-Minot/geneshot/modules/genecatalog.nf <ARGUMENTS>
     
     Required Arguments:
       --manifest            CSV file listing samples (see below)
@@ -754,8 +754,6 @@ def helpMessage() {
       -w                    Working directory. Defaults to `./work`
 
     For Assembly:
-      --gene_fasta          (optional) Compressed FASTA with pre-generated catalog of microbial genes.
-                            If provided, then the entire de novo assembly process will be skipped entirely.
       --phred_offset        for spades. Default 33.
       --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90)
       --min_coverage        Length cutoff used to combine similar genes (default: 50) (linclust)

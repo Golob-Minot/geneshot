@@ -1,3 +1,5 @@
+nextflow.preview.dsl=2
+
 // containers
 container__FAMLI = 'quay.io/fhcrc-microbiome/famli:v1.5'
 container__collection = 'quay.io/fhcrc-microbiome/experiment-collection:v0.2'
@@ -11,6 +13,14 @@ params.distance_threshold = 0.5
 params.distance_metric = "cosine"
 params.linkage_type = "average"
 params.famli_batchsize = 10000000
+
+// Alignment options
+params.dmnd_min_identity = 80 // DIAMOND
+params.dmnd_min_coverage = 50 // DIAMOND
+params.dmnd_top_pct = 1 // DIAMOND
+params.dmnd_min_score = 20 // DIAMOND
+params.gencode = 11 //DIAMOND
+params.sd_mean_cutoff = 3.0 // FAMLI
 
 include { makeInitialCAGs } from "./make_cags" params(
     distance_threshold: params.distance_threshold / 2,
@@ -715,4 +725,87 @@ df.reset_index(
 
 logging.info("Done")
     """
+}
+
+//
+// Steps to run alignment independently.
+//
+// Default values for boolean flags
+// If these are not set by the user, then they will be set to the values below
+// This is useful for the if/then control syntax below
+params.help = false
+params.output = './results/'
+params.manifest = null
+params.output_prefix = 'geneshot'
+params.gene_fasta = null
+
+
+
+// Make sure that --output ends with trailing "/" characters
+if (!params.output.endsWith("/")){
+    params.output_folder = params.output.concat("/")
+} else {
+    params.output_folder = params.output
+}
+
+// imports
+include { Read_manifest } from './general'
+
+// Function which prints help message text
+def helpMessage() {
+    log.info"""
+    Usage:
+
+    nextflow run Golob-Minot/geneshot/modules/alignment.nf <ARGUMENTS>
+    
+    Required Arguments:
+      --manifest            CSV file listing samples (see below)
+      --gene_fasta          Compressed FASTA with pre-generated catalog of microbial genes.
+
+
+    Options:
+      --output              Folder to place analysis outputs (default ./results)
+      --output_prefix       Text used as a prefix for summary HDF5 output files (default: geneshot)
+      -w                    Working directory. Defaults to `./work`
+
+    For Alignment:
+      --dmnd_min_identity   Amino acid identity cutoff used to align short reads (default: 90) (DIAMOND)
+      --dmnd_min_coverage   Query coverage cutoff used to align short reads (default: 50) (DIAMOND)
+      --dmnd_top_pct        Keep top X% of alignments for each short read (default: 1) (DIAMOND)
+      --dmnd_min_score      Minimum score for short read alignment (default: 20) (DIAMOND)
+      --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
+      --sd_mean_cutoff      Ratio of standard deviation / mean depth of sequencing used to filter genes (default: 3.0) (FAMLI)
+      --famli_batchsize     Number of alignments to deduplicate in batches (default: 10000000) (FAMLI)
+
+    Manifest:
+      The manifest is a CSV with a header indicating which samples correspond to which files.
+      The file must contain a column `specimen`. This CANNOT be repeated. One row per specimen.
+      Data is only accepted as paired reads.
+      Reads are specified by columns, `R1` and `R2`.
+      These MUST be preprocessed for this workflow.
+    """.stripIndent()
+}
+
+workflow {
+    main:
+
+ 
+    // Show help message if the user specifies the --help flag at runtime
+    if (params.help || params.manifest == null || params.gene_fasta == null){
+        // Invoke the function above which prints the help message
+        helpMessage()
+        // Exit out and do not run anything else
+        exit 0
+    }
+    // Read and validate manifest
+    manifest_file = Channel.from(file(params.manifest))
+    manifest = Read_manifest(manifest_file).valid_paired
+
+
+    Alignment_wf(
+        file( params.gene_fasta ),
+        manifest.map{ [it.specimen, file(it.R1), file(it.R2)] },
+        params.output_prefix
+  )
+
 }
