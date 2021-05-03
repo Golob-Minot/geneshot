@@ -28,7 +28,7 @@ workflow composition_wf {
     publishDir path: "${params.output_folder}MetaPhlAn2/", mode: "copy"
 
     input:
-    tuple specimen, file(R1), file(R2)
+    tuple val(specimen), file(R1), file(R2)
     
     output:
     tuple val(specimen), file("${specimen}.metaphlan2.tsv")
@@ -54,7 +54,7 @@ metaphlan2.py --nproc ${task.cpus} --input_type sam -t rel_ab_w_read_stats -o ${
     publishDir path: "${params.output_folder}MetaPhlAn2/", mode: "copy"
 
     input:
-    tuple specimen, file(R1)
+    tuple val(specimen), file(R1)
     
     output:
     tuple val(specimen), file("${specimen}.metaphlan2.tsv")
