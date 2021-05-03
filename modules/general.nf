@@ -306,8 +306,8 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
     # Write to HDF5
     breakaway_df.to_hdf(store, "/summary/breakaway")
 
-    # Write out a combined table
-    pd.concat(
+    # Create a combined table
+    summary_all = pd.concat(
         [
             readcount_df.set_index("specimen"),
             specimen_gene_count_df.set_index("specimen"),
@@ -320,7 +320,10 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
         columns = dict([
             ("index", "specimen")
         ])
-    ).to_hdf(
+    )
+
+    # Write out a combined table
+    summary_all.to_hdf(
         store,
         "/summary/all"
     )
