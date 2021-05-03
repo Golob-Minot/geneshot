@@ -1,4 +1,4 @@
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 // containers
 container__FAMLI = 'quay.io/fhcrc-microbiome/famli:v1.5'
