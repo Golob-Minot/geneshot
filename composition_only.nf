@@ -86,8 +86,8 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include read_manifest from './modules/general'
-include preprocess_wf from './modules/preprocess' params(
+include { read_manifest } from './modules/general'
+include { preprocess_wf } from './modules/preprocess' params(
     adapter_F: params.adapter_F,
     adapter_R: params.adapter_R,
     hg_index: params.hg_index,
@@ -95,13 +95,13 @@ include preprocess_wf from './modules/preprocess' params(
     min_hg_align_score: params.min_hg_align_score,
 )
 // Import some general tasks
-include combineReads from './modules/general' params(
+include { combineReads } from './modules/general' params(
     savereads: params.savereads,
     output_folder: output_folder
 )
 
 // Import from composition_wf module
-include composition_wf from './modules/composition' params(
+include { composition_wf } from './modules/composition' params(
     output_folder: params.output_folder
 )
 

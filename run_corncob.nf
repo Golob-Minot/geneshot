@@ -59,38 +59,38 @@ if (params.help || params.input_hdf == false || params.input_folder == false || 
 }
 
 // Import the process used to shard CAGs for corncob
-include splitCorncob from './modules/statistics' params(
+include { splitCorncob } from './modules/statistics' params(
     corncob_batches: params.corncob_batches
 )
 
 // Import the process used for statistical analysis
-include runCorncob from './modules/statistics' params(
+include { runCorncob } from './modules/statistics' params(
     formula: params.formula
 )
 
 // Import the process used to join the results for multiple formulae
-include joinCorncob from './modules/statistics' params(
+include { joinCorncob } from './modules/statistics' params(
     output_folder: params.output_folder
 )
 
 // Import the process used to aggregate readcounts across all samples
 // This process is only run if `abund/CAG.readcounts.csv.gz` can not be found yet
 // After the process completes, a new `abund/CAG.readcounts.csv.gz` will be added to that input folder
-include extractCounts from './modules/statistics' params(
+include { extractCounts } from './modules/statistics' params(
     output_folder: params.input_folder
 )
 
 // Import the processes needed to run meta-analysis of corncob results by annotation
-include runBetta from './modules/statistics'
-include addBetta from './modules/statistics' params(
+include { runBetta } from './modules/statistics'
+include { addBetta } from './modules/statistics' params(
     fdr_method: params.fdr_method
 )
 
 // Import the process used to add corncob results to the output
-include repackHDF from './modules/general' params(
+include { repackHDF } from './modules/general' params(
     output_folder: params.output_folder
 )
-include addCorncobResults from './modules/general' params(
+include { addCorncobResults } from './modules/general' params(
     fdr_method: params.fdr_method
 )
 
