@@ -80,7 +80,7 @@ include repackHDF from './modules/general' params(
 )
 
 // Import the workflows used for annotation
-include annotation_wf from './modules/assembly' params(
+include annotation_wf from './modules/genecatalog' params(
     output_folder: params.output_folder,
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,

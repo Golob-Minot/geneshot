@@ -388,7 +388,7 @@ workflow {
 
     } else {
 
-        // Run the assembly and annotation workflow (in modules/assembly.nf)
+        // Run the assembly and annotation workflow (in modules/genecatalog.nf)
         Genecatalog_wf(
             combined_reads.out
         )
