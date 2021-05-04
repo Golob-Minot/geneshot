@@ -9,7 +9,7 @@
 */
 
 // Using DSL-2
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 // Parameters
 params.input_hdf = false
@@ -70,17 +70,17 @@ if (params.taxonomic_dmnd == false && params.eggnog_dmnd == false && params.eggn
 }
 
 // Import the process used to add annotation results to the output
-include readTaxonomy from './modules/general'
-include addTaxResults from './modules/general'
+include { readTaxonomy } from './modules/general'
+include { addTaxResults } from './modules/general'
 
-include addEggnogResults from './modules/general'
+include { addEggnogResults } from './modules/general'
 
-include repackHDF from './modules/general' params(
+include { repackHDF } from './modules/general' params(
     output_folder: params.output_folder
 )
 
 // Import the workflows used for annotation
-include annotation_wf from './modules/assembly' params(
+include { annotation_wf } from './modules/genecatalog' params(
     output_folder: params.output_folder,
     min_identity: params.min_identity,
     min_coverage: params.min_coverage,

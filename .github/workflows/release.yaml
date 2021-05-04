@@ -37,7 +37,7 @@ jobs:
           df -h
       - name:  Run geneshot
         run: |
-          NXF_VER=20.04.1 nextflow run main.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2,label1" --distance_threshold 0.5 -w work/ --eggnog_db false --eggnog_dmnd false --taxonomic_dmnd false -with-docker ubuntu:latest
+          NXF_VER=21.04.0 nextflow run main.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --hg_index data/hg_chr_21_bwa_index.tar.gz --formula "label1 + label2,label1" --distance_threshold 0.5 -w work/ --eggnog_db false --eggnog_dmnd false --taxonomic_dmnd false -with-docker ubuntu:latest
       - name:  Validate results
         run: |
           docker run --rm -v $PWD:/share quay.io/fhcrc-microbiome/python-pandas:v1.0.3 python3 /share/bin/validate_geneshot_output.py --results-hdf /share/output/geneshot.results.hdf5 --details-hdf /share/output/geneshot.details.hdf5 --check-corncob

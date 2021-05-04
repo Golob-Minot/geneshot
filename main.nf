@@ -20,7 +20,7 @@
 */
 
 // Using DSL-2
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 // Default values for boolean flags
 // If these are not set by the user, then they will be set to the values below
@@ -388,7 +388,7 @@ workflow {
 
     } else {
 
-        // Run the assembly and annotation workflow (in modules/assembly.nf)
+        // Run the assembly and annotation workflow (in modules/genecatalog.nf)
         Genecatalog_wf(
             combined_reads.out
         )

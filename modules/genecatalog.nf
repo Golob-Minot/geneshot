@@ -1,5 +1,5 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 // Default parameters
 params.output_prefix = "geneshot"
 // Assembly options
