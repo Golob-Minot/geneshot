@@ -210,7 +210,7 @@ process BWA_remove_human {
     tag "Remove human reads"
     container "${container__bwa}"
     errorStrategy 'finish'
-    label 'mem_veryhigh'
+    label 'multithread'
 
 
     input:
