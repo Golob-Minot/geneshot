@@ -211,6 +211,20 @@ def save_cag_data(r, results_store, details_store):
     # Save the table with CAG sizes
     copy_table(r, "cag_summary_metrics", results_store, "/annot/cag/all")
 
+    # Read the assignment of genes to CAGs
+    gene_cag_df = pd.read_hdf(
+        results_store, 
+        "/annot/gene/cag"
+    ).set_index(
+        "gene"
+    )
+
+    # Get the number of genes assigned to each CAG
+    cag_size = gene_cag_df["CAG"].value_counts()
+
+    # Save a dict with the number of genes for each CAG
+    r.set("cag_size_dict", cag_size.to_dict())
+
 
 def save_expt_data(r, results_store, details_store):
     """Save information related to experimental design."""
@@ -399,12 +413,6 @@ def save_tax_data(r, results_store, details_store):
     ).set_index(
         "gene"
     )
-
-    # Get the number of genes assigned to each CAG
-    cag_size = gene_cag_df["CAG"].value_counts()
-
-    # Save a dict with the number of genes for each CAG
-    r.set("cag_size_dict", cag_size.to_dict())
 
     # Make a combined DF with the genes that have both
     df = pd.DataFrame(dict(
