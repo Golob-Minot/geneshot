@@ -384,18 +384,25 @@ def save_tax_data(r, results_store, details_store):
         # Use the Taxonomy object to format the taxonomic assignment DF
         specimen_tax_df = tax.make_cag_tax_df(
             taxa_abund.loc[taxa_abund > 0]
-        ).sort_values(
-            by="count",
-            ascending=False
         )
-
-        # Save to redis
-        r.set(
-            f"specimen_abundance_tax {specimen}",
-            specimen_tax_df.drop(
-                columns=['rank', 'name', 'total']
+        
+        # If there are counts of taxonomic assignments for this CAG 
+        if "count" in specimen_tax_df.columns.values:
+            
+            # Sort by counts
+            specimen_tax_df.sort_values(
+                by="count",
+                ascending=False,
+                inplace=True
             )
-        )
+
+            # Save to redis
+            r.set(
+                f"specimen_abundance_tax {specimen}",
+                specimen_tax_df.drop(
+                    columns=['rank', 'name', 'total']
+                )
+            )
 
     # Save the ordination
     r.set(
