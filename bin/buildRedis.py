@@ -487,6 +487,9 @@ def save_tax_data(r, results_store, details_store):
             "count"
         ].to_dict()
 
+        # Get the size of each CAG
+        cag_size = pd.read_hdf(results_store, "/annot/cag/all").set_index("cag")["size"]
+
         # For each taxonomic rank
         for tax_rank, tax_rank_df in cag_tax_df.groupby("rank"):
 
