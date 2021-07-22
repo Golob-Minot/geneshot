@@ -387,10 +387,14 @@ def report_progress(iac):
 class SpecimenPCA:
     """Run PCA on a subset of genes to generate embeddings on specimens."""
 
-    def __init__(self, gene_abund, max_genes=100000, variance_cutoff=0.01):
+    def __init__(self, gene_abund, max_genes=1000000, variance_cutoff=0.001):
 
-        # Get the list of genes which will be used
-        gene_key_list = list(gene_abund.gene_ix.ix.keys())[:max_genes]
+        # Get the total list of genes which were detected
+        gene_key_list = list(gene_abund.gene_ix.ix.keys())
+        # Randomly sample up to `max_genes` of those genes
+        gene_key_list = pd.Series(gene_key_list).sample(
+            min(max_genes, len(gene_key_list))
+        ).tolist()
 
         n_genes = len(gene_key_list)
         n_specimens = len(specimen_list())
