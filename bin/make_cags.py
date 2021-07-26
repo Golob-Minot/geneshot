@@ -7,7 +7,6 @@ from functools import lru_cache
 import pandas as pd
 import numpy as np
 from scipy.spatial import distance
-from sklearn.decomposition import PCA
 import sys
 from time import time
 import logging
@@ -384,59 +383,6 @@ def report_progress(iac):
     return time()
 
 
-class SpecimenPCA:
-    """Run PCA on a subset of genes to generate embeddings on specimens."""
-
-    def __init__(self, gene_abund, max_genes=1000000, variance_cutoff=0.001):
-
-        # Get the total list of genes which were detected
-        gene_key_list = list(gene_abund.gene_ix.ix.keys())
-        # Randomly sample up to `max_genes` of those genes
-        gene_key_list = pd.Series(gene_key_list).sample(
-            min(max_genes, len(gene_key_list))
-        ).tolist()
-
-        n_genes = len(gene_key_list)
-        n_specimens = len(specimen_list())
-        logging.info(f"Running PCA on a subset of {n_genes:,} genes across all {n_specimens:,} specimens")
-
-        # Set up an empty array
-        abund_array = np.zeros((len(specimen_list()), len(gene_key_list)))
-
-        # Iterate over each of the genes which were selected
-        for gene_ix, gene_key in enumerate(gene_key_list):
-
-            # Get the abundance for this gene
-            a = make_dense_abund(
-                gene_abund.abund[
-                    gene_abund.gene_ix.get(
-                        gene_key
-                    )
-                ]
-            )
-
-            # Add the abundances for that gene to the array
-            abund_array[:, gene_ix] = a
-
-        # Set up PCA
-        self.pca = PCA()
-        
-        # Fit the data
-        self.pca.fit(abund_array.T)
-
-        # Calculate the number of dimensions which capture 1-variance_cutoff variance
-        cumulative_exp = np.cumsum(self.pca.explained_variance_ratio_)
-
-        # Set the maximum number of dimensions to use
-        self.max_dim = len(specimen_list())
-        for i, v in enumerate(cumulative_exp):
-            if v > (1 - variance_cutoff):
-                self.max_dim = (i + 1)
-                break
-
-        logging.info(f"Using {self.max_dim:,} / {len(specimen_list()):,} PCA dimensions")
-
-
 def co_assembly_boosted_clustering(
     contig_df,
     gene_abund,
@@ -446,13 +392,10 @@ def co_assembly_boosted_clustering(
     # Start the clock
     start_time = time()
 
-    # Start by running PCA on specimens using a random subset of genes
-    specimen_pca = SpecimenPCA(gene_abund)
-
     # Now let's use the approach where we add genes which are found on the same contig first
 
     # Set up the IAC object for the overall assembly
-    iac = IAC(max_dim=specimen_pca.max_dim)
+    iac = IAC(max_dim=len(specimen_list()))
     
     # Keep track of what genes have been added
     all_genes = set([])
@@ -489,11 +432,6 @@ def co_assembly_boosted_clustering(
             ]
         )
 
-        # Transform the abundance based on PCA weightings
-        embedded_abund = specimen_pca.pca.transform(
-            abund[np.newaxis, :]
-        )[0, :specimen_pca.max_dim]
-
         # If this is a new contig
         if current_contig is None or current_contig != r["contig"]:
 
@@ -515,12 +453,12 @@ def co_assembly_boosted_clustering(
 
             # Set up an object for the genes in this new contig
             current_contig = r["contig"]
-            current_contig_iac = IAC(max_dim=specimen_pca.max_dim)
+            current_contig_iac = IAC(max_dim=len(specimen_list()))
 
         # Add this gene to the IAC for this contig
         current_contig_iac.add(
             set([gene_ix]),
-            embedded_abund
+            abund
         )
 
         # If more than log_interval seconds have passed
