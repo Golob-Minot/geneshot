@@ -5,6 +5,7 @@ from collections import defaultdict
 from fastdist import fastdist
 from functools import lru_cache
 import pandas as pd
+from multiprocessing import Process, Queue
 import numpy as np
 from scipy.spatial import distance
 import sys
@@ -81,6 +82,12 @@ parser.add_argument(
     type=str,
     default="CAGs",
     help='Prefix for output files'
+)
+parser.add_argument(
+    '--processes',
+    type=int,
+    default=1,
+    help='Number of processes to run concurrently'
 )
 
 # Parse the arguments
@@ -340,6 +347,49 @@ class IAC:
 
             # Yield the set of genes, and the vector of abundances
             yield group_set, self.abunds[group_ix]
+
+
+def iac_worker(max_dim, input_queue, output_queue):
+    """Set up a worker which will build up an IAC using data from a queue."""
+
+    # Set up the timing for reporting progress
+    log_interval=300
+    start_time = time()
+
+    # Set up the IAC
+    iac = IAC(max_dim=max_dim)
+
+    # Wait for a new gene from the input queue
+    input_from_queue = input_queue.get()
+
+    # Stop once a `None` is encountered from the queue
+    while input_from_queue is not None:
+
+        # Parse the input tuple
+        gene_ix_set, gene_abund = input_from_queue
+
+        # Add it to the IAC
+        iac.add(gene_ix_set, gene_abund)
+
+        # If more than log_interval seconds have passed
+        if (time() - start_time) >= log_interval:
+
+            # Report the progress
+            start_time = report_progress(iac)
+
+        # Wait for a new gene from the input queue
+        input_from_queue = input_queue.get()
+
+    # At this point, a `None` was encountered in the queue
+
+    # Before finishing, return all of the clusters via the output queue
+    for group_ix, group_set in iac.items():
+
+        # Add them to the queue
+        output_queue.put((group_ix, group_set))
+
+    # To signal that the process is complete, send a `None` through the queue
+    output_queue.put(None)
         
 
 def make_dense_abund(a):
@@ -386,17 +436,18 @@ def report_progress(iac):
 def co_assembly_boosted_clustering(
     contig_df,
     gene_abund,
+    iac_pool,
+    input_queue,
+    output_queue,
     log_interval=300,
 ):
-    
-    # Start the clock
-    start_time = time()
 
+    # Start the pool of workers
+    for p in iac_pool:
+        p.start()
+    
     # Now let's use the approach where we add genes which are found on the same contig first
 
-    # Set up the IAC object for the overall assembly
-    iac = IAC(max_dim=len(specimen_list()))
-    
     # Keep track of what genes have been added
     all_genes = set([])
 
@@ -441,15 +492,8 @@ def co_assembly_boosted_clustering(
                 # Iterate over the previous set of groups
                 for prev_genes, prev_abund in current_contig_iac.items():
 
-                    # Add them to the global IAC
-                    iac.add(prev_genes, prev_abund)
-
-                    # If we have exceeded the args.max_n_cags threshold
-                    if iac.abunds.shape[0] > args.max_n_cags:
-
-                        # Bail out of the process
-                        logging.info(f"Reached limit of {args.max_n_cags:,}, stopping.")
-                        return
+                    # Add them to the global IAC worker pool
+                    input_queue.put((prev_genes, prev_abund))
 
             # Set up an object for the genes in this new contig
             current_contig = r["contig"]
@@ -461,24 +505,57 @@ def co_assembly_boosted_clustering(
             abund
         )
 
-        # If more than log_interval seconds have passed
-        if (time() - start_time) >= log_interval:
-
-            # Report the progress
-            start_time = report_progress(iac)
-
     # Iterate over the set of groups from the last contig
     for prev_genes, prev_abund in current_contig_iac.items():
 
-        # Add them to the global IAC
-        iac.add(prev_genes, prev_abund)
+        # Add them to the global IAC worker pool
+        input_queue.put((prev_genes, prev_abund))
 
-        # If we have exceeded the args.max_n_cags threshold
-        if iac.abunds.shape[0] > args.max_n_cags:
+    logging.info("STOPPING WORKERS")
 
-            # Bail out of the process
-            logging.info(f"Reached limit of {args.max_n_cags:,}, stopping.")
-            return
+    # Stop each of the workers
+    for _ in range(args.processes):
+        input_queue.put(None)
+
+    # Set up the IAC object for the overall assembly
+    iac = IAC(max_dim=len(specimen_list()))
+
+    # Start the clock
+    start_time = time()
+
+    # Keep track of how many of the workers are finished
+    n_finished_workers = 0
+
+    # Keep reading from the output queue until all of the workers are finished
+    while n_finished_workers < args.processes:
+
+        # Get the values from the queue
+        queue_value = output_queue.get()
+
+        # If the value from the queue is a `None`
+        if queue_value is None:
+
+            # Then add to the counter of finished workers
+            n_finished_workers += 1
+
+        # Otherwise, there are values in the queue
+        else:
+
+            # Parse the tuple
+            prev_genes, prev_abund = queue_value
+
+            # Add them to the global IAC
+            iac.add(prev_genes, prev_abund)
+
+            # If more than log_interval seconds have passed
+            if (time() - start_time) >= log_interval:
+
+                # Report the progress
+                start_time = report_progress(iac)
+
+    # Close the pool of workers
+    for p in iac_pool:
+        p.join()
 
     # Report the end of the entire process
     logging.info("FINISHED")
@@ -515,6 +592,17 @@ if __name__ == "__main__":
 
     # Get the list of specimens
     logging.info(f"There are {len(specimen_list()):,} specimens present.")
+    logging.info(f"There are {args.processes:,} processes available.")
+
+    # Set up a queue to use for the input and the output to communicate with workers
+    input_queue = Queue()
+    output_queue = Queue()
+
+    # Start IAC processes which listen to those queues
+    iac_pool = [
+        Process(target=iac_worker, args=(len(specimen_list()), input_queue, output_queue,))
+        for _ in range(args.processes)
+    ]
 
     # Read in assembly information for all specimens
     assembly_start = time() # Start the clock
@@ -545,6 +633,9 @@ if __name__ == "__main__":
     iac = co_assembly_boosted_clustering(
         contig_df,
         gene_abund,
+        iac_pool,
+        input_queue,
+        output_queue,
     )
     iac_elapsed = time() - iac_start
     logging.info(f"DONE CLUSTERING - {round(iac_elapsed, 1):,} seconds")
