@@ -5,7 +5,7 @@ from collections import defaultdict
 from fastdist import fastdist
 from functools import lru_cache
 import pandas as pd
-from multiprocessing import Pool, Manager
+from multiprocessing import Process, Queue
 import numpy as np
 from scipy.spatial import distance
 import sys
@@ -377,6 +377,9 @@ def iac_worker(max_dim, input_queue, output_queue):
             # Report the progress
             start_time = report_progress(iac)
 
+        # Wait for a new gene from the input queue
+        input_from_queue = input_queue.get()
+
     # At this point, a `None` was encountered in the queue
 
     # Before finishing, return all of the clusters via the output queue
@@ -433,21 +436,16 @@ def report_progress(iac):
 def co_assembly_boosted_clustering(
     contig_df,
     gene_abund,
+    iac_pool,
+    input_queue,
+    output_queue,
     log_interval=300,
 ):
+
+    # Start the pool of workers
+    for p in iac_pool:
+        p.start()
     
-    # Set up a pool of workers which will each start to cluster genes
-    iac_pool = Pool(processes=args.processes)
-
-    # Set up a queue to use for the input and the output
-    manager = Manager()
-    input_queue = manager.Queue()
-    output_queue = manager.Queue()
-
-    # Start IAC processes which listen to those queues
-    for _ in range(args.processes):
-        iac_pool.apply_async(iac_worker, (input_queue, output_queue))
-
     # Now let's use the approach where we add genes which are found on the same contig first
 
     # Keep track of what genes have been added
@@ -556,8 +554,8 @@ def co_assembly_boosted_clustering(
                 start_time = report_progress(iac)
 
     # Close the pool of workers
-    iac_pool.close()
-    iac_pool.join()
+    for p in iac_pool:
+        p.join()
 
     # Report the end of the entire process
     logging.info("FINISHED")
@@ -596,6 +594,16 @@ if __name__ == "__main__":
     logging.info(f"There are {len(specimen_list()):,} specimens present.")
     logging.info(f"There are {args.processes:,} processes available.")
 
+    # Set up a queue to use for the input and the output to communicate with workers
+    input_queue = Queue()
+    output_queue = Queue()
+
+    # Start IAC processes which listen to those queues
+    iac_pool = [
+        Process(target=iac_worker, args=(len(specimen_list()), input_queue, output_queue,))
+        for _ in range(args.processes)
+    ]
+
     # Read in assembly information for all specimens
     assembly_start = time() # Start the clock
     contig_df = pd.concat(
@@ -625,6 +633,9 @@ if __name__ == "__main__":
     iac = co_assembly_boosted_clustering(
         contig_df,
         gene_abund,
+        iac_pool,
+        input_queue,
+        output_queue,
     )
     iac_elapsed = time() - iac_start
     logging.info(f"DONE CLUSTERING - {round(iac_elapsed, 1):,} seconds")
