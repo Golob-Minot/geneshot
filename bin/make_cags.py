@@ -5,7 +5,7 @@ from collections import defaultdict
 from fastdist import fastdist
 from functools import lru_cache
 import pandas as pd
-from multiprocessing import Pool, Queue
+from multiprocessing import Pool, Manager
 import numpy as np
 from scipy.spatial import distance
 import sys
@@ -440,14 +440,13 @@ def co_assembly_boosted_clustering(
     iac_pool = Pool(processes=args.processes)
 
     # Set up a queue to use for the input and the output
-    input_queue = Queue()
-    output_queue = Queue()
+    manager = Manager()
+    input_queue = manager.Queue()
+    output_queue = manager.Queue()
 
     # Start IAC processes which listen to those queues
-    iac_pool.map(
-        iac_worker, 
-        [(input_queue, output_queue) for _ in range(args.processes)]
-    )
+    for _ in range(args.processes):
+        iac_pool.apply_async(iac_worker, (input_queue, output_queue))
 
     # Now let's use the approach where we add genes which are found on the same contig first
 
@@ -558,6 +557,7 @@ def co_assembly_boosted_clustering(
 
     # Close the pool of workers
     iac_pool.close()
+    iac_pool.join()
 
     # Report the end of the entire process
     logging.info("FINISHED")
