@@ -35,7 +35,8 @@ make_cags.py \
     --min-contig-depth ${params.min_contig_depth} \
     --min-specimens ${params.min_specimens} \
     --output-folder ./ \
-    --output-prefix CAGs
+    --output-prefix CAGs \
+    --processes ${task.cpus}
 
     """
 }
