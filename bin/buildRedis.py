@@ -521,19 +521,19 @@ def save_tax_data(r, results_store, details_store):
             tax_df["CAG"].value_counts().to_dict()
         )
 
-    # Process the tax spectra
-    layout_cags_by_taxonomy(
-        results_store,
-        cag_tax_spectra,
-        r
-    )
+    # # Process the tax spectra
+    # layout_cags_by_taxonomy(
+    #     results_store,
+    #     cag_tax_spectra,
+    #     r
+    # )
 
-    # Lay out the taxa radially (sized by the number of genes assigned)
-    layout_taxa_by_taxonomy(
-        tax,
-        taxa_size_dict,
-        r
-    )
+    # # Lay out the taxa radially (sized by the number of genes assigned)
+    # layout_taxa_by_taxonomy(
+    #     tax,
+    #     taxa_size_dict,
+    #     r
+    # )
 
     
 def layout_cags_by_taxonomy(results_store, cag_tax_spectra, r, metric="euclidean", method="complete"):
