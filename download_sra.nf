@@ -133,7 +133,6 @@ workflow {
 process getSRAlist {
     container "${container__pandas}"
     label "mem_medium"
-    errorStrategy 'finish'
     
     input:
     val accession
@@ -234,7 +233,6 @@ with open("accession_list.txt", "wt") as fo:
 process getMetadata {
     container "${container__pandas}"
     label "mem_medium"
-    errorStrategy 'finish'
     
     input:
     val sra_id
@@ -372,7 +370,6 @@ with gzip.open("%s.metadata.json.gz" % sra_accession, "wt") as fo:
 process joinMetadata {
     container "${container__pandas}"
     label "mem_medium"
-    errorStrategy 'finish'
     
     input:
     file metadata_json_list
@@ -420,7 +417,6 @@ metadata_df.to_csv("${params.accession}.metadata.csv", index=None)
 process downloadSRA {
     container "quay.io/hdc-workflows/curl:latest"
     label "io_limited"
-    errorStrategy 'finish'
     
     input:
     val accession
@@ -457,7 +453,6 @@ fi
 process extractSRA {
     container "quay.io/fhcrc-microbiome/get_sra:v0.4"
     label "io_limited"
-    errorStrategy 'finish'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
@@ -489,7 +484,6 @@ process extractSRA {
 process fasterqDump {
     container "quay.io/hdc-workflows/sratools:latest"
     label "io_limited"
-    errorStrategy 'finish'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
@@ -521,7 +515,6 @@ echo "Done"
 process gatherReadnames {
     container "${container__pandas}"
     label "io_limited"
-    errorStrategy 'finish'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
 
     input:
