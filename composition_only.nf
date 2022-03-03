@@ -19,11 +19,9 @@ params.savereads = false
 params.help = false
 params.output = './results'
 params.output_prefix = 'geneshot'
-params.manifest = null
+params.manifest = false
 
 // Preprocessing options
-params.adapter_F = "CTGTCTCTTATACACATCT"
-params.adapter_R = "CTGTCTCTTATACACATCT"
 params.hg_index_url = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
 params.hg_index = false
 params.min_hg_align_score = 30
@@ -54,9 +52,6 @@ def helpMessage() {
     For preprocessing:
       --hg_index_url        URL for human genome index, defaults to current HG
       --hg_index            Cached copy of the bwa indexed human genome, TGZ format
-      --adapter_F           Forward sequencing adapter sequence (to be removed)
-      --adapter_R           Reverse sequencing adapter sequence (to be removed)
-                              (Adapter sequences default to nextera adapters)
       --min_hg_align_score  Minimum alignment score for human genome (default 30)
     
     Manifest file:
@@ -88,8 +83,6 @@ if (!params.output.endsWith("/")){
 // Import the preprocess_wf module
 include { Read_manifest } from './modules/general'
 include { preprocess_wf } from './modules/preprocess' params(
-    adapter_F: params.adapter_F,
-    adapter_R: params.adapter_R,
     hg_index: params.hg_index,
     hg_index_url: params.hg_index_url,
     min_hg_align_score: params.min_hg_align_score,
