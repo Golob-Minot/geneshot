@@ -86,7 +86,7 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include { read_manifest } from './modules/general'
+include { Read_manifest } from './modules/general'
 include { preprocess_wf } from './modules/preprocess' params(
     adapter_F: params.adapter_F,
     adapter_R: params.adapter_R,
@@ -111,7 +111,7 @@ workflow {
     // Phase 0: Validation of input data
     manifest_file = Channel.from(file(params.manifest))
     // Read manifest splits out our manifest.
-    manifest_qced = read_manifest(manifest_file)
+    manifest_qced = Read_manifest(manifest_file)
 
     // Phase I: Preprocessing
     if (!params.nopreprocess) {
