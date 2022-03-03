@@ -66,7 +66,7 @@ def helpMessage() {
 }
 
 // Show help message if the user specifies the --help flag at runtime
-if (params.help || params.manifest == null){
+if (params.help || !params.manifest){
     // Invoke the function above which prints the help message
     helpMessage()
     // Exit out and do not run anything else
@@ -81,7 +81,9 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include { Read_manifest } from './modules/general'
+include { Read_manifest } from './modules/general' params (
+    
+)
 include { preprocess_wf } from './modules/preprocess' params(
     hg_index: params.hg_index,
     hg_index_url: params.hg_index_url,
