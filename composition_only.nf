@@ -134,7 +134,7 @@ workflow {
     // # Composition  #
     // ################
     composition_wf(
-        combineReads.out,
+        CombineReads.out,
         manifest_qced.valid_unpaired.map{ r-> 
             [r.specimen, file(r.R1)]
         }
