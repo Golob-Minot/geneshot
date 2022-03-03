@@ -18,7 +18,6 @@ params.nopreprocess = false
 params.savereads = false
 params.help = false
 params.output = './results'
-params.output_prefix = 'geneshot'
 params.manifest = false
 
 // Preprocessing options
@@ -26,8 +25,33 @@ params.hg_index_url = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GC
 params.hg_index = false
 params.min_hg_align_score = 30
 
+// Make sure that --output ends with trailing "/" characters
+if (!params.output.endsWith("/")){
+    output_folder = params.output.concat("/")
+} else {
+    output_folder = params.output
+}
 
 
+// Import the preprocess_wf module
+include { Read_manifest } from './modules/general'
+include { Preprocess_wf } from './modules/preprocess' params(
+    hg_index: params.hg_index,
+    hg_index_url: params.hg_index_url,
+    min_hg_align_score: params.min_hg_align_score,
+    output: output_folder
+)
+// Import some general tasks
+include { CombineReads } from './modules/preprocess' params(
+    savereads: params.savereads,
+    output_folder: output_folder
+)
+
+
+// Import from composition_wf module
+include { composition_wf } from './modules/composition' params(
+    output_folder: output_folder
+)
 
 // Function which prints help message text
 def helpMessage() {
@@ -44,7 +68,6 @@ def helpMessage() {
 
     Options:
       --output              Folder to place analysis outputs (default ./results)
-      --output_prefix       Text used as a prefix for summary HDF5 output files (default: geneshot)
       --nopreprocess        If specified, omit the preprocessing steps (removing adapters and human sequences)
       --savereads           If specified, save the preprocessed reads to the output folder (inside qc/)
       -w                    Working directory. Defaults to `./work`
@@ -73,32 +96,9 @@ if (params.help || !params.manifest){
     exit 0
 }
 
-// Make sure that --output ends with trailing "/" characters
-if (!params.output.endsWith("/")){
-    output_folder = params.output.concat("/")
-} else {
-    output_folder = params.output
-}
 
-// Import the preprocess_wf module
-include { Read_manifest } from './modules/general' params (
-    
-)
-include { preprocess_wf } from './modules/preprocess' params(
-    hg_index: params.hg_index,
-    hg_index_url: params.hg_index_url,
-    min_hg_align_score: params.min_hg_align_score,
-)
-// Import some general tasks
-include { combineReads } from './modules/general' params(
-    savereads: params.savereads,
-    output_folder: output_folder
-)
 
-// Import from composition_wf module
-include { composition_wf } from './modules/composition' params(
-    output_folder: params.output_folder
-)
+
 
 workflow {
     main:
@@ -111,17 +111,17 @@ workflow {
     // Phase I: Preprocessing
     if (!params.nopreprocess) {
         // Run the entire preprocessing workflow
-        preprocess_wf(
+        Preprocess_wf(
             manifest_qced.valid_paired_indexed,
              manifest_qced.valid_paired
         )
         // Combine the reads by specimen name
-        combineReads(preprocess_wf.out.groupTuple())
+        CombineReads(Preprocess_wf.out.groupTuple())
 
     } else {
         // If the user specified --nopreprocess, then just 
         // read the manifest and combine by specimen
-        combineReads(
+        CombineReads(
             manifest_qced.valid_paired.mix(manifest_qced.valid_paired_indexed)
             .map { 
                 r -> [r.specimen, file(r.R1), file(r.R2)]
