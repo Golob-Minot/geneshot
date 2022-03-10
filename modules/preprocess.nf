@@ -370,7 +370,7 @@ params.nopreprocess = false
 params.savereads = false
 params.help = false
 params.output = './results/'
-params.manifest = null
+params.manifest = false
 
 // Preprocessing options
 params.hg_index_url = 'https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
@@ -417,7 +417,7 @@ workflow {
 
  
     // Show help message if the user specifies the --help flag at runtime
-    if (params.help || params.manifest == null){
+    if (params.help || !params.manifest){
         // Invoke the function above which prints the help message
         helpMessage()
         // Exit out and do not run anything else
