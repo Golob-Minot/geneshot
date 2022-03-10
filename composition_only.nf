@@ -98,7 +98,7 @@ if (params.help || !params.manifest){
 
 
 // Import the preprocess_wf module
-include { preprocess_wf } from './modules/preprocess' params(
+include { Preprocess_wf } from './modules/preprocess' params(
     hg_index: params.hg_index,
     hg_index_url: params.hg_index_url,
     min_hg_align_score: params.min_hg_align_score,
