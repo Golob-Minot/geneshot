@@ -100,8 +100,6 @@ if (params.help || !params.manifest){
 // Import the preprocess_wf module
 include { read_manifest } from './modules/general'
 include { preprocess_wf } from './modules/preprocess' params(
-    adapter_F: params.adapter_F,
-    adapter_R: params.adapter_R,
     hg_index: params.hg_index,
     hg_index_url: params.hg_index_url,
     min_hg_align_score: params.min_hg_align_score,
