@@ -39,7 +39,8 @@ include { Preprocess_wf } from './modules/preprocess' params(
     hg_index: params.hg_index,
     hg_index_url: params.hg_index_url,
     min_hg_align_score: params.min_hg_align_score,
-    output: output_folder
+    output: output_folder,
+    savereads: params.savereads
 )
 // Import some general tasks
 include { CombineReads } from './modules/preprocess' params(
@@ -95,21 +96,6 @@ if (params.help || !params.manifest){
     // Exit out and do not run anything else
     exit 0
 }
-
-
-// Import the preprocess_wf module
-include { Preprocess_wf } from './modules/preprocess' params(
-    hg_index: params.hg_index,
-    hg_index_url: params.hg_index_url,
-    min_hg_align_score: params.min_hg_align_score,
-    savereads: params.savereads,
-)
-// Import some general tasks
-include { combineReads } from './modules/general' params(
-    savereads: params.savereads,
-    output_folder: output_folder
-)
-
 
 
 workflow {
