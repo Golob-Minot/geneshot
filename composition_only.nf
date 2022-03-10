@@ -98,7 +98,6 @@ if (params.help || !params.manifest){
 
 
 // Import the preprocess_wf module
-include { Read_manifest } from './modules/general'
 include { preprocess_wf } from './modules/preprocess' params(
     hg_index: params.hg_index,
     hg_index_url: params.hg_index_url,
