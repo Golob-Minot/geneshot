@@ -18,18 +18,40 @@ params.nopreprocess = false
 params.savereads = false
 params.help = false
 params.output = './results'
-params.output_prefix = 'geneshot'
-params.manifest = null
+params.manifest = false
 
 // Preprocessing options
-params.adapter_F = "CTGTCTCTTATACACATCT"
-params.adapter_R = "CTGTCTCTTATACACATCT"
 params.hg_index_url = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
 params.hg_index = false
 params.min_hg_align_score = 30
 
+// Make sure that --output ends with trailing "/" characters
+if (!params.output.endsWith("/")){
+    output_folder = params.output.concat("/")
+} else {
+    output_folder = params.output
+}
 
 
+// Import the preprocess_wf module
+include { Read_manifest } from './modules/general'
+include { Preprocess_wf } from './modules/preprocess' params(
+    hg_index: params.hg_index,
+    hg_index_url: params.hg_index_url,
+    min_hg_align_score: params.min_hg_align_score,
+    output: output_folder
+)
+// Import some general tasks
+include { CombineReads } from './modules/preprocess' params(
+    savereads: params.savereads,
+    output_folder: output_folder
+)
+
+
+// Import from composition_wf module
+include { composition_wf } from './modules/composition' params(
+    output_folder: output_folder
+)
 
 // Function which prints help message text
 def helpMessage() {
@@ -46,7 +68,6 @@ def helpMessage() {
 
     Options:
       --output              Folder to place analysis outputs (default ./results)
-      --output_prefix       Text used as a prefix for summary HDF5 output files (default: geneshot)
       --nopreprocess        If specified, omit the preprocessing steps (removing adapters and human sequences)
       --savereads           If specified, save the preprocessed reads to the output folder (inside qc/)
       -w                    Working directory. Defaults to `./work`
@@ -54,9 +75,6 @@ def helpMessage() {
     For preprocessing:
       --hg_index_url        URL for human genome index, defaults to current HG
       --hg_index            Cached copy of the bwa indexed human genome, TGZ format
-      --adapter_F           Forward sequencing adapter sequence (to be removed)
-      --adapter_R           Reverse sequencing adapter sequence (to be removed)
-                              (Adapter sequences default to nextera adapters)
       --min_hg_align_score  Minimum alignment score for human genome (default 30)
     
     Manifest file:
@@ -71,19 +89,13 @@ def helpMessage() {
 }
 
 // Show help message if the user specifies the --help flag at runtime
-if (params.help || params.manifest == null){
+if (params.help || !params.manifest){
     // Invoke the function above which prints the help message
     helpMessage()
     // Exit out and do not run anything else
     exit 0
 }
 
-// Make sure that --output ends with trailing "/" characters
-if (!params.output.endsWith("/")){
-    output_folder = params.output.concat("/")
-} else {
-    output_folder = params.output
-}
 
 // Import the preprocess_wf module
 include { read_manifest } from './modules/general'
@@ -101,10 +113,7 @@ include { combineReads } from './modules/general' params(
     output_folder: output_folder
 )
 
-// Import from composition_wf module
-include { composition_wf } from './modules/composition' params(
-    output_folder: params.output_folder
-)
+
 
 workflow {
     main:
@@ -112,22 +121,22 @@ workflow {
     // Phase 0: Validation of input data
     manifest_file = Channel.from(file(params.manifest))
     // Read manifest splits out our manifest.
-    manifest_qced = read_manifest(manifest_file)
+    manifest_qced = Read_manifest(manifest_file)
 
     // Phase I: Preprocessing
     if (!params.nopreprocess) {
         // Run the entire preprocessing workflow
-        preprocess_wf(
+        Preprocess_wf(
             manifest_qced.valid_paired_indexed,
              manifest_qced.valid_paired
         )
         // Combine the reads by specimen name
-        combineReads(preprocess_wf.out.groupTuple())
+        CombineReads(Preprocess_wf.out.groupTuple())
 
     } else {
         // If the user specified --nopreprocess, then just 
         // read the manifest and combine by specimen
-        combineReads(
+        CombineReads(
             manifest_qced.valid_paired.mix(manifest_qced.valid_paired_indexed)
             .map { 
                 r -> [r.specimen, file(r.R1), file(r.R2)]
@@ -140,7 +149,7 @@ workflow {
     // # Composition  #
     // ################
     composition_wf(
-        combineReads.out,
+        CombineReads.out,
         manifest_qced.valid_unpaired.map{ r-> 
             [r.specimen, file(r.R1)]
         }
