@@ -4,14 +4,14 @@ set -euo pipefail
 
 date
 echo
-echo "Running workflow '${WORKFLOW_REPO}' from ${PWD}"
+echo "Running workflow '${TOOL_REPO}' from ${PWD}"
 echo
 
 # Run the workflow
 echo Starting workflow
 nextflow \
     run \
-    "${WORKFLOW_REPO}" \
+    "${TOOL_REPO}" \
     -params-file ._wb/tool/params.json \
     -resume
 
