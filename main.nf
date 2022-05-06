@@ -445,7 +445,10 @@ workflow {
 
     // Calculate the richness of each sample using the breakaway algorithm
     breakaway(
-        alignments_output.famli_json_list.flatten()
+        alignments_output
+            .famli_json_list
+            .ifEmpty{ error "No alignments found" }
+            .flatten()
     )
     collectBreakaway(
         breakaway.out.toSortedList()
