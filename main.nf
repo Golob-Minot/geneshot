@@ -447,11 +447,13 @@ workflow {
     breakaway(
         alignments_output
             .famli_json_list
-            .ifEmpty{ error "No alignments found" }
             .flatten()
     )
     collectBreakaway(
-        breakaway.out.toSortedList()
+        breakaway
+            .out
+            .ifEmpty{ error "No alignments found" }
+            .toSortedList()
     )
 
     // ###################
