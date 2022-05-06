@@ -1,0 +1,37 @@
+{
+    "$schema": "https://raw.githubusercontent.com/FredHutch/bash-workbench/main/docs/schema.json",
+    "name": "Estimate CAG Abundance",
+    "description": "Quantify the relative abundance of previously generated CAGs",
+    "args": {
+        "manifest": {
+            "help": "File listing the input files for analysis using the columns 'specimen,R1,R2' (CSV)",
+            "wb_type": "file",
+            "required": true
+        },
+        "output": {
+            "help": "Folder for output files",
+            "wb_type": "folder",
+            "default": "./results"
+        },
+        "output_prefix": {
+            "help": "Prefix to append to output files",
+            "wb_type": "string",
+            "default": "geneshot"
+        },
+        "gene_fasta": {
+            "help": "Gene sequences for the previously-generated set of CAGs (e.g. ref/genes.fasta.gz)",
+            "wb_type": "file",
+            "required": true
+        },
+        "cags_csv": {
+            "help": "CAG assignments for genes in the previously-generated set of CAGs (e.g. *.CAGSs.csv.gz)",
+            "wb_type": "file",
+            "required": true
+        },        
+        "composition": {
+            "help": "If specified, estimate the relative abundance of microbial taxa with the MetaPhlAn2 utility",
+            "wb_type": "bool",
+            "default": true
+        }
+    }
+}
