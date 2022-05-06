@@ -75,8 +75,8 @@ combine_fastq_pairs.py \
 -o1 "${sample}.R1.fastq.gz" \
 -o2 "${sample}.R2.fastq.gz"
 
-(( \$(gunzip -c "${sample}.R1.fastq.gz" | head | wc -l) > 1 ))
-(( \$(gunzip -c "${sample}.R2.fastq.gz" | head | wc -l) > 1 ))
+(( \$(gunzip -fc "${sample}.R1.fastq.gz" | head | wc -l) > 1 ))
+(( \$(gunzip -fc "${sample}.R2.fastq.gz" | head | wc -l) > 1 ))
 
 """
 
@@ -138,7 +138,7 @@ set -e
 [[ -s ${R1} ]]
 [[ -s ${R2} ]]
 
-n=\$(cat <(gunzip -c "${R1}") <(gunzip -c "${R2}") | awk 'NR % 4 == 1' | wc -l)
+n=\$(cat <(gunzip -fc "${R1}") <(gunzip -fc "${R2}") | awk 'NR % 4 == 1' | wc -l)
 echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
 """
 }

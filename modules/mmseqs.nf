@@ -25,7 +25,7 @@ cat input.genes.* > input.genes.fasta.gz
 # will be sufficient.
 # Also, linclust seems to break on very small input files
 
-if (( \$(gunzip -c input.genes.fasta.gz | grep -v '>' | wc -c ) < 1000000 )); then
+if (( \$(gunzip -fc input.genes.fasta.gz | grep -v '>' | wc -c ) < 1000000 )); then
 
     echo "Input files are < 1M characters -- skipping linclust"
     mv input.genes.fasta.gz output.genes.fasta.gz

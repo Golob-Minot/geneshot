@@ -284,7 +284,7 @@ process prodigal {
 """
 set -Eeuo pipefail 
 
-gunzip -c ${contigs} > ${specimen}.contigs.fasta
+gunzip -fc ${contigs} > ${specimen}.contigs.fasta
 
 prodigal \
     -a ${specimen}.faa \
@@ -318,7 +318,7 @@ process barrnap{
 """
 #!/bin/bash
 
-gunzip -c ${fasta} > FASTA
+gunzip -fc ${fasta} > FASTA
 barrnap -o ${specimen}.rrna.fasta < FASTA > ${specimen}.rrna.gff
 """
 
@@ -511,7 +511,7 @@ process shard_genes {
 
 set -Eeuo pipefail
 
-split --additional-suffix .fasta -l ${params.gene_shard_size} <(gunzip -c ${fasta_gz}) genes.shard.
+split --additional-suffix .fasta -l ${params.gene_shard_size} <(gunzip -fc ${fasta_gz}) genes.shard.
 
 gzip genes.shard.*.fasta
 """
@@ -675,7 +675,7 @@ process alignAlleles {
     echo "Aligning ${alleles_fasta}"
 
     # Check to see if there are any reads
-    if (( \$( gunzip -c ${alleles_fasta} | wc -l ) <= 1 )); then
+    if (( \$( gunzip -fc ${alleles_fasta} | wc -l ) <= 1 )); then
     
         echo "No alleles found in ${alleles_fasta}, skipping"
     

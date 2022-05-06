@@ -112,7 +112,7 @@ process diamond {
 
     for fp in ${R1} ${R2}; do
         cat \$fp | \
-        gunzip -c | \
+        gunzip -fc | \
         awk "{if(NR % 4 == 1){print \\"@\$fp\\" NR }else{if(NR % 4 == 3){print \\"+\\"}else{print}}}" | \
         gzip -c \
         > query.fastq.gz
