@@ -349,9 +349,12 @@ workflow {
 
     // Count the reads for every sample individually (just take the first of the pair of reads)
     countReads(
-        combineReads.out.map {
-            r -> [r[0], r[1], r[2]]
-        }
+        combineReads
+            .out
+            .ifEmpty{ error "No reads found" }
+            .map {
+                r -> [r[0], r[1], r[2]]
+            }
     )
 
     // Make a summary of every sample and write it out to --output
