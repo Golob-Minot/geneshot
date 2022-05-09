@@ -181,10 +181,13 @@ process download_hg_index {
     output:
     file 'hg_index.tar.gz'
     
-"""
+"""#!/bin/bash
 set -e
 
 wget --quiet ${params.hg_index_url} -O hg_index.tar.gz
+
+# Make sure that the entire file was downloaded
+tar -tzvf hg_index.tar.gz
 """
 }
 
