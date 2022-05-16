@@ -11,7 +11,7 @@ echo
 echo Starting workflow
 nextflow \
     run \
-    "${TOOL_REPO}" \
+    "${TOOL_REPO}/quantify_cags.nf" \
     -params-file ._wb/tool/params.json \
     -resume
 

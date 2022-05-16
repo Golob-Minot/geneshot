@@ -259,7 +259,8 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
     n_genes_assembled_df = pd.read_csv(n_genes_assembled_csv)
 
     # Write to HDF5
-    n_genes_assembled_df.to_hdf(store, "/summary/genes_assembled")
+    if n_genes_assembled_df.shape[0] > 0:
+        n_genes_assembled_df.to_hdf(store, "/summary/genes_assembled")
 
     # Read in the number of aligned reads per sample
     aligned_reads_dict = pd.read_csv(
@@ -293,14 +294,18 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
     # Write to HDF5
     breakaway_df.to_hdf(store, "/summary/breakaway")
 
+    # Collect the total information
+    summary_all_dat = [
+        readcount_df.set_index("specimen"),
+        specimen_gene_count_df.set_index("specimen"),
+        breakaway_df.set_index("specimen"),
+    ]
+    if n_genes_assembled_df.shape[0] > 0:
+        summary_all_dat.append(n_genes_assembled_df.set_index("specimen"))
+
     # Write out a combined table
     pd.concat(
-        [
-            readcount_df.set_index("specimen"),
-            specimen_gene_count_df.set_index("specimen"),
-            breakaway_df.set_index("specimen"),
-            n_genes_assembled_df.set_index("specimen"),
-        ], 
+        summary_all_dat, 
         axis = 1, 
         sort = True
     ).reset_index(
