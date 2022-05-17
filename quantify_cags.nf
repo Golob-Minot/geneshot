@@ -12,40 +12,6 @@
 // Using DSL-2
 nextflow.enable.dsl=2
 
-// Default values for boolean flags
-// If these are not set by the user, then they will be set to the values below
-// This is useful for the if/then control syntax below
-params.nopreprocess = false
-params.savereads = false
-params.help = false
-params.output = './results'
-params.output_prefix = 'geneshot'
-params.manifest = null
-
-// Preprocessing options
-params.adapter_F = "CTGTCTCTTATACACATCT"
-params.adapter_R = "CTGTCTCTTATACACATCT"
-params.hg_index_url = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
-params.hg_index = false
-params.min_hg_align_score = 30
-
-// Genes and CAGs from the previous analysis
-params.gene_fasta = false
-params.cags_csv = false
-
-// Alignment parameters
-params.dmnd_min_identity = 80 // DIAMOND
-params.dmnd_min_coverage = 50 // DIAMOND
-params.dmnd_top_pct = 1 // DIAMOND
-params.dmnd_min_score = 20 // DIAMOND
-params.gencode = 11 //DIAMOND
-params.sd_mean_cutoff = 3.0 // FAMLI
-params.famli_batchsize = 10000000 // FAMLI
-params.famli_folder = false // Import FAMLI-filtered alignments
-
-// Compositional analysis options
-params.composition = false
-
 // Function which prints help message text
 def helpMessage() {
     log.info"""

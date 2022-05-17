@@ -22,64 +22,6 @@
 // Using DSL-2
 nextflow.enable.dsl=2
 
-// Default values for boolean flags
-// If these are not set by the user, then they will be set to the values below
-// This is useful for the if/then control syntax below
-params.nopreprocess = false
-params.savereads = false
-params.help = false
-params.output = './results'
-params.output_prefix = 'geneshot'
-params.manifest = null
-
-// Preprocessing options
-params.adapter_F = "CTGTCTCTTATACACATCT"
-params.adapter_R = "CTGTCTCTTATACACATCT"
-params.hg_index_url = 'ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
-params.hg_index = false
-params.min_hg_align_score = 30
-
-// Assembly options
-params.gene_fasta = false
-params.assembly_folder = false
-params.phred_offset = 33 // spades
-params.min_identity = 90 // linclust and reference genome alignment
-params.min_coverage = 50 // linclust and reference genome alignment
-params.dmnd_min_identity = 80 // DIAMOND
-params.dmnd_min_coverage = 50 // DIAMOND
-params.dmnd_top_pct = 1 // DIAMOND
-params.dmnd_min_score = 20 // DIAMOND
-params.gencode = 11 //DIAMOND
-params.sd_mean_cutoff = 3.0 // FAMLI
-params.famli_batchsize = 10000000 // FAMLI
-params.famli_folder = false // Import FAMLI-filtered alignments
-
-// Annotation options
-params.gene_shard_size = 100000
-params.noannot = false
-params.taxonomic_dmnd = false
-params.tax_evalue = 0.00001
-params.ncbi_taxdump = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
-params.eggnog_db = false
-params.eggnog_dmnd = false
-params.eggnog_evalue = 0.00001
-
-// CAG options
-params.distance_threshold = 0.25
-params.distance_metric = "cosine"
-params.min_contig_size = 3
-params.min_contig_depth = 5
-params.min_specimens = 1
-params.cags_csv = false
-
-// Statistical analysis options
-params.formula = false
-params.fdr_method = "fdr_bh"
-params.corncob_batches = 10
-
-// Compositional analysis options
-params.composition = false
-
 // Function which prints help message text
 def helpMessage() {
     log.info"""
