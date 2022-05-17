@@ -94,7 +94,6 @@ include {
     addEggnogResults;
     addTaxResults;
     calcDistances;
-    joinHDF as joinDetailedHDF;
     repackHDF as repackFullHDF;
     repackHDF as repackDetailedHDF;
     buildRedis;
@@ -119,7 +118,8 @@ include { makeCAGs } from './modules/make_cags'
 // to analyze either the CAGs, tax IDs, or eggNOG groups
 include { 
     breakaway;
-    collectBreakaway
+    collectBreakaway;
+    corncob_wf as cag_corncob_wf;
 } from './modules/statistics' addParams(
     output_folder: output_folder
 )
@@ -298,6 +298,20 @@ workflow {
         file("$projectDir/templates/gene_count_template.csv")
     )
     resultsHDF = collectResults.out
+    
+    // ##################################
+    // # STATISTICAL ANALYSIS - FORMULA #
+    // ##################################
+
+    // Calculate the association of individual CAGs with user-provided features
+    cag_corncob_wf(
+        resultsHDF,
+        alignments_output.detailed_hdf,
+        manifest_file,
+        "cag",
+        "CAG"
+    )
+    resultsHDF = cag_corncob_wf.out
 
     // If we performed compositional analysis, add the results to the HDF5
     if (params.composition) {
