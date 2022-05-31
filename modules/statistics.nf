@@ -220,7 +220,7 @@ for cag_id, cag_df in df.groupby("CAG"):
 process extractCounts {
     container "${container__pandas}"
     label 'mem_veryhigh'
-    publishDir "${params.output_folder}/abund/", mode: "copy"
+    publishDir "${params.output_folder}/abund/", mode: "copy", pattern: "*.csv.gz"
     
     input:
     file results_hdf
