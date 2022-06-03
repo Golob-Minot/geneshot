@@ -1,0 +1,37 @@
+{
+    "$schema": "https://raw.githubusercontent.com/FredHutch/bash-workbench/main/docs/schema.json",
+    "name": "Extract Gene Abundances",
+    "description": "Extract the relative abundances of the subset of genes with a particular annotated function",
+    "args": {
+        "query": {
+            "help": "Return abundances for all genes which contain this string in their eggNOG description",
+            "wb_type": "string",
+            "required": true
+        },
+        "results_hdf": {
+            "help": "Geneshot output file *.results.hdf5",
+            "wb_type": "file",
+            "required": true
+        },
+        "details_hdf": {
+            "help": "Geneshot output file *.details.hdf5",
+            "wb_type": "file",
+            "required": true
+        },
+        "genes_fasta": {
+            "help": "Geneshot output file ref/genes.fasta.gz",
+            "wb_type": "file",
+            "required": true
+        },
+        "output_folder": {
+            "help": "Folder for output files",
+            "wb_type": "folder",
+            "default": "./results"
+        },
+        "output_prefix": {
+            "help": "Prefix for output files",
+            "wb_type": "string",
+            "default": "geneshot"
+        }
+    }
+}
