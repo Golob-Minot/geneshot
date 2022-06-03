@@ -1,0 +1,63 @@
+{
+    "$schema": "https://raw.githubusercontent.com/FredHutch/bash-workbench/main/docs/schema.json",
+    "name": "End-to-end CAG workflow",
+    "description": "De novo assemble genes, build CAGs, quantify CAGs, and test for associations",
+    "args": {
+        "manifest": {
+            "help": "File listing the input files for analysis using the columns 'specimen,R1,R2' (CSV)",
+            "wb_type": "file",
+            "required": true
+        },
+        "output": {
+            "help": "Folder for output files",
+            "wb_type": "folder",
+            "default": "./results"
+        },
+        "output_prefix": {
+            "help": "Prefix to append to output files",
+            "wb_type": "string",
+            "default": "geneshot"
+        },
+        "formula": {
+            "help": "If specified, test for the association of CAGs with a feature of interest defined as a column in the manifest",
+            "wb_type": "string"
+        },
+        "taxonomic_dmnd": {
+            "help": "If specified, perform taxonomic annotation of assembled genes by alignment to a DIAMOND reference database",
+            "wb_type": "file"
+        },
+        "eggnog_db": {
+            "help": "If specified, perform functional annotation of assembled genes by alignment to an eggNOG reference database (requires eggnog_dmnd)",
+            "wb_type": "file"
+        },
+        "eggnog_dmnd": {
+            "help": "If specified, perform functional annotation of assembled genes by alignment to an eggNOG reference database (requires eggnog_db)",
+            "wb_type": "file"
+        },
+        "composition": {
+            "help": "If specified, estimate the relative abundance of microbial taxa with the MetaPhlAn2 utility",
+            "wb_type": "bool",
+            "default": true
+        },
+        "distance_threshold": {
+            "help": "Cosine distance threshold used to build CAGs (lower values are more stringent). (Range: 0-1, default: 0.25)",
+            "default": "0.25",
+            "wb_type": "float"
+        },
+        "min_specimens": {
+            "help": "Minimum number of specimens which a gene must be found in for inclusion in CAGs",
+            "default": "1",
+            "wb_type": "integer"
+        },
+        "min_identity": {
+            "help": "Minimum amino acid identity threshold used to group gene sequences (default: 90)",
+            "default": "90",
+            "wb_type": "integer"
+        },
+        "nopreprocess": {
+            "help": "Skip adapter trimming and preprocessing of FASTQ inputs",
+            "default": false,
+            "wb_type": "bool"
+        }
+    }
+}
