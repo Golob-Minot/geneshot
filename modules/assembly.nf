@@ -39,6 +39,16 @@ workflow assembly_wf {
 
     main:
 
+    // Log the parameters used in this subworkflow
+    log.info"""
+    Assembly Parameters:
+    assembly_folder:   ${params.assembly_folder}
+    gene_fasta:        ${params.gene_fasta}
+    min_identity:      ${params.min_identity}
+    min_coverage:      ${params.min_coverage}
+    """
+
+
     // If the user provided an assembly folder
     if ( params.assembly_folder ) {
 
@@ -162,6 +172,15 @@ workflow annotation_wf {
     gene_fasta
 
     main:
+
+    // Log the parameters used in this subworkflow
+    log.info"""
+    Annotation Parameters:
+    noannot:          ${params.noannot}
+    eggnog_db:        ${params.eggnog_db}
+    eggnog_dmnd:      ${params.eggnog_dmnd}
+    taxonomic_dmnd:   ${params.taxonomic_dmnd}
+    """
 
     // Split up the gene catalog into shards for more efficient processing
     shard_genes(
