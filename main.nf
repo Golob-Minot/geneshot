@@ -124,14 +124,8 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include { preprocess_wf } from './modules/preprocess' params(
-    manifest: params.manifest,
-    adapter_F: params.adapter_F,
-    adapter_R: params.adapter_R,
-    hg_index: params.hg_index,
-    hg_index_url: params.hg_index_url,
-    min_hg_align_score: params.min_hg_align_score,
-)
+include { preprocess_wf } from './modules/preprocess'
+
 // Import some general tasks, such as combineReads and writeManifest
 include { 
     countReads;
@@ -149,65 +143,28 @@ include {
     repackHDF as repackDetailedHDF;
     buildRedis;
     splitCagFasta
-} from './modules/general' params(
-    output_folder: output_folder,
-    output_prefix: params.output_prefix,
-    formula: params.formula,
-    distance_metric: params.distance_metric,
-    distance_threshold: params.distance_threshold,
-    sd_mean_cutoff: params.sd_mean_cutoff,
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage,
-    dmnd_min_identity: params.dmnd_min_identity,
-    dmnd_min_coverage: params.dmnd_min_coverage,
-    eggnog_evalue: params.eggnog_evalue,
-    savereads: params.savereads,
-    fdr_method: params.fdr_method,
+} from './modules/general' addParams(
+    output_folder: output_folder
 )
 
 // Import the workflows used for assembly
 include { 
     assembly_wf;
     annotation_wf;
-} from './modules/assembly' params(
-    output_folder: output_folder,
-    output_prefix: params.output_prefix,
-    phred_offset: params.phred_offset,
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage,
-    noannot: params.noannot,
-    eggnog_db: params.eggnog_db,
-    eggnog_dmnd: params.eggnog_dmnd,
-    taxonomic_dmnd: params.taxonomic_dmnd,
-    gencode: params.gencode,
-    tax_evalue: params.tax_evalue,
-    gene_fasta: params.gene_fasta,
-    assembly_folder: params.assembly_folder,
+} from './modules/assembly' addParams(
+    output_folder: output_folder
 )
 
 // Import the workflows used for alignment-based analysis
 include { 
     alignment_wf;
     import_alignments_wf
-} from './modules/alignment' params(
-    output_folder: output_folder,
-    dmnd_min_identity: params.dmnd_min_identity,
-    dmnd_min_coverage: params.dmnd_min_coverage,
-    dmnd_top_pct: params.dmnd_top_pct,
-    dmnd_min_score: params.dmnd_min_score,
-    gencode: params.gencode,
-    sd_mean_cutoff: params.sd_mean_cutoff,
-    famli_batchsize: params.famli_batchsize,
+} from './modules/alignment' addParams(
+    output_folder: output_folder
 )
 
 // Import the workflow used to make CAGs
-include { makeCAGs } from './modules/make_cags' params(
-    distance_metric: params.distance_metric,
-    distance_threshold: params.distance_threshold,
-    min_contig_size: params.min_contig_size,
-    min_contig_depth: params.min_contig_depth,
-    min_specimens: params.min_specimens,
-)
+include { makeCAGs } from './modules/make_cags'
 
 // Import the workflows used for statistical analysis
 // Use separate workflows for corncob, each
