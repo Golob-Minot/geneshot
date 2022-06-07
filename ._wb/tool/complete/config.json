@@ -41,17 +41,17 @@
         },
         "distance_threshold": {
             "help": "Cosine distance threshold used to build CAGs (lower values are more stringent). (Range: 0-1, default: 0.25)",
-            "default": "0.25",
+            "default": 0.25,
             "wb_type": "float"
         },
         "min_specimens": {
             "help": "Minimum number of specimens which a gene must be found in for inclusion in CAGs",
-            "default": "1",
+            "default": 1,
             "wb_type": "integer"
         },
         "min_identity": {
             "help": "Minimum amino acid identity threshold used to group gene sequences (default: 90)",
-            "default": "90",
+            "default": 90,
             "wb_type": "integer"
         },
         "nopreprocess": {
