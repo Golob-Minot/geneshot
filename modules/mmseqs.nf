@@ -10,6 +10,9 @@ process linclust {
     
     output:
     file "output.genes.fasta.gz"
+
+    def min_seq_id = "${params.min_identity}".toInteger() / 100
+    def min_cov = "${params.min_coverage}".toInteger() / 100
     
 """
 #!/bin/bash
@@ -38,8 +41,8 @@ else
 
     # Cluster the protein sequences
     mmseqs linclust db cluster_db ./ \
-        --min-seq-id ${params.min_identity / 100} \
-        -c ${params.min_coverage / 100}
+        --min-seq-id ${min_seq_id} \
+        -c ${min_cov}
 
     # Get the representative sequences
     mmseqs result2repseq db cluster_db genes
