@@ -187,51 +187,56 @@ workflow annotation_wf {
         gene_fasta
     )
 
-    // Determine whether or not to run the eggNOG annotation based
-    // on --noannot and --eggnog_db / --eggnog_dmnd
-    run_eggnog = false
-    if ( params.noannot == false ) {
-        if ( params.eggnog_db && params.eggnog_dmnd ) {
-            if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
-                run_eggnog = true
-            }
-        }
-    }
+    // Determine whether or not to run the eggNOG and taxonomic annotations based
+    // on --noannot and --eggnog_db / --eggnog_dmnd / --taxonomic_dmnd
+    if ( "${params.noannot}" != "true" ) {
 
-    // Annotate the clustered genes with eggNOG
-    if ( run_eggnog ){
-        eggnog(
-            shard_genes.out.flatten(),
-            file(params.eggnog_db),
-            file(params.eggnog_dmnd)
-        )
-        eggnog_tsv = eggnog.out.collect()
+        // Check if the eggnog databases were set
+        if ( "${params.eggnog_db}" != "false" && "${params.eggnog_dmnd}" != "false" ) {
+
+            // Map the files used for the eggnog annotation database
+            eggnog_db = file("${params.eggnog_db}", checkIfExists: true)
+            eggnog_dmnd = file("${params.eggnog_dmnd}", checkIfExists: true)
+
+            // Annotate the clustered genes with eggNOG
+            eggnog(
+                shard_genes.out.flatten(),
+                eggnog_db,
+                eggnog_dmnd
+            )
+            eggnog_tsv = eggnog.out.collect()
+
+        } else {
+
+            log.info"""Skipping eggnog annotations -- eggnog_db == ${eggnog_db} | eggnog_dmnd == ${eggnog_dmnd}"""
+            eggnog_tsv = false
+
+        }
+
+        // Check if the taxonomic databases were set
+        if ( "${params.taxonomic_dmnd}" != "false" ){
+
+            // Map the file
+            taxonomic_dmnd = file("${params.taxonomic_dmnd}", checkIfExists: true)
+
+            // Annotate the clustered genes with DIAMOND for taxonomic ID
+            diamond_tax(
+                shard_genes.out.flatten(),
+                taxonomic_dmnd
+            )
+            tax_tsv = diamond_tax.out.collect()
+            join_tax(tax_tsv)
+
+        } else {
+
+            log.info"""Skipping taxonomic annotation -- taxonomic_dmnd == ${taxonomic_dmnd}"""
+            tax_tsv = false
+
+        }
+
     } else {
+        log.info"""Skipping eggnog and taxonomic annotations -- noannot == true"""
         eggnog_tsv = false
-    }
-
-    // Determine whether or not to run the taxnomic annotation based
-    // on --noannot and --taxonomic_dmnd
-    run_tax = false
-    if ( params.noannot == false ) {
-        if ( params.taxonomic_dmnd ) {
-            if ( !file(params.taxonomic_dmnd).isEmpty() ){
-                run_tax = true
-            }
-        }
-    }
-
-    // Annotate the clustered genes with DIAMOND for taxonomic ID
-    if ( run_tax ) {
-        diamond_tax(
-            shard_genes.out.flatten(),
-            file(params.taxonomic_dmnd)
-        )
-        tax_tsv = diamond_tax.out.collect()
-        join_tax(
-            tax_tsv
-        )
-    } else {
         tax_tsv = false
     }
 
