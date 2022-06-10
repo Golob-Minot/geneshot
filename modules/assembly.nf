@@ -208,7 +208,7 @@ workflow annotation_wf {
 
         } else {
 
-            log.info"""Skipping eggnog annotations -- eggnog_db == ${eggnog_db} | eggnog_dmnd == ${eggnog_dmnd}"""
+            log.info"""Skipping eggnog annotations -- eggnog_db == ${params.eggnog_db} | eggnog_dmnd == ${params.eggnog_dmnd}"""
             eggnog_tsv = false
 
         }
@@ -229,7 +229,7 @@ workflow annotation_wf {
 
         } else {
 
-            log.info"""Skipping taxonomic annotation -- taxonomic_dmnd == ${taxonomic_dmnd}"""
+            log.info"""Skipping taxonomic annotation -- taxonomic_dmnd == ${params.taxonomic_dmnd}"""
             tax_tsv = false
 
         }
