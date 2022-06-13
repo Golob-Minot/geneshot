@@ -6,12 +6,15 @@ import sys
 
 # Set the input path
 results_hdf = sys.argv[1]
+print(f"Results HDF5: {results_hdf}")
 
 # Set the query string
 query_str = sys.argv[2]
+print(f"Query string: {query_str}")
 
 # Set the output path
 output_fp = sys.argv[3]
+print(f"Output filepath: {output_fp}")
 
 # Make sure that the file is present in the working folder
 assert os.path.exists(results_hdf)
@@ -28,10 +31,10 @@ eggnog_desc = pd.read_hdf(
 # contain the query string of interest
 eggnog_desc = eggnog_desc.loc[eggnog_desc.fillna('').apply(lambda s: query_str in s)]
 
-assert eggnog_desc.shape[0] > 0, f"Did not find any annotations containing '{query_str}'"
+assert eggnog_desc.shape[0] > 0, "No annotations found"
 
 print(f"There are {eggnog_desc.shape[0]:,} annotations containing '{query_str}':")
-print('\\n'.join(eggnog_desc.sort_values().tolist()))
+print('\n'.join(eggnog_desc.sort_values().tolist()))
 
 # Set up a function to filter a DataFrame by the query string
 def filter_df(df):
