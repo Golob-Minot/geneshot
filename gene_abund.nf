@@ -264,10 +264,20 @@ with pd.HDFStore(details_hdf, 'r') as store:
     # Set up an object to save the proportion of gene copies in each specimen
     for specimen_name in manifest_df['specimen'].unique():
 
+        # Make the key which is used to store the abundances for this specimen
+        abundance_key = "/abund/gene/long/%s" % specimen_name
+
+        # If there are no abundances for this specimen
+        if abundance_key not in store:
+
+            # Skip it
+            print("No abundances found for specimen '%s'" % specimen_name)
+            continue
+
         print("Reading in abundances for specimen '%s'" % specimen_name)
 
         # Read in the full table
-        specimen_df = pd.read_hdf(store, "/abund/gene/long/%s" % specimen_name)
+        specimen_df = pd.read_hdf(store, abundance_key)
 
         # Get the total depth for all gene copies
         tot = specimen_df['depth'].sum()
