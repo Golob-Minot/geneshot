@@ -117,8 +117,8 @@ workflow {
 
     // Update the manifest
     replaceManifest(
-        file(params.input_hdf),
-        file(params.manifest)
+        file(params.input_hdf, checkIfExists: true),
+        file(params.manifest, checkIfExists: true)
     )
 
     // Repack the HDF

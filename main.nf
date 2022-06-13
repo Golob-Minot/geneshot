@@ -207,11 +207,11 @@ workflow {
     // compatible with the data provided in the manifest
     if ( params.formula ) {
         validation_wf(
-            file(params.manifest)
+            file(params.manifest, checkIfExists: true)
         )
         manifest_file = validation_wf.out
     } else {
-        manifest_file = Channel.from(file(params.manifest))
+        manifest_file = Channel.from(file(params.manifest, checkIfExists: true))
     }
 
     manifest_qced = read_manifest(manifest_file)
@@ -234,7 +234,7 @@ workflow {
         combineReads(
             manifest_qced.valid_paired.mix(manifest_qced.valid_paired_indexed)
             .map { 
-                r -> [r.specimen, file(r.R1), file(r.R2)]
+                r -> [r.specimen, file(r.R1, checkIfExists: true), file(r.R2, checkIfExists: true)]
             }.groupTuple()
         )
     }
@@ -325,7 +325,7 @@ workflow {
     if ( params.cags_csv ) {
 
         // Point to that file
-        cags_csv = file(params.cags_csv)
+        cags_csv = file(params.cags_csv, checkIfExists: true)
 
     // Otherwise
     } else {
@@ -450,7 +450,7 @@ workflow {
         if ( params.taxonomic_dmnd ) {
             if ( !file(params.taxonomic_dmnd).isEmpty() ){
                 readTaxonomy(
-                    file(params.ncbi_taxdump)
+                    file(params.ncbi_taxdump, checkIfExists: true)
                 )
 
                 addTaxResults(

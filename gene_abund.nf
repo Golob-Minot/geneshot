@@ -73,24 +73,24 @@ workflow {
 
     // Get the table of genes which contain this annotation
     extractAnnotations(
-        file(params.results_hdf)
+        file(params.results_hdf, checkIfExists: true)
     )
 
     // Get the sequences of the genes which match this query
     extractFASTA(
         extractAnnotations.out,
-        file(params.genes_fasta)
+        file(params.genes_fasta, checkIfExists: true)
     )
 
     // Get the user-provided manifest
     extractManifest(
-        file(params.results_hdf)
+        file(params.results_hdf, checkIfExists: true)
     )
 
     // Get the proportion of gene copies for these genes across all specimens
     extractAbund(
         extractAnnotations.out,
-        file(params.details_hdf),
+        file(params.details_hdf, checkIfExists: true),
         extractManifest.out
     )
 

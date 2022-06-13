@@ -102,7 +102,7 @@ workflow {
     main:
 
     // Phase 0: Validation of input data
-    manifest_file = Channel.from(file(params.manifest))
+    manifest_file = Channel.from(file(params.manifest, checkIfExists: true))
     // Read manifest splits out our manifest.
     manifest_qced = read_manifest(manifest_file)
 
@@ -122,7 +122,7 @@ workflow {
         combineReads(
             manifest_qced.valid_paired.mix(manifest_qced.valid_paired_indexed)
             .map { 
-                r -> [r.specimen, file(r.R1), file(r.R2)]
+                r -> [r.specimen, file(r.R1, checkIfExists: true), file(r.R2, checkIfExists: true)]
             }.groupTuple()
         )
 
@@ -134,7 +134,7 @@ workflow {
     composition_wf(
         combineReads.out,
         manifest_qced.valid_unpaired.map{ r-> 
-            [r.specimen, file(r.R1)]
+            [r.specimen, file(r.R1, checkIfExists: true)]
         }
     )
 

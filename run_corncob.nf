@@ -159,13 +159,13 @@ workflow {
     // First update the formula listed in the geneshot results file,
     // a process which will also extract the manifest CSV
     updateFormula(
-        file(params.results_hdf)
+        file(params.results_hdf, checkIfExists: true)
     )
 
     // Calculate the association of individual CAGs with user-provided features
     cag_corncob_wf(
         updateFormula.out[0],
-        file(params.details_hdf),
+        file(params.details_hdf, checkIfExists: true),
         updateFormula.out[1],
         "cag",
         "CAG"
