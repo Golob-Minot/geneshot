@@ -86,22 +86,16 @@ if (!params.output.endsWith("/")){
 }
 
 // Import the preprocess_wf module
-include { preprocess_wf } from './modules/preprocess' params(
-    adapter_F: params.adapter_F,
-    adapter_R: params.adapter_R,
-    hg_index: params.hg_index,
-    hg_index_url: params.hg_index_url,
-    min_hg_align_score: params.min_hg_align_score,
-)
+include { preprocess_wf } from './modules/preprocess'
+
 // Import some general tasks
-include { combineReads; read_manifest } from './modules/general' params(
-    savereads: params.savereads,
+include { combineReads; read_manifest } from './modules/general' addParams(
     output_folder: output_folder
 )
 
 // Import from composition_wf module
-include { composition_wf } from './modules/composition' params(
-    output_folder: params.output_folder
+include { composition_wf } from './modules/composition' addParams(
+    output_folder: output_folder
 )
 
 workflow {

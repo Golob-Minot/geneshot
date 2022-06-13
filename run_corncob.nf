@@ -63,22 +63,14 @@ include {
     corncob_wf as cag_corncob_wf;
     corncob_wf as tax_corncob_wf;
     corncob_wf as func_corncob_wf;
-} from './modules/statistics' params(
-    output_folder: params.output_folder,
-    formula: params.formula,
-    corncob_batches: params.corncob_batches,
-    fdr_method: params.fdr_method,
-    output_prefix: params.output_prefix,    
-)
+} from './modules/statistics'
 
 
 
 // Import the process used to compress the output HDF
 include {
     repackHDF
- } from './modules/general' params(
-    output_folder: params.output_folder,
-)
+ } from './modules/general'
 
 // Process to update the formula listed in the summary table
 // Also extract the manifest to reduce the number of times

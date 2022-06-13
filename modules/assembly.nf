@@ -7,9 +7,8 @@ params.gene_fasta = false
 params.assembly_folder = false
 params.gene_shard_size = 100000
 
-include { diamondDB } from "./alignment" params(
-    output_folder: params.output_folder
-)
+include { diamondDB } from "./alignment"
+
 include {
     linclust as linclustRound1;
     linclust as linclustRound2;

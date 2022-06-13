@@ -79,22 +79,10 @@ include {
     addTaxResults;
     addEggnogResults;
     repackHDF;
-} from './modules/general' params(
-    output_folder: params.output_folder,
-    eggnog_evalue: params.eggnog_evalue,
-)
+} from './modules/general'
 
 // Import the workflows used for annotation
-include { annotation_wf } from './modules/assembly' params(
-    output_folder: params.output_folder,
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage,
-    eggnog_db: params.eggnog_db,
-    eggnog_dmnd: params.eggnog_dmnd,
-    taxonomic_dmnd: params.taxonomic_dmnd,
-    tax_evalue: params.tax_evalue,
-    noannot: params.noannot
-)
+include { annotation_wf } from './modules/assembly'
 
 // Process to rename the input HDF file
 process renameHDF{

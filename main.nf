@@ -185,7 +185,7 @@ include {
 )
 
 // Import the workflow used for composition analysis
-include { metaphlan2_fastq } from './modules/composition' params(
+include { metaphlan2_fastq } from './modules/composition' addParams(
     output_folder: output_folder
 )
 
@@ -193,7 +193,7 @@ include { metaphlan2_fastq } from './modules/composition' params(
 include {
     addMetaPhlAn2Results;
     publish as publishGeneAbundances
-} from './modules/general' params(
+} from './modules/general' addParams(
     output_folder: "${output_folder}/abund/"
 )
 
