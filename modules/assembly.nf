@@ -21,10 +21,7 @@ include {
     diamondDedup as dedupRound3;
     diamondDedup as dedupRound4;
     diamondDedup as dedupRound5;
- } from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
-)
+ } from "./mmseqs"
 
 workflow assembly_wf {
     take:
