@@ -1,18 +1,11 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 
-container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
-container__general = "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-
 // Default parameters
 params.output_prefix = "geneshot"
 params.tax_evalue = 0.00001
 params.gene_fasta = false
 params.assembly_folder = false
 params.gene_shard_size = 100000
-
-// Containers
-container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 
 include { diamondDB } from "./alignment" params(
     output_folder: params.output_folder
@@ -251,7 +244,7 @@ workflow annotation_wf {
 // De novo assembly
 process assembly {
     tag "De novo metagenomic assembly"
-    container "${container__assembler}"
+    container "${params.container__assembler}"
     label 'mem_veryhigh'
 
     publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
@@ -351,7 +344,7 @@ barrnap -o ${specimen}.rrna.fasta < FASTA > ${specimen}.rrna.gff
 // Summarize the depth of sequencing and GC content for every assembled gene
 process parseGeneAnnotations {
     tag "Summarize every assembled gene"
-    container "${container__pandas}"
+    container "${params.container__pandas}"
     label 'mem_medium'
     
     input:
@@ -459,7 +452,7 @@ parse_prodigal_faa("${faa}").to_csv(
 // Combine the assembly table with the assignment of catalog genes
 process annotateAssemblies {
     tag "Summarize every assembled gene"
-    container "${container__pandas}"
+    container "${params.container__pandas}"
     label 'mem_medium'
 
     publishDir "${params.output_folder}/assembly/${specimen}", mode: "copy"
@@ -521,7 +514,7 @@ assembly_df.to_csv(
 
 process shard_genes {
     tag "Split the gene catalog into smaller shards"
-    container "${container__general}"
+    container "${params.container__general}"
     label 'mem_medium'
     
     input:
@@ -578,7 +571,7 @@ rm ${diamond_tax_db}
 
 process join_tax {
     tag "Concatenate taxonomy annotation files"
-    container "${container__general}"
+    container "${params.container__general}"
     label 'mem_medium'
     publishDir "${params.output_folder}/annot/", mode: "copy"
 
@@ -646,7 +639,7 @@ gzip genes.emapper.annotations
 // Assign a new, shorter name to a set of genes
 process renameGenes {
     tag "Make concise unique gene names"
-    container "${container__general}"
+    container "${params.container__general}"
     label 'io_limited'
     publishDir "${params.output_folder}/ref/", mode: "copy"
 
@@ -731,7 +724,7 @@ process alignAlleles {
 // Combine all assembly results into a single HDF file (and summary CSV)
 process joinAssemblyData{
     tag "Convert gene assembly data to HDF"
-    container "${container__experiment_collection}"
+    container "${params.container__experiment_collection}"
     label 'mem_veryhigh'
 
     input:

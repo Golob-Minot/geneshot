@@ -1,10 +1,3 @@
-
-// Container versions
-container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
-container__ubuntu = "ubuntu:18.04"
-container__experiment_collection = "quay.io/fhcrc-microbiome/experiment-collection:v0.2"
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
-
 // Default parameters
 params.fdr_method = "fdr_bh"
 params.eggnog_evalue = 0.00001
@@ -51,7 +44,7 @@ workflow combineReads {
 
 process joinFASTQ {
     tag "Join FASTQ files per-specimen"
-    container "${container__fastatools}"
+    container "${params.container__fastatools}"
     label 'mem_medium'
 
     // If the user sets --preprocess_output, write out the combined reads to that folder
@@ -83,7 +76,7 @@ combine_fastq_pairs.py \
 }
 
 process outputManifest {
-    container "${container__ubuntu}"
+    container "${params.container__ubuntu}"
 
     publishDir path: "${params.output_folder}qc/", enabled: params.savereads, mode: "copy"
 
@@ -122,7 +115,7 @@ workflow writeManifest {
 // Count the number of input reads for a single sample
 process countReads {
     tag "Count the number of reads per sample"
-    container "${container__fastatools}"
+    container "${params.container__fastatools}"
     cpus 1
     memory "4 GB"
 
@@ -150,7 +143,7 @@ echo "${sample_name},\$n" > "${sample_name}.countReads.csv"
 // a single list containing all of the data from all samples.
 process countReadsSummary {
     tag "Summarize the number of reads per sample"
-    container "${container__fastatools}"
+    container "${params.container__fastatools}"
     // The output from this process will be copied to the --output_folder specified by the user
     publishDir "${params.output_folder}/qc/", mode: 'copy'
 
@@ -174,7 +167,7 @@ cat ${readcount_csv_list} >> readcounts.csv
 // Process which will concatenate a set of files
 process concatenateFiles {
     tag "Directly combine a group of files"
-    container "${container__ubuntu}"
+    container "${params.container__ubuntu}"
     label "mem_medium"
     
     input:
@@ -194,7 +187,7 @@ cat __INPUT* > ${output_name}
 
 process collectResults{
     
-    container "${container__experiment_collection}"
+    container "${params.container__experiment_collection}"
     label 'mem_veryhigh'
 
     input:
@@ -388,7 +381,7 @@ with pd.HDFStore("${params.output_prefix}.results.hdf5", "w") as store:
 
 process calcDistances{
     
-    container "${container__experiment_collection}"
+    container "${params.container__experiment_collection}"
     label 'mem_medium'
 
     input:
@@ -625,7 +618,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
 
 process joinHDF{
-    container "${container__pandas}"
+    container "${params.container__pandas}"
     label 'mem_veryhigh'
 
     input:
@@ -665,7 +658,7 @@ with pd.HDFStore(inputA, "a") as output_store:
 
 process addMetaPhlAn2Results{
     tag "Add composition analysis to HDF"
-    container "${container__pandas}"
+    container "${params.container__pandas}"
     label 'mem_medium'
 
     input:
@@ -718,7 +711,7 @@ print("Done")
 
 process addEggnogResults {
     tag "Add functional predictions to HDF"
-    container "${container__experiment_collection}"
+    container "${params.container__experiment_collection}"
     label 'mem_veryhigh'
 
     input:
@@ -891,7 +884,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 
 process readTaxonomy {
     tag "Read the NCBI taxonomy"
-    container "${container__experiment_collection}"
+    container "${params.container__experiment_collection}"
     label 'mem_medium'
 
     input:
@@ -1005,7 +998,7 @@ tax_df.to_csv(
 
 process addTaxResults {
     tag "Add taxonomic annotations to HDF"
-    container "${container__experiment_collection}"
+    container "${params.container__experiment_collection}"
     label 'mem_veryhigh'
 
     input:
@@ -1121,7 +1114,7 @@ with pd.HDFStore("${results_hdf}", "a") as store:
 // Repack an HDF5 file
 process repackHDF {
 
-    container "${container__pandas}"
+    container "${params.container__pandas}"
     tag "Compress HDF store"
     label "mem_veryhigh"
     publishDir "${params.output_folder}", mode: "copy", overwrite: true
@@ -1211,7 +1204,7 @@ echo "Done"
 
 process splitCagFasta{
     
-    container "${container__experiment_collection}"
+    container "${params.container__experiment_collection}"
     label 'io_limited'
     publishDir "${params.output_folder}/ref/", mode: "copy"
 

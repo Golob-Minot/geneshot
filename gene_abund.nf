@@ -98,7 +98,7 @@ workflow {
 
 process extractAnnotations {
 
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "${params.container__general}"
     label "mem_medium"
 
     input:
@@ -121,7 +121,7 @@ extractAnnotations.py "${results_hdf}" "${params.query}" "${params.output_prefix
 
 process extractManifest {
 
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "${params.container__general}"
     label "mem_medium"
 
     input:
@@ -155,7 +155,7 @@ manifest_df.to_csv("${params.output_prefix}.manifest.csv", index=None)
 
 process extractFASTA {
 
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "${params.container__general}"
     label "io_limited"
 
     input:
@@ -218,7 +218,7 @@ print("DONE")
 
 process extractAbund {
 
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "${params.container__pandas}"
     label "mem_medium"
 
     input:

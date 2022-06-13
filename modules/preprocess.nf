@@ -1,12 +1,3 @@
-// Container versions
-container__barcodecop = "quay.io/fhcrc-microbiome/barcodecop:barcodecop_0.5.3"
-container__cutadapt = "quay.io/fhcrc-microbiome/cutadapt:cutadapt_2.3_bcw_0.3.1"
-container__bwa = "quay.io/fhcrc-microbiome/bwa:bwa.0.7.17__bcw.0.3.0I"
-
-// Input to this workflow is a manifest CSV 
-
-
-
 // Function to filter a manifest to those rows which 
 // have values for specimen, R1, and R2, but are missing any values in I1 or I2
 def filter_no_index(manifest_ch){
@@ -109,7 +100,7 @@ workflow preprocess_wf {
 // Run barcodecop to validate the demultiplex
 process barcodecop {
     tag "Validate barcode demultiplexing for WGS reads"
-    container "${container__barcodecop}"
+    container "${params.container__barcodecop}"
     label 'mem_medium'
     maxRetries 10
 
@@ -151,7 +142,7 @@ echo "Done"
 // Process to run catadapt
 process cutadapt {
     tag "Trim adapters from WGS reads"
-    container "${container__cutadapt}"
+    container "${params.container__cutadapt}"
     label 'mem_medium'
     maxRetries 10
 
@@ -175,7 +166,7 @@ ${R1} ${R1} > ${R1.getSimpleName()}.cutadapt.log
 // Process to download the human genome BWA index, already tarballed
 process download_hg_index {
     tag "Download human reference genome"
-    container "${container__bwa}"
+    container "${params.container__bwa}"
     label 'io_limited'
 
     output:
@@ -195,7 +186,7 @@ tar -tzvf hg_index.tar.gz
 // Process to remove human reads
 process bwa {
     tag "Remove human reads"
-    container "${container__bwa}"
+    container "${params.container__bwa}"
     maxRetries 10
     label 'mem_veryhigh'
 

@@ -17,9 +17,6 @@ params.output_prefix = false
 params.manifest = false
 params.help = false
 
-// Docker containers
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
-
 // Function which prints help message text
 def helpMessage() {
     log.info"""
@@ -54,7 +51,7 @@ include { repackHDF } from './modules/general'
 // Also extract the manifest to reduce the number of times
 // the file is opened
 process replaceManifest {
-    container "${container__pandas}"
+    container "${params.container__pandas}"
     label 'mem_medium'
     errorStrategy 'finish'
 

@@ -21,9 +21,6 @@ params.fdr_method = "fdr_bh"
 params.corncob_batches = 10
 params.help = false
 
-// Docker containers
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
-
 // Function which prints help message text
 def helpMessage() {
     log.info"""
@@ -87,7 +84,7 @@ include {
 // Also extract the manifest to reduce the number of times
 // the file is opened
 process updateFormula{
-    container "${container__pandas}"
+    container "${params.container__pandas}"
     label 'mem_medium'
     errorStrategy 'finish'
 

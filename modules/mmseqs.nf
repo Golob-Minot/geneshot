@@ -1,8 +1,6 @@
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
-
 process linclust {
     tag "Cluster genes with similar sequences"
-    container "quay.io/fhcrc-microbiome/mmseqs2:version-12"
+    container "${params.container__mmseqs}"
     label 'mem_medium'
     
     input:
@@ -60,7 +58,7 @@ fi
 
 process diamondDedup {
     tag "Deduplicate sequences by alignment with DIAMOND"
-    container "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6-biopython"
+    container "${params.container__diamond}"
     label 'mem_veryhigh'
     
     input:

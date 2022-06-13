@@ -1,5 +1,3 @@
-container__find_cags = "quay.io/fhcrc-microbiome/python-pandas:sklearn"
-
 // Default options
 params.distance_threshold = 0.15
 params.distance_metric = "cosine"
@@ -9,7 +7,7 @@ params.min_contig_depth = 5
 // Group together genes by co-abundance
 process makeCAGs {
     tag "Group genes by co-abundance"
-    container "${container__find_cags}"
+    container "${params.container__find_cags}"
     label "mem_veryhigh"
 
     input:
