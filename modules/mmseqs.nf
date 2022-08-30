@@ -1,6 +1,6 @@
 process linclust {
     tag "Cluster genes with similar sequences"
-    container "${params.container__mmseqs}"
+    container "quay.io/fhcrc-microbiome/mmseqs2:version-12"
     label 'mem_medium'
     
     input:
