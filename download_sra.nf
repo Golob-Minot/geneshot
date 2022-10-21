@@ -7,7 +7,8 @@ nextflow.enable.dsl=2
 
 // Set default values for parameters
 params.accession = false
-params.output = false
+params.list = false
+params.output = '.'
 params.help = false
 
 // Function which prints help message text
@@ -21,7 +22,10 @@ def helpMessage() {
 
     Required Arguments:
       --accession           Accession for NCBI BioProject to download
-      --output              Folder to write output files
+                    OR
+      --list                List of SRA IDs to download
+      --output              Folder to write output files (default invoking directory)
+
 
     Output Files:
 
@@ -37,7 +41,7 @@ def helpMessage() {
 }
 
 // Show help message if the user specifies the --help flag at runtime
-if (params.help || params.accession == false || params.output == false){
+if (params.help){
     // Invoke the function above which prints the help message
     helpMessage()
     // Exit out and do not run anything else
@@ -54,13 +58,20 @@ if (!params.output.endsWith("/")){
 // Main workflow
 workflow {
 
-    // Get a file listing every SRA ID
-    getSRAlist(
-        params.accession
-    )
+    if (params.accession) {
+        // Get a file listing every SRA ID
+        getSRAlist(
+            params.accession
+        )
 
-    // Make a channel with every individual SRA ID
-    sra_id_ch = getSRAlist.out.splitText().map { r -> r.replaceAll(/\n/, "")}
+        // Make a channel with every individual SRA ID
+        sra_id_ch = getSRAlist.out.splitText().map { r -> r.replaceAll(/\n/, "")}
+    } else if (params.list) {
+        sra_id_ch = Channel.fromPath(params.list).splitText()
+    } else {
+        helpMessage()
+        exit 0
+    }
 
     // Get the metadata for each accession
     getMetadata(
