@@ -67,7 +67,7 @@ workflow {
         // Make a channel with every individual SRA ID
         sra_id_ch = getSRAlist.out.splitText().map { r -> r.replaceAll(/\n/, "")}
     } else if (params.list) {
-        sra_id_ch = Channel.fromPath(params.list).splitText()
+        sra_id_ch = Channel.fromPath(params.list).splitText() { it.strip() }
     } else {
         helpMessage()
         exit 0
