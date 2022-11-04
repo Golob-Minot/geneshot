@@ -73,6 +73,8 @@ workflow {
         exit 0
     }
 
+    sra_id_ch.view()
+    
     // Get the metadata for each accession
     getMetadata(
         sra_id_ch
