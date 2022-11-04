@@ -225,7 +225,7 @@ with open("accession_list.txt", "wt") as fo:
 process getSRRuid {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_net"
-    errorStrategy 'finish'
+    errorStrategy 'ignore'
     
     input:
     val accession
@@ -292,7 +292,7 @@ print(SRR_id.strip())
 process getMetadata {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_net"
-    errorStrategy 'finish'
+    errorStrategy 'ignore'
     
     input:
     val sra_id
@@ -474,7 +474,7 @@ metadata_df.to_csv("${params.accession}.metadata.csv", index=None)
 process downloadSRA {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "io_net"
-    errorStrategy 'finish'
+    errorStrategy 'ignore'
     
     input:
     val accession
