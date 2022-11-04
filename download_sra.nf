@@ -67,14 +67,20 @@ workflow {
         // Make a channel with every individual SRA ID
         sra_id_ch = getSRAlist.out.splitText().map { r -> r.replaceAll(/\n/, "")}
     } else if (params.list) {
-        sra_id_ch = Channel.fromPath(params.list).splitText() { it.strip() }
+        sra_acc_ch = Channel.fromList(
+            file(params.list).readLines().each { it.strip() }
+       )
+
+    
+        sra_id_ch = getSRRuid(
+            sra_acc_ch 
+        ).map { it.strip() }
+        
     } else {
         helpMessage()
         exit 0
     }
 
-    sra_id_ch.view()
-    
     // Get the metadata for each accession
     getMetadata(
         sra_id_ch
@@ -214,6 +220,73 @@ with open("accession_list.txt", "wt") as fo:
 
 """
 }
+
+// Get the UID for an SRR
+process getSRRuid {
+    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    label "io_net"
+    errorStrategy 'finish'
+    
+    input:
+    val accession
+
+    output:
+    stdout
+
+"""
+#!/usr/bin/env python3
+import requests
+from time import sleep
+import xml.etree.ElementTree as ET
+import os
+
+run_accession ="${accession}"
+
+# Make a function to fetch data from the Entrez API
+# while retrying if any errors are encountered
+def request_url(url, max_retries=10, pause_seconds=0.5):
+    # Try the request `max_retries` times, with a `pause_seconds` pause in-between
+    assert isinstance(max_retries, int)
+    assert max_retries > 0
+    for i in range(max_retries):
+        r = requests.get(url)
+        if r.status_code == 200:
+            return r.text
+        sleep(pause_seconds)
+
+# Format an Entrez query, execute the request, and return the result
+def entrez(mode, **kwargs):
+    assert mode in ["efetch", "esearch", "elink"]
+
+    kwargs_str = "&".join(["%s=%s" % (k, v) for k, v in kwargs.items()])
+    url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/%s.fcgi?%s"
+    url = url % (mode, kwargs_str)
+
+    # Get the text response
+    response_text = request_url(url)
+
+    # Parse the XML
+    return ET.fromstring(response_text)
+
+
+# First, serch for the SRA accession
+SRA_result = entrez(
+    'esearch', 
+    db="sra", 
+    term=run_accession
+)
+
+SRR_id = SRA_result.find(
+    "IdList"
+).find(
+    "Id"
+).text
+
+print(SRR_id.strip())
+
+"""
+}
+
 
 // Get the metadata for a single SRA accession
 process getMetadata {
@@ -387,10 +460,6 @@ metadata_df = pd.DataFrame([
 ])
 print("Found records for %d SRA accessions" % metadata_df.shape[0])
 
-# Filter down to just the PAIRED records
-metadata_df = metadata_df.query("LAYOUT == 'PAIRED'")
-print("Kept records for %d PAIRED SRA accessions" % metadata_df.shape[0])
-
 # Make sure that we have a column for the SRR* accession
 assert "RUN_SET_accession" in metadata_df.columns.values
 assert metadata_df["RUN_SET_accession"].isnull().sum() == 0
@@ -441,7 +510,7 @@ fi
 process extractSRA {
     container "quay.io/fhcrc-microbiome/get_sra:v0.4"
     label "io_limited"
-    errorStrategy 'finish'
+    errorStrategy 'ignore'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
     input:
