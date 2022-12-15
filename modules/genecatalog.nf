@@ -229,7 +229,7 @@ process Assembly {
     tag "De novo metagenomic assembly"
     container "${container__assembler}"
     label 'mem_veryhigh'
-    errorStrategy "finish"
+    errorStrategy "ignore"
 
     publishDir "${params.output_folder}/genecatalog/${specimen}", mode: "copy"
 

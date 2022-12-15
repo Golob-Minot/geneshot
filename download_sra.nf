@@ -87,9 +87,9 @@ workflow {
     )
 
     // Join together all of the metadata into a single table
-    joinMetadata(
-        getMetadata.out.toSortedList()
-    )
+//    joinMetadata(
+//        getMetadata.out.toSortedList()
+//    )
 
     // Parse the accession from the metadata file names
     sra_acc_ch = getMetadata.out.map {
@@ -114,10 +114,10 @@ workflow {
     }
 
     // Make a single set of readnames joined with the metadata
-    gatherReadnames(
-        manifestStr,
-        joinMetadata.out
-    )
+//    gatherReadnames(
+//        manifestStr,
+//        joinMetadata.out
+//    )
 
 }
 
@@ -430,7 +430,7 @@ with gzip.open("%s.metadata.json.gz" % sra_accession, "wt") as fo:
 process joinMetadata {
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
     label "mem_medium"
-    errorStrategy 'retry'
+    errorStrategy 'ignore'
     
     input:
     file metadata_json_list
