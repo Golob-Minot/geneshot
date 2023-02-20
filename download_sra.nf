@@ -488,9 +488,9 @@ set -e
 
 echo "Getting the URL for the SRA file"
 ACC=$accession
-curl -o \${ACC}.json -s -X POST "https://www.ncbi.nlm.nih.gov/Traces/sdl/1/retrieve?acc=\${ACC}&location=s3.us-west-2"
+curl -o \${ACC}.json -s -X POST "https://www.ncbi.nlm.nih.gov/Traces/sdl/2/retrieve?acc=\${ACC}"
 
-sra_url="\$(cat \${ACC}.json | jq '.[0] | .files | .[0] | .link' | tr -d '"')"
+sra_url="\$(cat \${ACC}.json | jq '.result | .[0] | .files | .[0] | .locations | .[0] | .link' | tr -d '"')"
 echo "Download URL is \$sra_url"
 
 if [[ \$sra_url == null ]]; then
@@ -508,8 +508,8 @@ fi
 
 // Extract the FASTQ files from the SRA file
 process extractSRA {
-    container "quay.io/fhcrc-microbiome/get_sra:v0.4"
-    label "io_limited"
+    container "golob/get_sra:v3.0.0A"
+    label "io_net"
     errorStrategy 'ignore'
     publishDir "${output_folder}", mode: "copy", overwrite: "true"
     
