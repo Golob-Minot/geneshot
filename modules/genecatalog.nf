@@ -5,8 +5,8 @@ params.output_prefix = "geneshot"
 // Assembly options
 params.gene_fasta = false
 params.phred_offset = 33 // spades
-params.min_identity = 90 // linclust and reference genome alignment
-params.min_coverage = 50 // linclust and reference genome alignment
+params.min_identity = 50 // linclust and reference genome alignment
+params.min_coverage = 80 // linclust and reference genome alignment
 // Default values for boolean flags
 // If these are not set by the user, then they will be set to the values below
 // This is useful for the if/then control syntax below
@@ -30,41 +30,19 @@ container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 include { DiamondDB } from "./alignment" params(
     output_folder: params.output_folder
 )
-include { linclust as linclustRound1 } from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
+include { MMSeqs2_Cluster as MMSeqs2_Cluster_100 } from "./mmseqs" params(
+    min_identity: 100,
+    min_coverage: 80
 )
-include { linclust as linclustRound2 } from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
+include { MMSeqs2_Cluster as MMSeqs2_Cluster_90 } from "./mmseqs" params(
+    min_identity: 90,
+    min_coverage: 80
 )
-include { linclust as linclustRound3 } from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
+include { MMSeqs2_Cluster as MMSeqs2_Cluster_50 } from "./mmseqs" params(
+    min_identity: 50,
+    min_coverage: 80
 )
-include { linclust as linclustRound4 } from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
-)
-include { linclust as linclustRound5 } from "./mmseqs" params(
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage
-)
-include { diamondDedup as dedupRound1 } from "./mmseqs" params(
-    min_identity: params.min_identity
-)
-include { diamondDedup as dedupRound2 } from "./mmseqs" params(
-    min_identity: params.min_identity
-)
-include { diamondDedup as dedupRound3 } from "./mmseqs" params(
-    min_identity: params.min_identity
-)
-include { diamondDedup as dedupRound4 } from "./mmseqs" params(
-    min_identity: params.min_identity
-)
-include { diamondDedup as dedupRound5 } from "./mmseqs" params(
-    min_identity: params.min_identity
-)
+
 
 workflow Genecatalog_wf {
     take:
@@ -87,72 +65,40 @@ workflow Genecatalog_wf {
         Prodigal.out[0].map{ r -> [r[0], r[1]]}
     )
 
-    // Combine genes by amino acid identity in five rounds
-    // Each round will include both linclust- and DIAMOND-based deduplication
-    // linclust provides fast symmetrical overlap search, while
-    // DIAMOND performs slower, asymmetrical overlap search
-    linclustRound1(
-        Prodigal.out[0].map{ r -> r[1]}.toSortedList().flatten().collate(4)
-    )
-    dedupRound1(
-        linclustRound1.out
-    )
-    linclustRound2(
-        dedupRound1.out.toSortedList().flatten().collate(4)
-    )
-    dedupRound2(
-        linclustRound2.out
-    )
-    linclustRound3(
-        dedupRound2.out.toSortedList().flatten().collate(4)
-    )
-    dedupRound3(
-        linclustRound3.out
-    )
-    linclustRound4(
-        dedupRound3.out.toSortedList().flatten().collate(4)
-    )
-    dedupRound4(
-        linclustRound4.out
-    )
-    linclustRound5(
-        dedupRound4.out.toSortedList()
-    )
-    dedupRound5(
-        linclustRound5.out
-    )
-
-    // Make new, shorter names for each gene
-    renameGenes(
-        dedupRound5.out
-    )
-
-    // Index the assembled alleles for alignment
-    DiamondDB(
-        renameGenes.out
-    )
-
-    // Align the assembled alleles against the gene centroids
-    AlignAlleles(
-        Prodigal.out[0].map{ r -> [r[0], r[1]]},
-        DiamondDB.out
-    )
-
-    // Join the gene annotation tables with the gene assignments
-    AnnotateAssemblies(
-        ParseGeneAnnotations.out.join(
-            AlignAlleles.out
-        )
-    )
     // Make a dereplicated allele catalog 
     DereplicateAlleles(
-        AnnotateAssemblies.out.collect{ it[0] }, // specimens
-        AnnotateAssemblies.out.collect{ it[2] }, // specimen allele FAA
-        AnnotateAssemblies.out.collect{ it[1] }, // specimen allele info CSV
+        ParseGeneAnnotations.out.collect{ it[0] }, // specimens
+        ParseGeneAnnotations.out.collect{ it[1] }, // specimen allele FAA
+        ParseGeneAnnotations.out.collect{ it[2] }, // specimen allele info CSV
     )
-    emit:
-        gene_fasta = renameGenes.out
-        allele_assembly_csv_list = AnnotateAssemblies.out.map{ it[1] }.toSortedList()
+
+    // Cluster at 80 / 100 c/i
+    MMSeqs2_Cluster_100(
+        DereplicateAlleles.out.alleles
+    )
+
+    MMSeqs2_Cluster_90(
+        MMSeqs2_Cluster_100.out.seqs
+    )
+
+    MMSeqs2_Cluster_50(
+        MMSeqs2_Cluster_90.out.seqs
+    )
+    // Summarize!
+
+    SummarizeAllelesAndClusters(
+        DereplicateAlleles.out.allele_info,
+        MMSeqs2_Cluster_100.out.clusters,
+        MMSeqs2_Cluster_90.out.clusters,
+        MMSeqs2_Cluster_50.out.clusters,
+        MMSeqs2_Cluster_100.out.seqs,
+        MMSeqs2_Cluster_90.out.seqs,
+        MMSeqs2_Cluster_50.out.seqs,        
+    )
+
+    //emit:
+    //    gene_fasta = renameGenes.out
+    //    allele_assembly_csv_list = AnnotateAssemblies.out.map{ it[1] }.toSortedList()
 
 }
 
@@ -317,8 +263,8 @@ process DereplicateAlleles {
     file(specimen_allele_csvs)
     
     output:
-    path "allele_info.csv.gz"
-    path "alleles.faa.gz"
+    path "allele_info.csv.gz", emit: allele_info
+    path "alleles.faa.gz", emit: alleles
 
     publishDir "${params.output_folder}/genecatalog/", mode: "copy"
 
@@ -329,7 +275,7 @@ from collections import defaultdict
 import fastalite
 import csv
 
-# First load in the per_specimen_allele -> contig and catalog_gene
+# First load in the per_specimen_allele -> contig
 sp_allele_csvs = "${specimen_allele_csvs.join(';;')}".split(';;')
 specimen_allele_info = {}
 for sac in sp_allele_csvs:
@@ -338,7 +284,6 @@ for sac in sp_allele_csvs:
         r['gene_name']: {
             'specimen_allele': r['gene_name'],
             'specimen': r['specimen'],
-            'catalog_gene': r['catalog_gene'],
             'contig': r['contig']
         } 
         for r in sac_r
@@ -364,7 +309,7 @@ with gzip.open("alleles.faa.gz", 'wt') as allele_h:
         ))
 
 with gzip.open("allele_info.csv.gz", 'wt') as allele_info_h:
-    allele_w = csv.DictWriter(allele_info_h, fieldnames=['allele', 'specimen_allele', 'specimen', 'contig', 'catalog_gene'])
+    allele_w = csv.DictWriter(allele_info_h, fieldnames=['allele', 'specimen_allele', 'specimen', 'contig'])
     allele_w.writeheader()
     allele_w.writerows(specimen_allele_info.values())
 """
@@ -518,6 +463,62 @@ parse_prodigal_faa("${faa}").to_csv(
 )
 """
 }
+
+process SummarizeAllelesAndClusters {
+    tag "Summarize all of the avaliable alleles and output"
+    container "${container__pandas}"
+    label 'mem_medium'
+    errorStrategy 'finish'
+    publishDir "${params.output_folder}/genecatalog/", mode: "copy"
+    
+    input:
+        path Alleles_csv
+        path C100_tsv
+        path C90_tsv
+        path C50_tsv
+        path Centroids_C100
+        path Centroids_C90
+        path Centroids_C50
+    
+    output:
+        path('Allele_Cluster_info.csv.gz')
+        path Centroids_C100
+        path Centroids_C90
+        path Centroids_C50        
+
+"""
+#!/usr/bin/env python3
+import pandas as pd
+a_i = pd.read_csv('${Alleles_csv}')
+A_c100 = {
+    r.allele: r.C100
+    for i, r in 
+    pd.read_csv('${C100_tsv}', delimiter='\\t', names=['C100', 'allele']).iterrows()
+}
+a_i['C100'] = a_i.allele.apply(A_c100.get)
+c100_c90 = {
+    r.C100: r.C90
+    for i, r in 
+    pd.read_csv('${C90_tsv}', delimiter='\\t', names=['C90', 'C100']).iterrows()
+}
+a_i['C90'] = a_i.C100.apply(c100_c90.get)
+c90_c50 = {
+    r.C90: r.C50
+    for i, r in 
+    pd.read_csv('${C50_tsv}', delimiter='\\t', names=['C50', 'C90']).iterrows()
+}
+a_i['C50'] = a_i.C90.apply(c90_c50.get)
+a_i.to_csv(
+    "Allele_Cluster_info.csv.gz",
+    index=None
+)
+
+
+"""
+}
+
+// ---
+
 
 
 process shard_genes {
@@ -713,7 +714,7 @@ process AlignAlleles {
         echo "Writing out to \$fo"
 
         diamond \
-        blastp \
+        blastx \
         --query ${alleles_fasta} \
         --out \$fo \
         --threads ${task.cpus} \
@@ -755,8 +756,8 @@ def helpMessage() {
 
     For Assembly:
       --phred_offset        for spades. Default 33.
-      --min_identity        Amino acid identity cutoff used to combine similar genes (default: 90)
-      --min_coverage        Length cutoff used to combine similar genes (default: 50) (linclust)
+      --min_identity        Amino acid identity cutoff used to combine similar genes (default: 50)
+      --min_coverage        Length cutoff used to combine similar genes (default: 80) (linclust)
 
     Manifest:
       The manifest is a CSV with a header indicating which samples correspond to which files.
