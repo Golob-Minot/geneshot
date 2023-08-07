@@ -1,11 +1,12 @@
+#!/usr/bin/env nextflow
+
 // Processes to perform de novo assembly and annotate those assembled sequences
 nextflow.enable.dsl=2
 // Default parameters
-params.output_prefix = "geneshot"
 // Assembly options
 params.gene_fasta = false
 params.phred_offset = 33 // spades
-params.min_identity = 50 // linclust and reference genome alignment
+
 params.min_coverage = 80 // linclust and reference genome alignment
 // Default values for boolean flags
 // If these are not set by the user, then they will be set to the values below
@@ -27,20 +28,20 @@ container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 container__prodigal = 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 
-include { DiamondDB } from "./alignment" params(
+include { DiamondDB } from "./alignment" addParams(
     output_folder: params.output_folder
 )
-include { MMSeqs2_Cluster as MMSeqs2_Cluster_100 } from "./mmseqs" params(
+include { MMSeqs2_Cluster as MMSeqs2_Cluster_100 } from "./mmseqs" addParams(
     min_identity: 100,
-    min_coverage: 80
+    min_coverage: params.min_coverage
 )
-include { MMSeqs2_Cluster as MMSeqs2_Cluster_90 } from "./mmseqs" params(
+include { MMSeqs2_Cluster as MMSeqs2_Cluster_90 } from "./mmseqs" addParams(
     min_identity: 90,
-    min_coverage: 80
+    min_coverage: params.min_coverage
 )
-include { MMSeqs2_Cluster as MMSeqs2_Cluster_50 } from "./mmseqs" params(
+include { MMSeqs2_Cluster as MMSeqs2_Cluster_50 } from "./mmseqs" addParams(
     min_identity: 50,
-    min_coverage: 80
+    min_coverage: params.min_coverage
 )
 
 
@@ -96,78 +97,12 @@ workflow Genecatalog_wf {
         MMSeqs2_Cluster_50.out.seqs,        
     )
 
-    //emit:
-    //    gene_fasta = renameGenes.out
-    //    allele_assembly_csv_list = AnnotateAssemblies.out.map{ it[1] }.toSortedList()
-
-}
-
-// Break out the annotation into a separate workflow
-workflow annotation_wf {
-    take:
-    gene_fasta
-
-    main:
-
-    // Split up the gene catalog into shards for more efficient processing
-    shard_genes(
-        gene_fasta
-    )
-
-    // Determine whether or not to run the eggNOG annotation based
-    // on --noannot and --eggnog_db / --eggnog_dmnd
-    run_eggnog = false
-    if ( params.noannot == false ) {
-        if ( params.eggnog_db && params.eggnog_dmnd ) {
-            if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
-                run_eggnog = true
-            }
-        }
-    }
-
-    // Annotate the clustered genes with eggNOG
-    if ( run_eggnog ){
-        eggnog(
-            shard_genes.out.flatten(),
-            file(params.eggnog_db),
-            file(params.eggnog_dmnd)
-        )
-        eggnog_tsv = eggnog.out.collect()
-    } else {
-        eggnog_tsv = false
-    }
-
-    // Determine whether or not to run the taxnomic annotation based
-    // on --noannot and --taxonomic_dmnd
-    run_tax = false
-    if ( params.noannot == false ) {
-        if ( params.taxonomic_dmnd ) {
-            if ( !file(params.taxonomic_dmnd).isEmpty() ){
-                run_tax = true
-            }
-        }
-    }
-
-    // Annotate the clustered genes with DIAMOND for taxonomic ID
-    if ( run_tax ) {
-        diamond_tax(
-            shard_genes.out.flatten(),
-            file(params.taxonomic_dmnd)
-        )
-        tax_tsv = diamond_tax.out.collect()
-        join_tax(
-            tax_tsv
-        )
-    } else {
-        tax_tsv = false
-    }
-
     emit:
-
-        tax_tsv = tax_tsv
-        eggnog_tsv = eggnog_tsv
+        gene_fasta = MMSeqs2_Cluster_90.out.seqs
+        allele_assembly_csv_list = ParseGeneAnnotations.out.map{ it[2] }.toSortedList()
 
 }
+
 
 
 // De novo assembly
@@ -481,10 +416,10 @@ process SummarizeAllelesAndClusters {
         path Centroids_C50
     
     output:
-        path('Allele_Cluster_info.csv.gz')
-        path Centroids_C100
-        path Centroids_C90
-        path Centroids_C50        
+        path('Allele_Cluster_info.csv.gz'), emit: AlleleClusterInfo
+        path Centroids_C100, emit: C100
+        path Centroids_C90, emit: C90
+        path Centroids_C50, emit: C50        
 
 """
 #!/usr/bin/env python3
@@ -517,219 +452,6 @@ a_i.to_csv(
 """
 }
 
-// ---
-
-
-
-process shard_genes {
-    tag "Split the gene catalog into smaller shards"
-    container "ubuntu:18.04"
-    label 'mem_medium'
-    errorStrategy 'finish'
-    
-    input:
-    file fasta_gz
-    
-    output:
-    file "genes.shard.*.fasta.gz"
-    
-"""
-#!/bin/bash
-
-set -e
-
-split --additional-suffix .fasta -l 1000000 <(gunzip -c ${fasta_gz}) genes.shard.
-
-gzip genes.shard.*.fasta
-"""
-}
-
-
-process diamond_tax {
-    tag "Annotate genes by taxonomy"
-    container "quay.io/fhcrc-microbiome/famli:v1.5"
-    label 'mem_veryhigh'
-
-    input:
-    file query
-    file diamond_tax_db
-    
-    output:
-    file "genes.tax.aln.gz"
-
-    
-"""
-set -e
-
-diamond \
-    blastp \
-    --db ${diamond_tax_db} \
-    --query ${query} \
-    --out genes.tax.aln.gz \
-    --outfmt 102 \
-    --id ${params.min_identity} \
-    --top ${100 - params.min_identity} \
-    --block-size ${task.memory.toMega() / (1024 * 6)} \
-    --threads ${task.cpus} \
-    --compress 1
-
-rm ${diamond_tax_db}
-"""
-
-}
-
-process join_tax {
-    tag "Concatenate taxonomy annotation files"
-    container "ubuntu:18.04"
-    label 'mem_medium'
-    publishDir "${params.output_folder}/annot/", mode: "copy"
-
-    input:
-    file "genes.tax.aln.*.gz"
-    
-    output:
-    file "genes.tax.aln.gz"
-
-    
-"""
-set -e
-
-for fp in genes.tax.aln.*.gz; do
-
-    cat \$fp
-    rm \$fp
-
-done > genes.tax.aln.gz
-"""
-
-}
-
-
-process eggnog {
-    tag "Annotate genes by predicted function"
-    container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
-    label 'mem_veryhigh'
-    
-    input:
-    path query
-    path eggnog_db
-    path eggnog_dmnd
-
-    output:
-    path "genes.emapper.annotations.gz"
-
-    
-    """
-set -e
-
-mkdir data
-mkdir TEMP
-mkdir SCRATCH
-
-mv ${eggnog_db} data/eggnog.db
-mv ${eggnog_dmnd} data/eggnog_proteins.dmnd
-
-emapper.py \
-    -i ${query} \
-    --output genes \
-    -m "diamond" \
-    --cpu ${task.cpus} \
-    --data_dir data/ \
-    --scratch_dir SCRATCH/ \
-    --temp_dir TEMP/
-
-gzip genes.emapper.annotations
-    
-    """
-
-}
-
-
-// Assign a new, shorter name to a set of genes
-process renameGenes {
-    tag "Make concise unique gene names"
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-    label 'io_limited'
-    errorStrategy 'finish'
-    publishDir "${params.output_folder}/ref/", mode: "copy"
-
-    input:
-    file "input.genes.fasta.gz"
-
-    output:
-    file "genes.fasta.gz"
-
-"""
-#!/usr/bin/env python3
-
-from Bio.SeqIO.FastaIO import SimpleFastaParser
-import gzip
-import uuid
-
-def random_string(n=8):
-    return str(uuid.uuid4())[:n]
-
-used_strings = set([])
-
-with gzip.open("genes.fasta.gz", "wt") as fo:
-    with gzip.open("input.genes.fasta.gz", "rt") as fi:
-        for header, seq in SimpleFastaParser(fi):
-            new_string = random_string()
-            while new_string in used_strings:
-                new_string = random_string()
-            used_strings.add(new_string)
-            fo.write(">gene_%s_%daa\\n%s\\n" % (new_string, len(seq), seq))
-
-"""
-}
-
-// Use alignment to figure out which assembled allele was grouped into which gene
-process AlignAlleles {
-    tag "Match alleles to gene centroids"
-    container "quay.io/fhcrc-microbiome/famli:v1.5"
-    label 'mem_medium'
-    errorStrategy 'finish'
-    
-    input:
-    tuple val(specimen), file(alleles_fasta)
-    file refdb
-    
-    output:
-    tuple val(specimen), file("${specimen}.gene_alignments.tsv.gz") optional true
-
-    """
-    set -e
-
-    echo "Aligning ${alleles_fasta}"
-
-    # Check to see if there are any reads
-    if (( \$( gunzip -c ${alleles_fasta} | wc -l ) <= 1 )); then
-    
-        echo "No alleles found in ${alleles_fasta}, skipping"
-    
-    else
-
-        # Make the output filepath
-        fo="${specimen}.gene_alignments.tsv.gz"
-        echo "Writing out to \$fo"
-
-        diamond \
-        blastx \
-        --query ${alleles_fasta} \
-        --out \$fo \
-        --threads ${task.cpus} \
-        --db ${refdb} \
-        --outfmt 6 qseqid sseqid pident length qlen slen \
-        --query-cover ${params.min_coverage} \
-        --id ${params.min_identity} \
-        --top 0 \
-        --block-size ${task.memory.toMega() / (1024 * 6)} \
-        --compress 1 \
-        --unal 0
-
-    fi
-    """
-}
 
 //
 // Steps to run gene-catalog independently.
