@@ -226,7 +226,7 @@ include { Genecatalog_wf } from './modules/genecatalog' params(
 )
 
 // Import the workflows used for annotation
-include { annotation_wf } from './modules/genecatalog' params(
+include { annotation_wf } from './modules/annotation' params(
     output_folder: output_folder,
     phred_offset: params.phred_offset,
     min_identity: params.min_identity,
