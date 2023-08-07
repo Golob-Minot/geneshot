@@ -26,11 +26,11 @@ set -e
 
 mkdir db/
 mkdir cluster/
-mmseqs_arch createdb original.fastp.gz db/original.DB
-mmseqs_arch  cluster db/original.DB cluster/cluster.DB /tmp/mmseq -c ${params.min_coverage / 100}  --min-seq-id ${params.min_identity / 100}
-mmseqs_arch  createtsv db/original.DB db/original.DB cluster/cluster.DB clusters.C${params.min_identity}.tsv
-mmseqs_arch  createsubdb cluster/cluster.DB db/original.DB cluster/cluster_rep.DB
-mmseqs_arch  convert2fasta cluster/cluster_rep.DB centroids.C${params.min_identity}.fastp
+entrypoint createdb original.fastp.gz db/original.DB
+entrypoint  cluster db/original.DB cluster/cluster.DB /tmp/mmseq -c ${params.min_coverage / 100}  --min-seq-id ${params.min_identity / 100}
+entrypoint  createtsv db/original.DB db/original.DB cluster/cluster.DB clusters.C${params.min_identity}.tsv
+entrypoint  createsubdb cluster/cluster.DB db/original.DB cluster/cluster_rep.DB
+entrypoint  convert2fasta cluster/cluster_rep.DB centroids.C${params.min_identity}.fastp
 gzip centroids.C${params.min_identity}.fastp
 gzip clusters.C${params.min_identity}.tsv
 """
