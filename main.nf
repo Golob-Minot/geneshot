@@ -226,7 +226,7 @@ include { Genecatalog_wf } from './modules/genecatalog' params(
 )
 
 // Import the workflows used for annotation
-include { annotation_wf } from './modules/annotation' params(
+include { Annotation_wf } from './modules/annotation' params(
     output_folder: output_folder,
     phred_offset: params.phred_offset,
     min_identity: params.min_identity,
@@ -397,7 +397,7 @@ workflow {
     }
 
     // Run the annotation steps on the gene catalog
-    annotation_wf(
+    Annotation_wf(
         gene_fasta
     )
 
@@ -493,7 +493,7 @@ workflow {
             if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
                 addEggnogResults(
                     resultsHDF,
-                    annotation_wf.out.eggnog_tsv
+                    Annotation_wf.out.eggnog_tsv
                 )
 
                 resultsHDF = addEggnogResults.out
@@ -511,7 +511,7 @@ workflow {
 
                 addTaxResults(
                     resultsHDF,
-                    annotation_wf.out.tax_tsv,
+                    Annotation_wf.out.tax_tsv,
                     readTaxonomy.out
                 )
 
