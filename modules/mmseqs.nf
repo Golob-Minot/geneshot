@@ -3,7 +3,7 @@
 nextflow.enable.dsl=2
 
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
-container__mmseqs2 = 'golob/mmseqs:20230807'
+container__mmseqs2 = 'golob/mmseqs:20230807A'
 
 process MMSeqs2_Cluster {
     tag "Use mmseqs2 to cluster. Non-linear"
