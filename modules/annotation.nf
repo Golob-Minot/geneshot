@@ -4,6 +4,29 @@
 nextflow.enable.dsl=2
 
 
+process shard_genes {
+    tag "Split the gene catalog into smaller shards"
+    container "ubuntu:18.04"
+    label 'mem_medium'
+    errorStrategy 'finish'
+    
+    input:
+    file fasta_gz
+    
+    output:
+    file "genes.shard.*.fasta.gz"
+    
+"""
+#!/bin/bash
+
+set -e
+
+split --additional-suffix .fasta -l 1000000 <(gunzip -c ${fasta_gz}) genes.shard.
+
+gzip genes.shard.*.fasta
+"""
+}
+
 // Break out the annotation into a separate workflow
 workflow Annotation_wf {
     take:
@@ -68,5 +91,106 @@ workflow Annotation_wf {
 
         tax_tsv = tax_tsv
         eggnog_tsv = eggnog_tsv
+
+}
+
+
+
+process diamond_tax {
+    tag "Annotate genes by taxonomy"
+    container "quay.io/fhcrc-microbiome/famli:v1.5"
+    label 'mem_veryhigh'
+
+    input:
+    file query
+    file diamond_tax_db
+    
+    output:
+    file "genes.tax.aln.gz"
+
+    
+"""
+set -e
+
+diamond \
+    blastp \
+    --db ${diamond_tax_db} \
+    --query ${query} \
+    --out genes.tax.aln.gz \
+    --outfmt 102 \
+    --id ${params.min_identity} \
+    --top ${100 - params.min_identity} \
+    --block-size ${task.memory.toMega() / (1024 * 6)} \
+    --threads ${task.cpus} \
+    --compress 1
+
+rm ${diamond_tax_db}
+"""
+
+}
+
+process join_tax {
+    tag "Concatenate taxonomy annotation files"
+    container "ubuntu:18.04"
+    label 'mem_medium'
+    publishDir "${params.output_folder}/annot/", mode: "copy"
+
+    input:
+    file "genes.tax.aln.*.gz"
+    
+    output:
+    file "genes.tax.aln.gz"
+
+    
+"""
+set -e
+
+for fp in genes.tax.aln.*.gz; do
+
+    cat \$fp
+    rm \$fp
+
+done > genes.tax.aln.gz
+"""
+
+}
+
+
+process eggnog {
+    tag "Annotate genes by predicted function"
+    container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
+    label 'mem_veryhigh'
+    
+    input:
+    path query
+    path eggnog_db
+    path eggnog_dmnd
+
+    output:
+    path "genes.emapper.annotations.gz"
+
+    
+    """
+set -e
+
+mkdir data
+mkdir TEMP
+mkdir SCRATCH
+
+mv ${eggnog_db} data/eggnog.db
+mv ${eggnog_dmnd} data/eggnog_proteins.dmnd
+
+emapper.py \
+    -i ${query} \
+    --output genes \
+    -m "diamond" \
+    --cpu ${task.cpus} \
+    --data_dir data/ \
+    --scratch_dir SCRATCH/ \
+    --temp_dir TEMP/
+
+gzip genes.emapper.annotations
+    
+    """
 
 }
