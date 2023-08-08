@@ -165,25 +165,23 @@ process TrimGalore {
     errorStrategy 'ignore'
 
     input:
-    tuple val(specimen), file(R1), file(R2)
+    tuple val(specimen), path(R1), path(R2)
 
     output:
-    tuple val(specimen), file("${R1.getSimpleName()}__R1.tg.fastq.gz"), file("${R2.getSimpleName()}__R2.tg.fastq.gz")
+    tuple val(specimen), path("${R1.getSimpleName()}__R1.tg.fastq.gz"), path("${R2.getSimpleName()}__R2.tg.fastq.gz")
 
     """
     set -e
-
-    ln -s ${R1} R1.fastq.gz
-    ln -s ${R2} R2.fastq.gz
 
     trim_galore \
     --gzip \
     --cores ${task.cpus} \
     --paired \
-    R1.fastq.gz R2.fastq.gz
+    ${R1} ${R2} \
+    --basename trimmed
 
-    mv R1_val_1.fq.gz "${R1.getSimpleName()}__R1.tg.fastq.gz"
-    mv R2_val_2.fq.gz "${R2.getSimpleName()}__R2.tg.fastq.gz"
+    mv trimmed_val_1.fq.gz "${R1.getSimpleName()}__R1.tg.fastq.gz"
+    mv trimmed_val_2.fq.gz "${R2.getSimpleName()}__R2.tg.fastq.gz"
     """
 }
 
