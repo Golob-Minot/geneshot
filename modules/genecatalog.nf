@@ -28,9 +28,6 @@ container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 container__prodigal = 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 
-include { DiamondDB } from "./alignment" addParams(
-    output_folder: params.output_folder
-)
 include { MMSeqs2_Cluster as MMSeqs2_Cluster_100 } from "./mmseqs" addParams(
     min_identity: 100,
     min_coverage: params.min_coverage
@@ -97,9 +94,15 @@ workflow Genecatalog_wf {
         MMSeqs2_Cluster_50.out.seqs,        
     )
 
+    // Per specimen summary with all the wonderful details
+    MakePerSpecimenAlleleSummary(
+        ParseGeneAnnotations.out.map{ [it[0], it[2]] }
+        .combine(SummarizeAllelesAndClusters.out.AlleleClusterInfo)
+    )
+
     emit:
-        gene_fasta = MMSeqs2_Cluster_90.out.seqs
-        allele_assembly_csv_list = ParseGeneAnnotations.out.map{ it[2] }.toSortedList()
+        gene_fasta = MMSeqs2_Cluster_50.out.seqs
+        allele_assembly_csv_list = MakePerSpecimenAlleleSummary.out.toSortedList()
 
 }
 
@@ -447,12 +450,42 @@ a_i.to_csv(
     "Allele_Cluster_info.csv.gz",
     index=None
 )
-
-
 """
 }
 
+process MakePerSpecimenAlleleSummary {
+    tag "Inject allele information into per-specimen catalogs"
+    container "${container__pandas}"
+    label 'mem_medium'
+    errorStrategy 'finish'
+    publishDir "${params.output_folder}/genecatalog/${specimen}", mode: "copy"
+    
+    input:
+        tuple val (specimen), path (specimen_gene_annotations), path (allele_info)
+    
+    output:
+        path("${specimen}.csv.gz")   
 
+"""
+#!/usr/bin/env python3
+import pandas as pd
+sga = pd.read_csv('${specimen_gene_annotations}')
+specimen_genes = set(sga.gene_name)
+sa_C50 = {
+    r.specimen_allele: r.C50
+    for i, r in
+    pd.read_csv('${allele_info}').iterrows()
+    if r.specimen_allele in specimen_genes
+}
+sga['catalog_gene'] = sga.gene_name.apply(sa_C50.get)
+sga.to_csv(
+    "${specimen}.csv.gz",
+    index = None,
+    compression = "gzip"
+)
+
+"""
+}
 //
 // Steps to run gene-catalog independently.
 //
