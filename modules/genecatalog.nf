@@ -27,6 +27,7 @@ container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 container__prodigal = 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
+container__diamond = 'quay.io/biocontainers/diamond:2.1.8--h43eeafb_0'
 
 include { MMSeqs2_Cluster as MMSeqs2_Cluster_100 } from "./mmseqs" addParams(
     min_identity: 100,
@@ -100,8 +101,15 @@ workflow Genecatalog_wf {
         .combine(SummarizeAllelesAndClusters.out.AlleleClusterInfo)
     )
 
+    // And our gene catalog with diamond db
+    // Use the C50 clusters..
+    GeneCatalog(
+        MMSeqs2_Cluster_50.out.seqs
+    )
+
+
     emit:
-        gene_fasta = MMSeqs2_Cluster_50.out.seqs
+        gene_fasta = GeneCatalog.out.genes_fasta
         allele_assembly_csv_list = MakePerSpecimenAlleleSummary.out.toSortedList()
 
 }
@@ -486,6 +494,31 @@ sga.to_csv(
 
 """
 }
+
+process GeneCatalog {
+    tag "Settle on our gene catalog and make a diamond db"
+    container "${container__diamond}"
+    label 'multithread'
+    errorStrategy 'finish'
+    publishDir "${params.output_folder}/ref/", mode: 'copy'
+
+    input:
+        path 'genes.fasta.gz'
+    
+    output:
+        path 'genes.fasta.gz', emit: genes_fasta
+        path 'genes.dmnd', emit: genes_diamond
+    
+    """
+    diamond \
+    makedb \
+    --in genes.fasta.gz \
+    --db genes.dmnd \
+    --threads ${task.cpus}
+    """
+
+}
+
 //
 // Steps to run gene-catalog independently.
 //
@@ -522,6 +555,7 @@ def helpMessage() {
       These MUST be preprocessed for this workflow.
     """.stripIndent()
 }
+
 
 workflow {
     main:
