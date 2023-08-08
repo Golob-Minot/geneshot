@@ -80,10 +80,8 @@ include { repackHDF } from './modules/general' params(
 )
 
 // Import the workflows used for annotation
-include { annotation_wf } from './modules/genecatalog' params(
+include { Annotation_wf } from './modules/annotation' params(
     output_folder: params.output_folder,
-    min_identity: params.min_identity,
-    min_coverage: params.min_coverage,
     eggnog_db: params.eggnog_db,
     eggnog_dmnd: params.eggnog_dmnd,
     taxonomic_dmnd: params.taxonomic_dmnd,
@@ -122,7 +120,7 @@ workflow {
     }
 
     // Run the annotation steps on the gene catalog
-    annotation_wf(
+    Annotation_wf(
         file(params.gene_fasta)
     )
 
@@ -134,23 +132,23 @@ workflow {
     outputHDF = renameHDF.out
 
     // Add the eggNOG results
-    if (annotation_wf.out.eggnog_tsv != false && params.eggnog_db != false && params.eggnog_dmnd != false) {
+    if (Annotation_wf.out.eggnog_tsv != false && params.eggnog_db != false && params.eggnog_dmnd != false) {
         addEggnogResults(
             outputHDF,
-            annotation_wf.out.eggnog_tsv
+            Annotation_wf.out.eggnog_tsv
         )
         outputHDF = addEggnogResults.out
     }
     
     // Add the taxonomic assignment results
-    if (annotation_wf.out.tax_tsv != false && params.ncbi_taxdump != false && params.taxonomic_dmnd != false) {
+    if (Annotation_wf.out.tax_tsv != false && params.ncbi_taxdump != false && params.taxonomic_dmnd != false) {
         readTaxonomy(
             file(params.ncbi_taxdump)
         )
 
         addTaxResults(
             outputHDF,
-            annotation_wf.out.tax_tsv,
+            Annotation_wf.out.tax_tsv,
             readTaxonomy.out
         )
 
