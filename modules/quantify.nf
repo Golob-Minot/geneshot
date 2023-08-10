@@ -18,7 +18,7 @@ params.gencode = 11 //DIAMOND
 params.sd_mean_cutoff = 3.0 // FAMLI
 params.famli_batchsize = 10000000 // FAMLI
 
-
+params.output_prefix = 'gene'
 
 workflow Alignment_wf {
     take:
@@ -49,26 +49,9 @@ workflow Alignment_wf {
         gene_fasta,
     )
 
-    /*
-    // Make a single table with the abundance of every gene across every sample
-    AssembleAbundances(
-        Famli.out.toSortedList(),
-        params.cag_batchsize,
-        output_prefix
-    )
-
-    // Output the abundances
-    OutputSpecimenGeneAbundance(
-        AssembleAbundances.out.abundance_zarr_tar
-    )
     emit:
         famli_json_list = Famli.out.toSortedList()
-        specimen_gene_count_csv = AssembleAbundances.out.specimen_gene_count_csv
-        specimen_reads_aligned_csv = AssembleAbundances.out.specimen_reads_aligned_csv
-        detailed_hdf = AssembleAbundances.out.detailed_hdf
-        gene_length_csv = AssembleAbundances.out.gene_length_csv
-        gene_abundances_zarr_tar = AssembleAbundances.out.abundance_zarr_tar
-        gene_lists = AssembleAbundances.out.gene_lists
+        specimen_gene_quant = AssembleAnndata.out
     // */
 }
 
@@ -179,14 +162,14 @@ process AssembleAnndata {
     container "${container__anndata}"
     label "mem_veryhigh"
     errorStrategy 'finish'
-    publishDir "${params.output_folder}/abund/gene/", mode: "copy"
+    publishDir "${params.output_folder}/abund/${params.output_prefix}/", mode: "copy"
     
     input:
         path sample_jsons
         path peptide_fasta
 
     output:
-        path "specimen_peptide_quantity.h5ad"
+        path "specimen_${params.output_prefix}_quantity.h5ad"
 
 """
 #!/usr/bin/env python3
@@ -368,8 +351,8 @@ peptide_seq = {
 
 ad_wgs.var['seq'] = ad_wgs.var.index.map(peptide_seq.get)
 
-logging.info("Writing to H5AD format")
-ad_wgs.write_h5ad('specimen_peptide_quantity.h5ad')
+logging.info("Writing to H5ad format")
+ad_wgs.write_h5ad('specimen_${params.output_prefix}_quantity.h5ad')
 
 logging.info("Completed")
 
@@ -387,7 +370,7 @@ logging.info("Completed")
 params.help = false
 params.output = './results/'
 params.manifest = null
-params.output_prefix = 'geneshot'
+
 params.gene_fasta = null
 
 
@@ -416,7 +399,7 @@ def helpMessage() {
 
     Options:
       --output              Folder to place analysis outputs (default ./results)
-      --output_prefix       Text used as a prefix for summary HDF5 output files (default: geneshot)
+      --output_prefix       Text to describe what this catalog of genes is (default: gene)
       -w                    Working directory. Defaults to `./work`
 
     For Alignment:

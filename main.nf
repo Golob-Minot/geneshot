@@ -409,8 +409,9 @@ workflow {
     Alignment_wf(
         gene_fasta,
         combined_reads.out,
-        params.output_prefix
+        'gene' // output prefix here, of gene level output
     )
+
     /*
     // And the CAG generation steps
     CAG_contig_oriented_wf(
