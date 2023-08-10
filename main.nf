@@ -252,7 +252,7 @@ include { Alignment_wf } from './modules/alignment' params(
 )
 
 // And for CAG generation
-include { CAG_contig_oriented_wf } from './modules/alignment' params(
+include { CAG_contig_oriented_wf } from './modules/make_cags' params(
     output_folder: output_folder,
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
