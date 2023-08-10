@@ -1,3 +1,5 @@
+#!/usr/bin/env nextflow
+
 nextflow.enable.dsl=2
 
 // containers
@@ -6,13 +8,6 @@ container__collection = 'quay.io/fhcrc-microbiome/experiment-collection:v0.2'
 
 // Processes used for alignment of reads against gene databases
 
-params.cag_batchsize = 10000
-
-// Default options
-params.distance_threshold = 0.5
-params.distance_metric = "cosine"
-params.linkage_type = "average"
-params.famli_batchsize = 10000000
 
 // Alignment options
 params.dmnd_min_identity = 80 // DIAMOND
@@ -22,66 +17,7 @@ params.dmnd_min_score = 20 // DIAMOND
 params.gencode = 11 //DIAMOND
 params.sd_mean_cutoff = 3.0 // FAMLI
 
-include { makeInitialCAGs } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round1 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round2 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round3 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round4 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round5 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round6 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round7 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round8 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round9 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_round10 } from "./make_cags" params(
-    distance_threshold: params.distance_threshold / 2,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
-include { refineCAGs as refineCAGs_final } from "./make_cags" params(
-    distance_threshold: params.distance_threshold,
-    distance_metric: params.distance_metric,
-    linkage_type: params.linkage_type
-)
+
 
 workflow Alignment_wf {
     take:
@@ -126,76 +62,9 @@ workflow Alignment_wf {
         gene_length_csv = AssembleAbundances.out.gene_length_csv
         gene_abundances_zarr_tar = AssembleAbundances.out.abundance_zarr_tar
         gene_lists = AssembleAbundances.out.gene_lists
+    // */
 }
 
-workflow CAG_contig_oriented_wf {
-    //
-    //  CAG Stuff starts here
-    //    This is for the 'contig oriented'
-    //
-    take:
-        gene_abundances_zarr_tar
-        gene_lists
-
-    main: 
-    // Group shards of genes into Co-Abundant Gene Groups (CAGs)
-    makeInitialCAGs(
-        gene_abundances_zarr_tar,
-        gene_lists
-    )
-
-    // Perform multiple rounds of combining shards to make ever-larger CAGs
-    refineCAGs_round1(
-        makeInitialCAGs.out[0].toSortedList().flatten().collate(2),
-        makeInitialCAGs.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round2(
-        refineCAGs_round1.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round1.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round3(
-        refineCAGs_round2.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round2.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round4(
-        refineCAGs_round3.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round3.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round5(
-        refineCAGs_round4.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round4.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round6(
-        refineCAGs_round5.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round5.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round7(
-        refineCAGs_round6.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round6.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round8(
-        refineCAGs_round7.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round7.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round9(
-        refineCAGs_round8.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round8.out[1].toSortedList().flatten().collate(2),
-    )
-    refineCAGs_round10(
-        refineCAGs_round9.out[0].toSortedList().flatten().collate(2),
-        refineCAGs_round9.out[1].toSortedList().flatten().collate(2),
-    )
-
-    // Combine the shards and make a new set of CAGs
-    refineCAGs_final(
-        refineCAGs_round10.out[0].toSortedList(),
-        refineCAGs_round10.out[1].toSortedList(),
-    )
-
-    emit:
-        cag_csv = refineCAGs_final.out[0]
-        cag_abund_feather = refineCAGs_final.out[1]
-}
 
 // Align each sample against the reference database of genes using DIAMOND
 process DiamondDB {
