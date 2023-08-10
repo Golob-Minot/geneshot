@@ -16,6 +16,7 @@ params.dmnd_top_pct = 1 // DIAMOND
 params.dmnd_min_score = 20 // DIAMOND
 params.gencode = 11 //DIAMOND
 params.sd_mean_cutoff = 3.0 // FAMLI
+params.famli_batchsize = 10000000 // FAMLI
 
 
 
@@ -42,7 +43,7 @@ workflow Alignment_wf {
     Famli(
         Diamond.out
     )
-
+    /*
     // Make a single table with the abundance of every gene across every sample
     AssembleAbundances(
         Famli.out.toSortedList(),

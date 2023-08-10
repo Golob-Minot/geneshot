@@ -239,7 +239,7 @@ include { Annotation_wf } from './modules/annotation' params(
 )
 
 // Import the workflows used for alignment-based analysis
-include { Alignment_wf } from './modules/alignment' params(
+include { Alignment_wf } from './modules/quantify' params(
     output_folder: output_folder,
     dmnd_min_identity: params.dmnd_min_identity,
     dmnd_min_coverage: params.dmnd_min_coverage,
@@ -411,6 +411,7 @@ workflow {
         combined_reads.out,
         params.output_prefix
     )
+    /*
     // And the CAG generation steps
     CAG_contig_oriented_wf(
         Alignment_wf.out.gene_abundances_zarr_tar,
@@ -549,5 +550,6 @@ workflow {
     repackDetailedHDF(
         detailedHDF
     )
+    // */
 
 }
