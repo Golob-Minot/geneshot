@@ -207,7 +207,7 @@ wget --quiet ${params.hg_index_url} -O hg_index.tar.gz
 process BWA_remove_human {
     tag "Remove human reads"
     container "${container__bwa}"
-    errorStrategy 'finish'
+    errorStrategy 'ignore'
     label 'multithread'
 
 
