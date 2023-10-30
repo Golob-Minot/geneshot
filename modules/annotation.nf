@@ -226,13 +226,38 @@ def helpMessage() {
       --gene_fasta          Location for input 'genes.fasta.gz'
       --output_folder       Location for output
       --taxonomic_dmnd      Database used for taxonomic annotation (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
       --eggnog_dmnd         One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog.db)
+
+
+    ####################################
+    # Downloading Reference Databases: #
+    ####################################
+
+    --taxonomic_dmnd
+        The DIAMOND database of reference protein sequences must be indexed using both
+        (a) a set of sequences to search and (b) taxonomic annotations for each.
+        Full instructions for creating this indexed database file can be found
+        here: https://github.com/bbuchfink/diamond/wiki/3.-Command-line-options#makedb-options
+
+        Example:
+        diamond makedb \
+            --in <proteins_fasta> \
+            --db <output_dmnd> \
+            --taxonmap prot.accession2taxid.FULL.gz \
+            --taxonnodes nodes.dmp \
+            --taxonnames names.dmp
+
+    --eggnog_dmnd & --eggnog_db
+        The eggNOG database for functional annotation can be most easily downloaded
+        using the edicated utility provided along with the eggNOG-mapper utility.
+        The only flag which needs to be set when running the download utility is the
+        destination folder for the downloaded files.
+
+        Example:
+        download_eggnog_data.py --data_dir data/
     
     """.stripIndent()
 }
