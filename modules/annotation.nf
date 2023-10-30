@@ -175,7 +175,7 @@ done > genes.tax.aln.gz
 
 process eggnog {
     tag "Annotate genes by predicted function"
-    container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
+    container "quay.io/biocontainers/eggnog-mapper:2.1.12--pyhdfd78af_0"
     label 'mem_veryhigh'
     
     input:
@@ -199,6 +199,7 @@ mv ${eggnog_dmnd} data/eggnog_proteins.dmnd
 
 emapper.py \
     -i ${query} \
+    --itype proteins \
     --output genes \
     -m "diamond" \
     --cpu ${task.cpus} \
