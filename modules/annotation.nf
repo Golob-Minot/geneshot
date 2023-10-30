@@ -61,9 +61,29 @@ workflow Annotation_wf {
     run_eggnog = false
     if ( params.noannot == false ) {
         if ( params.eggnog_db && params.eggnog_dmnd ) {
-            if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
+            eggnog_db = file(params.eggnog_db)
+            eggnog_dmnd = file(params.eggnog_dmnd)
+
+            if ( eggnog_db.isEmpty() ){
+                log.info"Cannot find file ${params.eggnog_db}, skipping functional annotation"
+            }
+            if ( eggnog_dmnd.isEmpty() ){
+                log.info"Cannot find file ${params.eggnog_dmnd}, skipping functional annotation"
+            }
+        
+            if ( !eggnog_db.isEmpty() && !eggnog_dmnd.isEmpty() ){
                 run_eggnog = true
             }
+
+        } else {
+
+            if ( params.eggnog_db ) {
+                log.info"Missing --eggnog_dmnd, skipping functional annotation"
+            }
+            if ( params.eggnog_dmnd ) {
+                log.info"Missing --eggnog_db, skipping functional annotation"
+            }
+
         }
     }
 
@@ -71,8 +91,8 @@ workflow Annotation_wf {
     if ( run_eggnog ){
         eggnog(
             shard_genes.out.flatten(),
-            file(params.eggnog_db),
-            file(params.eggnog_dmnd)
+            eggnog_db,
+            eggnog_dmnd
         )
         eggnog_tsv = eggnog.out.collect()
     } else {
@@ -84,8 +104,11 @@ workflow Annotation_wf {
     run_tax = false
     if ( params.noannot == false ) {
         if ( params.taxonomic_dmnd ) {
-            if ( !file(params.taxonomic_dmnd).isEmpty() ){
+            taxonomic_dmnd = file(taxonomic_dmnd)
+            if ( !taxonomic_dmnd.isEmpty() ){
                 run_tax = true
+            } else {
+                log.info"Cannot find ${params.taxonomic_dmnd}, skipping taxonomic annotation"
             }
         }
     }
@@ -94,7 +117,7 @@ workflow Annotation_wf {
     if ( run_tax ) {
         diamond_tax(
             shard_genes.out.flatten(),
-            file(params.taxonomic_dmnd)
+            taxonomic_dmnd
         )
         tax_tsv = diamond_tax.out.collect()
         join_tax(
@@ -262,27 +285,27 @@ def helpMessage() {
     """.stripIndent()
 }
 
-
-// Show help message if the user specifies the --help flag at runtime
-if (params.help || params.gene_fasta == false || params.output_folder == false){
-    // Invoke the function above which prints the help message
-    helpMessage()
-    // Exit out and do not run anything else
-    exit 0
-}
-
-// Show help message if the user does not specify any annotations
-if (params.taxonomic_dmnd == false && params.eggnog_dmnd == false && params.eggnog_db == false){
-    // Invoke the function above which prints the help message
-    helpMessage()
-    // Exit out and do not run anything else
-    exit 0
-}
-
 workflow {
 
     main: 
     
+
+    // Show help message if the user specifies the --help flag at runtime
+    if (params.help || params.gene_fasta == false || params.output_folder == false){
+        // Invoke the function above which prints the help message
+        helpMessage()
+        // Exit out and do not run anything else
+        exit 0
+    }
+
+    // Show help message if the user does not specify any annotations
+    if (params.taxonomic_dmnd == false && params.eggnog_dmnd == false && params.eggnog_db == false){
+        // Invoke the function above which prints the help message
+        helpMessage()
+        // Exit out and do not run anything else
+        exit 0
+    }
+
     // Make sure we can find the input files
     if(file(params.gene_fasta).isEmpty()){
         log.info"""Cannot find input file ${params.gene_fasta}""".stripIndent()
@@ -293,7 +316,5 @@ workflow {
     Annotation_wf(
         file(params.gene_fasta)
     )
-
-
 
 }
