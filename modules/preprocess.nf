@@ -137,24 +137,17 @@ barcodecop \
 ${I1} ${I2} \
 --match-filter \
 -f ${R1} \
--o OUTPUT_R1.fq.gz
-echo "Done"
+-o ${R1}.bcc.fq.gz
 
-echo "Renaming output file to ${R1}.bcc.fq.gz"
-mv OUTPUT_R1.fq.gz ${R1}.bcc.fq.gz
-echo "Done"
 
 echo "Running barcodecop on ${R2}"
 barcodecop \
 ${I1} ${I2} \
 --match-filter \
 -f ${R2} \
--o OUTPUT_R2.fq.gz
+-o "${R2}.bcc.fq.gz")
 echo "Done"
 
-echo "Renaming output file to ${R2}.bcc.fq.gz"
-mv OUTPUT_R2.fq.gz ${R2}.bcc.fq.gz
-echo "Done"
 """
 }
 
