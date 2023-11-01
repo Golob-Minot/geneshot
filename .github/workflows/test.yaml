@@ -21,7 +21,7 @@ jobs:
           sudo apt clean
           docker rmi $(docker image ls -aq)
           df -h
-      - name:  Run geneshot
+      - name:  Run preprocess
         run: |
           NXF_VER=23.10.0 nextflow run modules/preprocess.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --host_index data/hg_chr_21_bwa_index.tar.gz  -w work/  -with-docker ubuntu:22.04
       - name:  Validate results 
