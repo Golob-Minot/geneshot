@@ -145,7 +145,7 @@ barcodecop \
 ${I1} ${I2} \
 --match-filter \
 -f ${R2} \
--o "${R2}.bcc.fq.gz")
+-o "${R2}.bcc.fq.gz"
 echo "Done"
 
 """
