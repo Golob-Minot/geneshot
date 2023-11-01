@@ -1,6 +1,6 @@
 specimen,R1,R2,I1,I2,batch,label1,label2
 Mock__11,data/Mock__11.R1.fastq.gz,data/Mock__11.R2.fastq.gz,data/Mock__11.I1.fastq.gz,data/Mock__11.I2.fastq.gz,mock,0,1
-Mock__11,data/Mock__11.R1.fastq.gz,data/Mock__11.R2.fastq.gz,data/Mock__11.I1.fastq.gz,data/Mock__11.I2.fastq.gz,mock,0,1
+Mock__11,data/Mock__11A.R1.fastq.gz,data/Mock__11A.R2.fastq.gz,data/Mock__11A.I1.fastq.gz,data/Mock__11A.I2.fastq.gz,mock,0,1
 Mock__12,data/Mock__12.R1.fastq.gz,data/Mock__12.R2.fastq.gz,data/Mock__12.I1.fastq.gz,data/Mock__12.I2.fastq.gz,mock,1,0
 Mock__13,data/Mock__13.R1.fastq.gz,data/Mock__13.R2.fastq.gz,data/Mock__13.I1.fastq.gz,data/Mock__13.I2.fastq.gz,mock,1,1
 Mock__14,data/Mock__14.R1.fastq.gz,data/Mock__14.R2.fastq.gz,data/Mock__14.I1.fastq.gz,data/Mock__14.I2.fastq.gz,mock,0,0

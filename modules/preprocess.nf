@@ -62,13 +62,12 @@ workflow Preprocess_wf {
     Barcodecop(to_bcc_ch)
 
     // Raise an error if any of the samples fail barcodecop
-    Barcodecop.out.bcc_empty_ch.filter {
+    Barcodecop.out.filter {
         r -> (file(r[1]).isEmpty() || file(r[2]).isEmpty())
     }.map { r -> assert false: "Specimen failed barcodecop ${r.specimen}"}
 
     // Send the files which pass barcodecop to trim
-    bcc_to_trim_ch = Barcodecop.out.bcc_to_cutadapt_ch
-        .filter { 
+    bcc_to_trim_ch = Barcodecop.out.filter { 
                 r -> (!file(r[1]).isEmpty() && !file(r[2]).isEmpty())
         }
 
@@ -121,14 +120,14 @@ process Barcodecop {
     tag "Validate barcode demultiplexing for WGS reads"
     container "${container__barcodecop}"
     label 'multithread'
-    errorStrategy 'finish'
+    errorStrategy 'ignore'
 
     input:
-        tuple val(specimen), file(R1), file(R2), file(I1), file(I2)
+        tuple val(specimen), path(R1), path(R2), path(I1), path(I2)
 
     output:
-        tuple val(specimen), file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_to_cutadapt_ch
-        tuple val(specimen), file("${R1}.bcc.fq.gz"), file("${R2}.bcc.fq.gz"), emit: bcc_empty_ch
+        tuple val(specimen), path("${R1}.bcc.fq.gz"), path("${R2}.bcc.fq.gz")
+
 """
 set -e
 
