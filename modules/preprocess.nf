@@ -281,7 +281,7 @@ combine_fastq_pairs.py \
 process OutputManifest {
     container "${container__ubuntu}"
 
-    publishDir path: "${params.output}qc/", enabled: params.savereads, mode: "copy"
+    publishDir path: "${params.output_folder}qc/", enabled: params.savereads, mode: "copy"
 
     input:
         path R1s
@@ -400,6 +400,12 @@ def helpMessage() {
     """.stripIndent()
 }
 
+// Make sure that --output ends with trailing "/" characters
+if (!params.output.endsWith("/")){
+    params.output_folder = params.output.concat("/")
+} else {
+    params.output_folder = params.output
+}
 
 workflow {
     main:
@@ -415,11 +421,12 @@ workflow {
     // Read and validate manifest
     manifest_file = Channel.from(file(params.manifest))
     manifest_qced = Read_manifest(manifest_file)
+    
     // Actually preprocess
 
     Preprocess_wf(
         manifest_qced.valid_paired_indexed,
-        manifest_qced.valid_paired
+        manifest_qced.valid_paired,
     )
 
 }
