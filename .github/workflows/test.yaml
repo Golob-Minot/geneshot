@@ -26,7 +26,7 @@ jobs:
           NXF_VER=23.10.0 nextflow run modules/preprocess.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --host_index data/hg_chr_21_bwa_index.tar.gz  -w work/  -with-docker ubuntu:22.04
       - name:  Validate results 
         run: |
-          ls output/
+          tree output/
           [[ -s output/qc/manifest.qc.csv ]]
           [[ -s output/qc/Mock__11.R1.fastq.gz ]]
           [[ -s output/qc/Mock__13__R1.noadapt.nohuman.fq.gz ]]
