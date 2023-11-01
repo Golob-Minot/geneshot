@@ -87,15 +87,15 @@ workflow Preprocess_wf {
     TrimGalore(demupltiplexed_ch)
 
     // Download the human index if needed
-    if (!params.hg_index) {
-        Download_hg_index()
-        hg_index_tgz = Download_hg_index.out
+    if (!params.host_index) {
+        Download_host_index()
+        host_index_tgz = Download_host_index.out
     } else {
-        hg_index_tgz = file(params.hg_index)
+        host_index_tgz = file(params.host_index)
     }
 
     // Remove the human reads
-    BWA_remove_human(hg_index_tgz, TrimGalore.out)
+    BWA_remove_human(host_index_tgz, TrimGalore.out)
 
     // Combine the reads by specimen name
     CombineReads(BWA_remove_human.out.groupTuple())
@@ -179,19 +179,19 @@ process TrimGalore {
 }
 
 // Process to download the human genome BWA index, already tarballed
-process Download_hg_index {
+process Download_host_index {
     tag "Download human reference genome"
     container "${container__bwa}"
     errorStrategy "finish"
     label 'io_net'
 
     output:
-    file 'hg_index.tar.gz'
+    file 'host_index.tar.gz'
     
 """
 set -e
 
-wget --quiet ${params.hg_index_url} -O hg_index.tar.gz
+wget --quiet ${params.host_index_url} -O host_index.tar.gz
 """
 }
 
@@ -205,7 +205,7 @@ process BWA_remove_human {
 
 
     input:
-        file hg_index_tgz
+        file host_index_tgz
         tuple val(sample_name), file(R1), file(R2)
 
     output:
@@ -216,19 +216,19 @@ process BWA_remove_human {
 set - e
 
 
-bwa_index_fn=\$(tar -ztvf ${hg_index_tgz} | head -1 | sed \'s/.* //\')
+bwa_index_fn=\$(tar -ztvf ${host_index_tgz} | head -1 | sed \'s/.* //\')
 bwa_index_prefix=\${bwa_index_fn%.*}
 echo BWA index prefix is \${bwa_index_prefix} | tee -a ${R1.getSimpleName()}.nohuman.log
 echo Extracting BWA index | tee -a ${R1.getSimpleName()}.nohuman.log
-mkdir -p hg_index/ 
-tar -I pigz -xf ${hg_index_tgz} -C hg_index/ | tee -a ${R1.getSimpleName()}.nohuman.log
+mkdir -p host_index/ 
+tar -I pigz -xf ${host_index_tgz} -C host_index/ | tee -a ${R1.getSimpleName()}.nohuman.log
 echo Files in index directory: | tee -a ${R1.getSimpleName()}.nohuman.log
-ls -l -h hg_index | tee -a ${R1.getSimpleName()}.nohuman.log
+ls -l -h host_index | tee -a ${R1.getSimpleName()}.nohuman.log
 echo Running BWA | tee -a ${R1.getSimpleName()}.nohuman.log
 bwa mem -t ${task.cpus} \
--T ${params.min_hg_align_score} \
+-T ${params.min_host_align_score} \
 -o alignment.sam \
-hg_index/\$bwa_index_prefix \
+host_index/\$bwa_index_prefix \
 ${R1} ${R2} \
 | tee -a ${R1.getSimpleName()}.nohuman.log
 echo Checking if alignment is empty  | tee -a ${R1.getSimpleName()}.nohuman.log
@@ -240,7 +240,7 @@ samtools fastq alignment.sam \
 | tee -a ${R1.getSimpleName()}.nohuman.log
 echo Done | tee -a ${R1.getSimpleName()}.nohuman.log
 
-rm -rf hg_index/*
+rm -rf host_index/*
 echo Cleanup Done
 """
 }
@@ -358,15 +358,15 @@ workflow CombineReads {
 // If these are not set by the user, then they will be set to the values below
 // This is useful for the if/then control syntax below
 params.nopreprocess = false
-params.savereads = false
+params.savereads = true
 params.help = false
 params.output = './results/'
 params.manifest = false
 
 // Preprocessing options
-params.hg_index_url = 'https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
-params.hg_index = false
-params.min_hg_align_score = 30
+params.host_index_url = 'https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.bwa_index.tar.gz'
+params.host_index = false
+params.min_host_align_score = 30
 
 // imports
 include { Read_manifest } from './general'
@@ -384,13 +384,12 @@ def helpMessage() {
 
     Options:
       --output              Folder to place analysis outputs (default ./results/)
-      --savereads           If specified, save the preprocessed reads to the output folder (inside qc/)
       -w                    Working directory. Defaults to `./work`
 
     For preprocessing:
-      --hg_index_url        URL for human genome index, defaults to current HG
-      --hg_index            Cached copy of the bwa indexed human genome, TGZ format
-      --min_hg_align_score  Minimum alignment score for human genome (default 30)
+      --host_index_url          URL for host genome index, defaults to Human genome GRCh38
+      --host_index              Cached copy of the bwa indexed host genome, TGZ format
+      --min_host_align_score      Minimum alignment score for host genome (default 30)
 
     Manifest:
       The manifest is a CSV with a header indicating which samples correspond to which files.
