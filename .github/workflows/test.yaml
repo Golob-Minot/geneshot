@@ -57,7 +57,31 @@ jobs:
           [[ -s output/MetaPhlAn2/metaphlan2.results.csv.gz ]]
           [[ -s output/MetaPhlAn2/metaphlan2.species.h5ad ]]
           
-
+  allele_catalog:
+    runs-on: ubuntu-22.04
+    env:
+      NXF_ANSI_LOG: 0
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Nextflow
+        run: |
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+      - name:  Run geneshot
+        run: |
+          NXF_VER=23.10.0 nextflow run modules/allele_catalog.nf --manifest data/example_output/qc/manifest.qc.csv --output output -w work/  -with-docker ubuntu:22.04
+      - name:  Validate results 
+        run: |
+          tree output/
+          [[ -s output/alleles/allele_info.csv.gz ]]
+          [[ -s output/alleles/alleles.faa.gz ]]
 
 
 
