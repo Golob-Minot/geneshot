@@ -1,0 +1,6 @@
+specimen,R1,R2
+Mock__12,data/example_output/qc/Mock__12__R1.noadapt.nohuman.fq.gz,data/example_output/qc/Mock__12__R2.noadapt.nohuman.fq.gz
+Mock__13,data/example_output/qc/Mock__13__R1.noadapt.nohuman.fq.gz,data/example_output/qc/Mock__13__R2.noadapt.nohuman.fq.gz
+Mock__14,data/example_output/qc/Mock__14__R1.noadapt.nohuman.fq.gz,
+Mock__15,data/example_output/qc/Mock__15__R1.noadapt.nohuman.fq.gz,
+Mock__11,data/example_output/qc/Mock__11.R1.fastq.gz,data/example_output/qc/Mock__11.R2.fastq.gz
