@@ -24,7 +24,7 @@ if (!params.output.endsWith("/")){
 
 // Containers
 container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+container__anndata = "golob/python-anndata:0.9.2"
 container__prodigal = 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 container__diamond = 'quay.io/biocontainers/diamond:2.1.8--h43eeafb_0'
@@ -43,7 +43,7 @@ include { MMSeqs2_Cluster as MMSeqs2_Cluster_50 } from "./mmseqs" addParams(
 )
 
 
-workflow Genecatalog_wf {
+workflow Allele_catalog {
     take:
         combined_reads_ch
 
@@ -71,6 +71,7 @@ workflow Genecatalog_wf {
         ParseGeneAnnotations.out.collect{ it[2] }, // specimen allele info CSV
     )
 
+    /*
     // Cluster at 80 / 100 c/i
     MMSeqs2_Cluster_100(
         DereplicateAlleles.out.alleles
@@ -111,7 +112,7 @@ workflow Genecatalog_wf {
     emit:
         gene_fasta = GeneCatalog.out.genes_fasta
         allele_assembly_csv_list = MakePerSpecimenAlleleSummary.out.toSortedList()
-
+    // */
 }
 
 
@@ -123,7 +124,7 @@ process Assembly {
     label 'mem_veryhigh'
     errorStrategy "ignore"
 
-    publishDir "${params.output_folder}/genecatalog/${specimen}", mode: "copy"
+    publishDir "${params.output_folder}/contigs/${specimen}", mode: "copy"
 
     input:
         tuple val(specimen), file(R1), file(R2)
@@ -166,7 +167,7 @@ process Prodigal {
     container "${container__prodigal}"
     label 'mem_medium'
     errorStrategy "finish"
-    publishDir "${params.output_folder}/genecatalog/${specimen}/", mode: "copy"
+    publishDir "${params.output_folder}/contigs/${specimen}/", mode: "copy"
 
     input:
         tuple val(specimen), file(contigs), file(spades_log)
@@ -212,7 +213,7 @@ process DereplicateAlleles {
     path "allele_info.csv.gz", emit: allele_info
     path "alleles.faa.gz", emit: alleles
 
-    publishDir "${params.output_folder}/genecatalog/", mode: "copy"
+    publishDir "${params.output_folder}/alleles/", mode: "copy"
 
 """
 #!/usr/bin/env python3
@@ -230,7 +231,10 @@ for sac in sp_allele_csvs:
         r['gene_name']: {
             'specimen_allele': r['gene_name'],
             'specimen': r['specimen'],
-            'contig': r['contig']
+            'contig': r['contig'],
+            'strand': r['strand'],
+            'start': r['start'],
+            'stop': r['stop'],
         } 
         for r in sac_r
     })
@@ -255,7 +259,7 @@ with gzip.open("alleles.faa.gz", 'wt') as allele_h:
         ))
 
 with gzip.open("allele_info.csv.gz", 'wt') as allele_info_h:
-    allele_w = csv.DictWriter(allele_info_h, fieldnames=['allele', 'specimen_allele', 'specimen', 'contig'])
+    allele_w = csv.DictWriter(allele_info_h, fieldnames=['allele', 'specimen_allele', 'specimen', 'contig', 'strand', 'start', 'stop'])
     allele_w.writeheader()
     allele_w.writerows(specimen_allele_info.values())
 """
@@ -264,11 +268,11 @@ with gzip.open("allele_info.csv.gz", 'wt') as allele_info_h:
 // Combine the assembly table with the assignment of catalog genes
 process AnnotateAssemblies {
     tag "Summarize every assembled gene"
-    container "${container__pandas}"
+    container "${container__anndata}"
     label 'mem_medium'
     errorStrategy 'finish'
 
-    publishDir "${params.output_folder}/genecatalog/${specimen}", mode: "copy"
+    publishDir "${params.output_folder}/alleles/${specimen}", mode: "copy"
     
     input:
     tuple val(specimen), file(faa), file(assembly_csv), file(alignment_tsv)
@@ -327,7 +331,7 @@ assembly_df.to_csv(
 // Summarize the depth of sequencing and GC content for every assembled gene
 process ParseGeneAnnotations {
     tag "Summarize every assembled gene"
-    container "${container__pandas}"
+    container "${container__anndata}"
     label 'mem_medium'
     errorStrategy 'finish'
     
@@ -412,10 +416,10 @@ parse_prodigal_faa("${faa}").to_csv(
 
 process SummarizeAllelesAndClusters {
     tag "Summarize all of the avaliable alleles and output"
-    container "${container__pandas}"
+    container "${container__anndata}"
     label 'mem_medium'
     errorStrategy 'finish'
-    publishDir "${params.output_folder}/genecatalog/", mode: "copy"
+    publishDir "${params.output_folder}/alleles/", mode: "copy"
     
     input:
         path Alleles_csv
@@ -463,10 +467,10 @@ a_i.to_csv(
 
 process MakePerSpecimenAlleleSummary {
     tag "Inject allele information into per-specimen catalogs"
-    container "${container__pandas}"
+    container "${container__anndata}"
     label 'mem_medium'
     errorStrategy 'finish'
-    publishDir "${params.output_folder}/genecatalog/${specimen}", mode: "copy"
+    publishDir "${params.output_folder}/alleles/${specimen}", mode: "copy"
     
     input:
         tuple val (specimen), path (specimen_gene_annotations), path (allele_info)
@@ -532,20 +536,20 @@ def helpMessage() {
     log.info"""
     Usage:
 
-    nextflow run Golob-Minot/geneshot/modules/genecatalog.nf <ARGUMENTS>
+    nextflow run modules/allele_catalog.nf <ARGUMENTS>
+    
+    From a set of raw fastq reads, assemble contigs, extract protein coding sequences
+    and dereplicate into an allele_catalog.
     
     Required Arguments:
       --manifest            CSV file listing samples (see below)
 
     Options:
       --output              Folder to place analysis outputs (default ./results)
-      --output_prefix       Text used as a prefix for summary HDF5 output files (default: geneshot)
       -w                    Working directory. Defaults to `./work`
 
     For Assembly:
       --phred_offset        for spades. Default 33.
-      --min_identity        Amino acid identity cutoff used to combine similar genes (default: 50)
-      --min_coverage        Length cutoff used to combine similar genes (default: 80) (linclust)
 
     Manifest:
       The manifest is a CSV with a header indicating which samples correspond to which files.
@@ -573,7 +577,7 @@ workflow {
     manifest = Read_manifest(manifest_file).valid_paired
 
 
-    Genecatalog_wf(
+    Allele_catalog(
         manifest.map{ [it.specimen, file(it.R1), file(it.R2)] }
   )
 
