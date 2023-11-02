@@ -108,10 +108,10 @@ jobs:
         run: |
           tree output/
           [[ -s output/alleles/Allele_Cluster_info.csv.gz ]]
-          [[ -s output/alleles/alleles/centroids.C100.fastp.gz ]]
-          [[ -s output/alleles/alleles/centroids.C90.fastp.gz ]]
-          [[ -s output/alleles/alleles/centroids.C50.fastp.gz ]]
-          [[ -s output/alleles/alleles/centroids.C100.fastp.gz.dmnd ]]
-          [[ -s output/alleles/alleles/centroids.C90.fastp.gz.dmnd ]]
-          [[ -s output/alleles/alleles/centroids.C50.fastp.gz.dmnd ]]
+          [[ -s output/alleles/centroids.C100.fastp.gz ]]
+          [[ -s output/alleles/centroids.C90.fastp.gz ]]
+          [[ -s output/alleles/centroids.C50.fastp.gz ]]
+          [[ -s output/alleles/centroids.C100.fastp.gz.dmnd ]]
+          [[ -s output/alleles/centroids.C90.fastp.gz.dmnd ]]
+          [[ -s output/alleles/centroids.C50.fastp.gz.dmnd ]]
 
