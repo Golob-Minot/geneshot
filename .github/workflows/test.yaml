@@ -82,6 +82,36 @@ jobs:
           tree output/
           [[ -s output/alleles/allele_info.csv.gz ]]
           [[ -s output/alleles/alleles.faa.gz ]]
+          [[ -s output/alleles/alleles.faa.gz.dmnd ]]
 
-
+  allele_clustering:
+    runs-on: ubuntu-22.04
+    env:
+      NXF_ANSI_LOG: 0
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Nextflow
+        run: |
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+      - name:  Run geneshot
+        run: |
+          NXF_VER=23.10.0 nnextflow run modules/allele_clustering.nf --alleles data/example_output/alleles/alleles.faa.gz --allele_info data/example_output/alleles/allele_info.csv.gz --output output -w work/  -with-docker ubuntu:22.04
+      - name:  Validate results 
+        run: |
+          tree output/
+          [[ -s output/alleles/Allele_Cluster_info.csv.gz ]]
+          [[ -s output/alleles/alleles/centroids.C100.fastp.gz ]]
+          [[ -s output/alleles/alleles/centroids.C90.fastp.gz ]]
+          [[ -s output/alleles/alleles/centroids.C50.fastp.gz ]]
+          [[ -s output/alleles/alleles/centroids.C100.fastp.gz.dmnd ]]
+          [[ -s output/alleles/alleles/centroids.C90.fastp.gz.dmnd ]]
+          [[ -s output/alleles/alleles/centroids.C50.fastp.gz.dmnd ]]
 

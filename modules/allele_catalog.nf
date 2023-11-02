@@ -7,7 +7,6 @@ nextflow.enable.dsl=2
 params.gene_fasta = false
 params.phred_offset = 33 // spades
 
-params.min_coverage = 80 // linclust and reference genome alignment
 // Default values for boolean flags
 // If these are not set by the user, then they will be set to the values below
 // This is useful for the if/then control syntax below
@@ -27,21 +26,10 @@ container__assembler = "quay.io/biocontainers/megahit:1.2.9--h8b12597_0"
 container__anndata = "golob/python-anndata:0.9.2"
 container__prodigal = 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
-container__diamond = 'quay.io/biocontainers/diamond:2.1.8--h43eeafb_0'
 
-include { MMSeqs2_Cluster as MMSeqs2_Cluster_100 } from "./mmseqs" addParams(
-    min_identity: 100,
-    min_coverage: params.min_coverage
+include { DiamondIndex as DiamondIndex_Alleles } from "./mmseqs" addParams(
+    output_folder: params.output_folder
 )
-include { MMSeqs2_Cluster as MMSeqs2_Cluster_90 } from "./mmseqs" addParams(
-    min_identity: 90,
-    min_coverage: params.min_coverage
-)
-include { MMSeqs2_Cluster as MMSeqs2_Cluster_50 } from "./mmseqs" addParams(
-    min_identity: 50,
-    min_coverage: params.min_coverage
-)
-
 
 workflow Allele_catalog {
     take:
@@ -71,47 +59,14 @@ workflow Allele_catalog {
         ParseGeneAnnotations.out.collect{ it[2] }, // specimen allele info CSV
     )
 
-    /*
-    // Cluster at 80 / 100 c/i
-    MMSeqs2_Cluster_100(
+    DiamondIndex_Alleles(
         DereplicateAlleles.out.alleles
     )
 
-    MMSeqs2_Cluster_90(
-        MMSeqs2_Cluster_100.out.seqs
-    )
-
-    MMSeqs2_Cluster_50(
-        MMSeqs2_Cluster_90.out.seqs
-    )
-    // Summarize!
-
-    SummarizeAllelesAndClusters(
-        DereplicateAlleles.out.allele_info,
-        MMSeqs2_Cluster_100.out.clusters,
-        MMSeqs2_Cluster_90.out.clusters,
-        MMSeqs2_Cluster_50.out.clusters,
-        MMSeqs2_Cluster_100.out.seqs,
-        MMSeqs2_Cluster_90.out.seqs,
-        MMSeqs2_Cluster_50.out.seqs,        
-    )
-
-    // Per specimen summary with all the wonderful details
-    MakePerSpecimenAlleleSummary(
-        ParseGeneAnnotations.out.map{ [it[0], it[2]] }
-        .combine(SummarizeAllelesAndClusters.out.AlleleClusterInfo)
-    )
-
-    // And our gene catalog with diamond db
-    // Use the C50 clusters..
-    GeneCatalog(
-        MMSeqs2_Cluster_50.out.seqs
-    )
-
-
     emit:
-        gene_fasta = GeneCatalog.out.genes_fasta
-        allele_assembly_csv_list = MakePerSpecimenAlleleSummary.out.toSortedList()
+        alleles = DereplicateAlleles.out.alleles
+        allele_info = DereplicateAlleles.out.allele_info
+        alleles_dmdb = DiamondIndex_Alleles.out
     // */
 }
 
@@ -414,117 +369,9 @@ parse_prodigal_faa("${faa}").to_csv(
 """
 }
 
-process SummarizeAllelesAndClusters {
-    tag "Summarize all of the avaliable alleles and output"
-    container "${container__anndata}"
-    label 'mem_medium'
-    errorStrategy 'finish'
-    publishDir "${params.output_folder}/alleles/", mode: "copy"
-    
-    input:
-        path Alleles_csv
-        path C100_tsv
-        path C90_tsv
-        path C50_tsv
-        path Centroids_C100
-        path Centroids_C90
-        path Centroids_C50
-    
-    output:
-        path('Allele_Cluster_info.csv.gz'), emit: AlleleClusterInfo
-        path Centroids_C100, emit: C100
-        path Centroids_C90, emit: C90
-        path Centroids_C50, emit: C50        
-
-"""
-#!/usr/bin/env python3
-import pandas as pd
-a_i = pd.read_csv('${Alleles_csv}')
-A_c100 = {
-    r.allele: r.C100
-    for i, r in 
-    pd.read_csv('${C100_tsv}', delimiter='\\t', names=['C100', 'allele']).iterrows()
-}
-a_i['C100'] = a_i.allele.apply(A_c100.get)
-c100_c90 = {
-    r.C100: r.C90
-    for i, r in 
-    pd.read_csv('${C90_tsv}', delimiter='\\t', names=['C90', 'C100']).iterrows()
-}
-a_i['C90'] = a_i.C100.apply(c100_c90.get)
-c90_c50 = {
-    r.C90: r.C50
-    for i, r in 
-    pd.read_csv('${C50_tsv}', delimiter='\\t', names=['C50', 'C90']).iterrows()
-}
-a_i['C50'] = a_i.C90.apply(c90_c50.get)
-a_i.to_csv(
-    "Allele_Cluster_info.csv.gz",
-    index=None
-)
-"""
-}
-
-process MakePerSpecimenAlleleSummary {
-    tag "Inject allele information into per-specimen catalogs"
-    container "${container__anndata}"
-    label 'mem_medium'
-    errorStrategy 'finish'
-    publishDir "${params.output_folder}/alleles/${specimen}", mode: "copy"
-    
-    input:
-        tuple val (specimen), path (specimen_gene_annotations), path (allele_info)
-    
-    output:
-        path("${specimen}.csv.gz")   
-
-"""
-#!/usr/bin/env python3
-import pandas as pd
-sga = pd.read_csv('${specimen_gene_annotations}')
-specimen_genes = set(sga.gene_name)
-sa_C50 = {
-    r.specimen_allele: r.C50
-    for i, r in
-    pd.read_csv('${allele_info}').iterrows()
-    if r.specimen_allele in specimen_genes
-}
-sga['catalog_gene'] = sga.gene_name.apply(sa_C50.get)
-sga.to_csv(
-    "${specimen}.csv.gz",
-    index = None,
-    compression = "gzip"
-)
-
-"""
-}
-
-process GeneCatalog {
-    tag "Settle on our gene catalog and make a diamond db"
-    container "${container__diamond}"
-    label 'multithread'
-    errorStrategy 'finish'
-    publishDir "${params.output_folder}/ref/", mode: 'copy'
-
-    input:
-        path 'genes.fasta.gz'
-    
-    output:
-        path 'genes.fasta.gz', emit: genes_fasta
-        path 'genes.dmnd', emit: genes_diamond
-    
-    """
-    diamond \
-    makedb \
-    --in genes.fasta.gz \
-    --db genes.dmnd \
-    --threads ${task.cpus}
-    """
-
-}
 
 //
-// Steps to run gene-catalog independently.
+// Steps to run allele-catalog independently.
 //
 
 
