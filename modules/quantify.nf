@@ -3,8 +3,9 @@
 nextflow.enable.dsl=2
 
 // containers
-container__FAMLI = 'quay.io/fhcrc-microbiome/famli:v1.5'
+container__FAMLI = 'golob/famli2:2.0.0.pre'
 container__anndata = 'golob/python-anndata:0.9.2'
+container__diamond = 'quay.io/biocontainers/diamond:2.1.8--h43eeafb_0'
 
 // Processes used for alignment of reads against gene databases
 
@@ -16,28 +17,23 @@ params.dmnd_top_pct = 1 // DIAMOND
 params.dmnd_min_score = 20 // DIAMOND
 params.gencode = 11 //DIAMOND
 params.sd_mean_cutoff = 3.0 // FAMLI
-params.famli_batchsize = 10000000 // FAMLI
 
-params.output_prefix = 'gene'
+
 
 workflow Alignment_wf {
     take:
-        gene_fasta
+        allele_faa
+        allele_dmnd
         reads_ch
-        output_prefix
 
     main:
-
-    // Make a DIAMOND indexed database from those gene sequences
-    DiamondDB(
-        gene_fasta
-    )
 
     // Align all specimens against the DIAMOND database
     Diamond(
         reads_ch,
-        DiamondDB.out
+        allele_dmnd
     )
+
 
     // Filter to the most likely single alignment per query
     Famli(
@@ -46,12 +42,12 @@ workflow Alignment_wf {
 
     AssembleAnndata(
         Famli.out.toSortedList(),
-        gene_fasta,
+        allele_faa,
     )
 
     emit:
         famli_json_list = Famli.out.toSortedList()
-        specimen_gene_quant = AssembleAnndata.out
+        specimen_allele_quant = AssembleAnndata.out
     // */
 }
 
@@ -59,23 +55,23 @@ workflow Alignment_wf {
 // Align each sample against the reference database of genes using DIAMOND
 process DiamondDB {
     tag "Make a DIAMOND database"
-    container "quay.io/fhcrc-microbiome/famli:v1.5"
+    container "${container__diamond}"
     label 'mem_veryhigh'
     errorStrategy 'finish'
-    publishDir "${params.output_folder}/ref/", mode: "copy"
+    publishDir "${params.output_folder}/alleles/", mode: "copy"
     
     input:
-    file fasta
+    file faa
 
     output:
-    file "genes.dmnd"
+    file "${faa.getName()}.dmnd"
 
     """
     set -e
     diamond \
       makedb \
-      --in ${fasta} \
-      --db genes.dmnd \
+      --in ${faa} \
+      --db ${faa.getName()}.dmnd \
       --threads ${task.cpus}
     """
 
@@ -85,7 +81,7 @@ process DiamondDB {
 // Align each sample against the reference database of genes using DIAMOND
 process Diamond {
     tag "Align to the gene catalog"
-    container "${container__FAMLI}"
+    container "${container__diamond}"
     label 'mem_veryhigh'
     errorStrategy 'finish'
     
@@ -134,7 +130,7 @@ process Famli {
     tag "Deduplicate multi-mapping reads"
     container "${container__FAMLI}"
     label 'mem_veryhigh'
-    publishDir "${params.output_folder}/abund/details/", mode: "copy"
+    publishDir "${params.output_folder}/quantify/per_specimen_json/", mode: "copy"
     errorStrategy 'finish'
     
     input:
@@ -145,12 +141,10 @@ process Famli {
 
     """
     set -e
-    famli \
-      filter \
+    famli2 \
       --input ${input_aln} \
       --output ${sample_name}.json \
       --threads ${task.cpus} \
-      --batchsize ${params.famli_batchsize} \
       --sd-mean-cutoff ${params.sd_mean_cutoff}
     gzip ${sample_name}.json
     """
@@ -162,14 +156,14 @@ process AssembleAnndata {
     container "${container__anndata}"
     label "mem_veryhigh"
     errorStrategy 'finish'
-    publishDir "${params.output_folder}/abund/${params.output_prefix}/", mode: "copy"
+    publishDir "${params.output_folder}/quantify/", mode: "copy"
     
     input:
         path sample_jsons
         path peptide_fasta
 
     output:
-        path "specimen_${params.output_prefix}_quantity.h5ad"
+        path "specimen_allele_quantity.h5ad"
 
 """
 #!/usr/bin/env python3
@@ -352,7 +346,7 @@ peptide_seq = {
 ad_wgs.var['seq'] = ad_wgs.var.index.map(peptide_seq.get)
 
 logging.info("Writing to H5ad format")
-ad_wgs.write_h5ad('specimen_${params.output_prefix}_quantity.h5ad')
+ad_wgs.write_h5ad('specimen_allele_quantity.h5ad')
 
 logging.info("Completed")
 
@@ -371,8 +365,8 @@ params.help = false
 params.output = './results/'
 params.manifest = null
 
-params.gene_fasta = null
-
+params.allele_fasta = null
+params.allele_dmnd  = null
 
 
 // Make sure that --output ends with trailing "/" characters
@@ -390,16 +384,16 @@ def helpMessage() {
     log.info"""
     Usage:
 
-    nextflow run Golob-Minot/geneshot/modules/alignment.nf <ARGUMENTS>
+    nextflow run modules/quantify.nf <ARGUMENTS>
     
     Required Arguments:
       --manifest            CSV file listing samples (see below)
-      --gene_fasta          Compressed FASTA with pre-generated catalog of microbial genes.
+      --allele_fasta        Compressed FASTA with pre-generated catalog of microbial alleles (faa.gz).
+      --allele_dmmd         (Optional) Diamond database for alleles (if not provided, will be generated)
 
 
     Options:
       --output              Folder to place analysis outputs (default ./results)
-      --output_prefix       Text to describe what this catalog of genes is (default: gene)
       -w                    Working directory. Defaults to `./work`
 
     For Alignment:
@@ -409,7 +403,6 @@ def helpMessage() {
       --dmnd_min_score      Minimum score for short read alignment (default: 20) (DIAMOND)
       --gencode             Genetic code used for conceptual translation (default: 11) (DIAMOND)
       --sd_mean_cutoff      Ratio of standard deviation / mean depth of sequencing used to filter genes (default: 3.0) (FAMLI)
-      --famli_batchsize     Number of alignments to deduplicate in batches (default: 10000000) (FAMLI)
 
     Manifest:
       The manifest is a CSV with a header indicating which samples correspond to which files.
@@ -425,7 +418,7 @@ workflow {
 
  
     // Show help message if the user specifies the --help flag at runtime
-    if (params.help || params.manifest == null || params.gene_fasta == null){
+    if (params.help || params.manifest == null || params.allele_fasta == null){
         // Invoke the function above which prints the help message
         helpMessage()
         // Exit out and do not run anything else
@@ -435,11 +428,17 @@ workflow {
     manifest_file = Channel.from(file(params.manifest))
     manifest = Read_manifest(manifest_file).valid_paired
 
+    if (params.allele_dmnd == null) {
+        DiamondDB(file(params.allele_fasta))
+        allele_dmnd = DiamondDB.out
+    } else {
+        allele_dmnd = file(params.allele_dmnd)
+    }
 
     Alignment_wf(
-        file( params.gene_fasta ),
+        file( params.allele_fasta ),
+        allele_dmnd,
         manifest.map{ [it.specimen, file(it.R1), file(it.R2)] },
-        params.output_prefix
   )
 
 }

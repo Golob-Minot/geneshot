@@ -37,15 +37,15 @@ include { MMSeqs2_Cluster as MMSeqs2_Cluster_50 } from "./mmseqs" addParams(
     min_coverage: params.min_coverage
 )
 
-include { DiamondIndex as DiamondIndex_C100 } from "./mmseqs" addParams(
+include { DiamondDB as DiamondIndex_C100 } from "./quantify" addParams(
     output_folder: params.output_folder
 )
 
-include { DiamondIndex as DiamondIndex_C90 } from "./mmseqs" addParams(
+include { DiamondDB as DiamondIndex_C90 } from "./quantify" addParams(
     output_folder: params.output_folder
 )
 
-include { DiamondIndex as DiamondIndex_C50 } from "./mmseqs" addParams(
+include { DiamondDB as DiamondIndex_C50 } from "./quantify" addParams(
     output_folder: params.output_folder
 )
 
