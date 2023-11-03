@@ -11,8 +11,7 @@ nextflow.enable.dsl=2
 
 // Parameters
 params.gene_fasta = false
-params.output_hdf = false
-params.output_folder = false
+params.output = './results/'
 params.help = false
 params.min_coverage = 50
 params.min_identity = 90
@@ -22,6 +21,12 @@ params.eggnog_db = false
 params.eggnog_dmnd = false
 params.noannot = false
 
+// Make sure that --output ends with trailing "/" characters
+if (!params.output.endsWith("/")){
+    params.output_folder = params.output.concat("/")
+} else {
+    params.output_folder = params.output
+}
 
 process shard_genes {
     tag "Split the gene catalog into smaller shards"
@@ -249,7 +254,7 @@ def helpMessage() {
     
     Options:
       --gene_fasta          Location for input 'genes.fasta.gz'
-      --output_folder       Location for output
+      --output              Location for output (default 'results')
       --taxonomic_dmnd      Database used for taxonomic annotation (default: false)
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
