@@ -3,7 +3,6 @@
 nextflow.enable.dsl=2
 
 container__mmseqs2 = 'golob/mmseqs:20230807A'
-container__diamond = 'quay.io/biocontainers/diamond:2.1.8--h43eeafb_0'
 
 process MMSeqs2_Cluster {
     tag "Use mmseqs2 to cluster. Non-linear"
@@ -37,28 +36,6 @@ gzip clusters.C${params.min_identity}.tsv
 
 }
 
-process DiamondIndex {
-    tag "Make a diamond db"
-    container "${container__diamond}"
-    label 'multithread'
-    errorStrategy 'finish'
-    publishDir "${params.output_folder}/alleles/", mode: 'copy'
-
-    input:
-        path faa
-    
-    output:
-        path "${faa.getName()}.dmnd", emit: diamond
-    
-    """
-    diamond \
-    makedb \
-    --in ${faa} \
-    --db ${faa.getName()}.dmnd \
-    --threads ${task.cpus}
-    """
-
-}
 
 
 //
