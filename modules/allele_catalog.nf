@@ -27,7 +27,7 @@ container__anndata = "golob/python-anndata:0.9.2"
 container__prodigal = 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
 container__fastatools = "quay.io/fhcrc-microbiome/fastatools:0.7.1__bcw.0.3.2"
 
-include { DiamondIndex as DiamondIndex_Alleles } from "./mmseqs" addParams(
+include { DiamondDB as DiamondIndex_Alleles } from "./quantify" addParams(
     output_folder: params.output_folder
 )
 

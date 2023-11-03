@@ -3,6 +3,8 @@
 // Processes to perform de novo assembly and annotate those assembled sequences
 nextflow.enable.dsl=2
 
+container__eggnogmapper = 'quay.io/biocontainers/eggnog-mapper:2.1.12--pyhdfd78af_0'
+container__diamond = 'quay.io/biocontainers/diamond:2.1.8--h43eeafb_0'
 
 // Using DSL-2
 nextflow.enable.dsl=2
@@ -23,8 +25,8 @@ params.noannot = false
 
 process shard_genes {
     tag "Split the gene catalog into smaller shards"
-    container "ubuntu:18.04"
-    label 'mem_medium'
+    container "ubuntu:22.04"
+    label 'io_limited'
     errorStrategy 'finish'
     
     input:
@@ -138,7 +140,7 @@ workflow Annotation_wf {
 
 process diamond_tax {
     tag "Annotate genes by taxonomy"
-    container "quay.io/fhcrc-microbiome/famli:v1.5"
+    container "${container__diamond}"
     label 'mem_veryhigh'
 
     input:
@@ -171,8 +173,8 @@ rm ${diamond_tax_db}
 
 process join_tax {
     tag "Concatenate taxonomy annotation files"
-    container "ubuntu:18.04"
-    label 'mem_medium'
+    container "ubuntu:22.04"
+    label 'io_limited'
     publishDir "${params.output_folder}/annot/", mode: "copy"
 
     input:
@@ -198,7 +200,7 @@ done > genes.tax.aln.gz
 
 process eggnog {
     tag "Annotate genes by predicted function"
-    container "quay.io/biocontainers/eggnog-mapper:2.1.12--pyhdfd78af_0"
+    container "${container__eggnogmapper}"
     label 'mem_veryhigh'
     
     input:
@@ -275,12 +277,12 @@ def helpMessage() {
 
     --eggnog_dmnd & --eggnog_db
         The eggNOG database for functional annotation can be most easily downloaded
-        using the edicated utility provided along with the eggNOG-mapper utility.
+        using the dedicated utility provided along with the eggNOG-mapper utility.
         The only flag which needs to be set when running the download utility is the
         destination folder for the downloaded files.
 
         Example:
-        download_eggnog_data.py --data_dir data/
+        docker run -v \$PWD:/working ${container__eggnogmapper} download_eggnog_data.py -y --data_dir /working/ 
     
     """.stripIndent()
 }
