@@ -23,7 +23,7 @@ jobs:
           df -h
       - name:  Run geneshot
         run: |
-          NXF_VER=23.10.0 nextflow run modules/preprocess.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --host_index data/hg_chr_21_bwa_index.tar.gz  -w work/  -with-docker ubuntu:22.04
+          NXF_VER=23.10.0 nextflow run modules/preprocess.nf --manifest data/mock.manifest.csv --output output --host_index data/hg_chr_21_bwa_index.tar.gz  -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing
       - name:  Validate results 
         run: |
           tree output/
@@ -50,7 +50,7 @@ jobs:
           df -h
       - name:  Run geneshot
         run: |
-          NXF_VER=23.10.0 nextflow run modules/composition.nf --manifest data/example_output/qc/manifest.qc.se.csv --output output -w work/  -with-docker ubuntu:22.04
+          NXF_VER=23.10.0 nextflow run modules/composition.nf --manifest data/example_output/qc/manifest.qc.se.csv --output output -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing
       - name:  Validate results 
         run: |
           tree output/
@@ -76,7 +76,7 @@ jobs:
           df -h
       - name:  Run geneshot
         run: |
-          NXF_VER=23.10.0 nextflow run modules/allele_catalog.nf --manifest data/example_output/qc/manifest.qc.csv --output output -w work/  -with-docker ubuntu:22.04
+          NXF_VER=23.10.0 nextflow run modules/allele_catalog.nf --manifest data/example_output/qc/manifest.qc.csv --output output -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing 
       - name:  Validate results 
         run: |
           tree output/
@@ -103,7 +103,7 @@ jobs:
           df -h
       - name:  Run geneshot
         run: |
-          NXF_VER=23.10.0 nextflow run modules/allele_clustering.nf --alleles data/example_output/alleles/alleles.faa.gz --allele_info data/example_output/alleles/allele_info.csv.gz --output output -w work/  -with-docker ubuntu:22.04
+          NXF_VER=23.10.0 nextflow run modules/allele_clustering.nf --alleles data/example_output/alleles/alleles.faa.gz --allele_info data/example_output/alleles/allele_info.csv.gz --output output -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing
       - name:  Validate results 
         run: |
           tree output/
@@ -134,7 +134,7 @@ jobs:
           df -h
       - name:  Run geneshot
         run: |
-          NXF_VER=23.10.0 nextflow run modules/quantify.nf --manifest data/example_output/qc/manifest.qc.csv --allele_fasta data/example_output/alleles/alleles.faa.gz  --output output -w work/  -with-docker ubuntu:22.04
+          NXF_VER=23.10.0 nextflow run modules/quantify.nf --manifest data/example_output/qc/manifest.qc.csv --allele_fasta data/example_output/alleles/alleles.faa.gz  --output output -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing
       - name:  Validate results 
         run: |
           tree output/
