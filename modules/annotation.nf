@@ -61,9 +61,29 @@ workflow Annotation_wf {
     run_eggnog = false
     if ( params.noannot == false ) {
         if ( params.eggnog_db && params.eggnog_dmnd ) {
-            if ( !file(params.eggnog_db).isEmpty() && !file(params.eggnog_dmnd).isEmpty() ){
+            eggnog_db = file(params.eggnog_db)
+            eggnog_dmnd = file(params.eggnog_dmnd)
+
+            if ( eggnog_db.isEmpty() ){
+                log.info"Cannot find file ${params.eggnog_db}, skipping functional annotation"
+            }
+            if ( eggnog_dmnd.isEmpty() ){
+                log.info"Cannot find file ${params.eggnog_dmnd}, skipping functional annotation"
+            }
+        
+            if ( !eggnog_db.isEmpty() && !eggnog_dmnd.isEmpty() ){
                 run_eggnog = true
             }
+
+        } else {
+
+            if ( params.eggnog_db ) {
+                log.info"Missing --eggnog_dmnd, skipping functional annotation"
+            }
+            if ( params.eggnog_dmnd ) {
+                log.info"Missing --eggnog_db, skipping functional annotation"
+            }
+
         }
     }
 
@@ -71,8 +91,8 @@ workflow Annotation_wf {
     if ( run_eggnog ){
         eggnog(
             shard_genes.out.flatten(),
-            file(params.eggnog_db),
-            file(params.eggnog_dmnd)
+            eggnog_db,
+            eggnog_dmnd
         )
         eggnog_tsv = eggnog.out.collect()
     } else {
@@ -84,8 +104,11 @@ workflow Annotation_wf {
     run_tax = false
     if ( params.noannot == false ) {
         if ( params.taxonomic_dmnd ) {
-            if ( !file(params.taxonomic_dmnd).isEmpty() ){
+            taxonomic_dmnd = file(taxonomic_dmnd)
+            if ( !taxonomic_dmnd.isEmpty() ){
                 run_tax = true
+            } else {
+                log.info"Cannot find ${params.taxonomic_dmnd}, skipping taxonomic annotation"
             }
         }
     }
@@ -94,7 +117,7 @@ workflow Annotation_wf {
     if ( run_tax ) {
         diamond_tax(
             shard_genes.out.flatten(),
-            file(params.taxonomic_dmnd)
+            taxonomic_dmnd
         )
         tax_tsv = diamond_tax.out.collect()
         join_tax(
@@ -175,7 +198,7 @@ done > genes.tax.aln.gz
 
 process eggnog {
     tag "Annotate genes by predicted function"
-    container "quay.io/biocontainers/eggnog-mapper:2.0.1--py_1"
+    container "quay.io/biocontainers/eggnog-mapper:2.1.12--pyhdfd78af_0"
     label 'mem_veryhigh'
     
     input:
@@ -199,6 +222,7 @@ mv ${eggnog_dmnd} data/eggnog_proteins.dmnd
 
 emapper.py \
     -i ${query} \
+    --itype proteins \
     --output genes \
     -m "diamond" \
     --cpu ${task.cpus} \
@@ -225,38 +249,63 @@ def helpMessage() {
       --gene_fasta          Location for input 'genes.fasta.gz'
       --output_folder       Location for output
       --taxonomic_dmnd      Database used for taxonomic annotation (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-01-15-geneshot/DB.refseq.tax.dmnd)
       --ncbi_taxdump        Reference describing the NCBI Taxonomy
                             (default: ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
       --eggnog_dmnd         One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog_proteins.dmnd)
       --eggnog_db           One of two databases used for functional annotation with eggNOG (default: false)
-                            (Data available at s3://fh-ctr-public-reference-data/tool_specific_data/geneshot/2020-06-17-eggNOG-v5.0/eggnog.db)
+
+
+    ####################################
+    # Downloading Reference Databases: #
+    ####################################
+
+    --taxonomic_dmnd
+        The DIAMOND database of reference protein sequences must be indexed using both
+        (a) a set of sequences to search and (b) taxonomic annotations for each.
+        Full instructions for creating this indexed database file can be found
+        here: https://github.com/bbuchfink/diamond/wiki/3.-Command-line-options#makedb-options
+
+        Example:
+        diamond makedb \
+            --in <proteins_fasta> \
+            --db <output_dmnd> \
+            --taxonmap prot.accession2taxid.FULL.gz \
+            --taxonnodes nodes.dmp \
+            --taxonnames names.dmp
+
+    --eggnog_dmnd & --eggnog_db
+        The eggNOG database for functional annotation can be most easily downloaded
+        using the edicated utility provided along with the eggNOG-mapper utility.
+        The only flag which needs to be set when running the download utility is the
+        destination folder for the downloaded files.
+
+        Example:
+        download_eggnog_data.py --data_dir data/
     
     """.stripIndent()
-}
-
-
-// Show help message if the user specifies the --help flag at runtime
-if (params.help || params.gene_fasta == false || params.output_folder == false){
-    // Invoke the function above which prints the help message
-    helpMessage()
-    // Exit out and do not run anything else
-    exit 0
-}
-
-// Show help message if the user does not specify any annotations
-if (params.taxonomic_dmnd == false && params.eggnog_dmnd == false && params.eggnog_db == false){
-    // Invoke the function above which prints the help message
-    helpMessage()
-    // Exit out and do not run anything else
-    exit 0
 }
 
 workflow {
 
     main: 
     
+
+    // Show help message if the user specifies the --help flag at runtime
+    if (params.help || params.gene_fasta == false || params.output_folder == false){
+        // Invoke the function above which prints the help message
+        helpMessage()
+        // Exit out and do not run anything else
+        exit 0
+    }
+
+    // Show help message if the user does not specify any annotations
+    if (params.taxonomic_dmnd == false && params.eggnog_dmnd == false && params.eggnog_db == false){
+        // Invoke the function above which prints the help message
+        helpMessage()
+        // Exit out and do not run anything else
+        exit 0
+    }
+
     // Make sure we can find the input files
     if(file(params.gene_fasta).isEmpty()){
         log.info"""Cannot find input file ${params.gene_fasta}""".stripIndent()
@@ -267,7 +316,5 @@ workflow {
     Annotation_wf(
         file(params.gene_fasta)
     )
-
-
 
 }
