@@ -23,7 +23,7 @@ jobs:
           df -h
       - name:  Run preprocess
         run: |
-          NXF_VER=23.10.0 nextflow run modules/preprocess.nf -c nextflow.config.sample -profile testing --manifest data/mock.manifest.csv --output output --host_index data/hg_chr_21_bwa_index.tar.gz  -w work/  -with-docker ubuntu:22.04
+          NXF_VER=23.10.0 nextflow run modules/preprocess.nf --manifest data/mock.manifest.csv --output output --host_index data/hg_chr_21_bwa_index.tar.gz  -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing
       - name:  Validate results 
         run: |
           tree output/
@@ -31,5 +31,111 @@ jobs:
           [[ -s output/qc/Mock__11.R1.fastq.gz ]]
           [[ -s output/qc/Mock__13__R1.noadapt.nohuman.fq.gz ]]
 
+  composition_metaphlan2:
+    runs-on: ubuntu-22.04
+    env:
+      NXF_ANSI_LOG: 0
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Nextflow
+        run: |
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+      - name:  Run geneshot
+        run: |
+          NXF_VER=23.10.0 nextflow run modules/composition.nf --manifest data/example_output/qc/manifest.qc.se.csv --output output -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing
+      - name:  Validate results 
+        run: |
+          tree output/
+          [[ -s output/MetaPhlAn2/metaphlan2.results.csv.gz ]]
+          [[ -s output/MetaPhlAn2/metaphlan2.species.h5ad ]]
+          
+  allele_catalog:
+    runs-on: ubuntu-22.04
+    env:
+      NXF_ANSI_LOG: 0
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Nextflow
+        run: |
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+      - name:  Run geneshot
+        run: |
+          NXF_VER=23.10.0 nextflow run modules/allele_catalog.nf --manifest data/example_output/qc/manifest.qc.csv --output output -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing 
+      - name:  Validate results 
+        run: |
+          tree output/
+          [[ -s output/alleles/allele_info.csv.gz ]]
+          [[ -s output/alleles/alleles.faa.gz ]]
+          [[ -s output/alleles/alleles.faa.gz.dmnd ]]
 
+  allele_clustering:
+    runs-on: ubuntu-22.04
+    env:
+      NXF_ANSI_LOG: 0
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Nextflow
+        run: |
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+      - name:  Run geneshot
+        run: |
+          NXF_VER=23.10.0 nextflow run modules/allele_clustering.nf --alleles data/example_output/alleles/alleles.faa.gz --allele_info data/example_output/alleles/allele_info.csv.gz --output output -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing
+      - name:  Validate results 
+        run: |
+          tree output/
+          [[ -s output/alleles/Allele_Cluster_info.csv.gz ]]
+          [[ -s output/alleles/centroids.C100.fastp.gz ]]
+          [[ -s output/alleles/centroids.C90.fastp.gz ]]
+          [[ -s output/alleles/centroids.C50.fastp.gz ]]
+          [[ -s output/alleles/centroids.C100.fastp.gz.dmnd ]]
+          [[ -s output/alleles/centroids.C90.fastp.gz.dmnd ]]
+          [[ -s output/alleles/centroids.C50.fastp.gz.dmnd ]]
 
+  allele_quantification:
+    runs-on: ubuntu-22.04
+    env:
+      NXF_ANSI_LOG: 0
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Nextflow
+        run: |
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+      - name:  Run geneshot
+        run: |
+          NXF_VER=23.10.0 nextflow run modules/quantify.nf --manifest data/example_output/qc/manifest.qc.csv --allele_fasta data/example_output/alleles/alleles.faa.gz  --output output -w work/  -with-docker ubuntu:22.04 -c nextflow.config.sample -profile testing
+      - name:  Validate results 
+        run: |
+          tree output/
+          [[ -s output/quantify/specimen_allele_quantity.h5ad ]]

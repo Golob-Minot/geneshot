@@ -1,7 +1,0 @@
-specimen,R1,R2,I1,I2,batch,label1,label2
-Mock__11,data/Mock__1.R1.fastq.gz,data/Mock__1.R2.fastq.gz,data/Mock__1.I1.fastq.gz,data/Mock__1.I2.fastq.gz,mock,0,1
-Mock__12,data/Mock__2.R1.fastq.gz,data/Mock__2.R2.fastq.gz,data/Mock__2.I1.fastq.gz,data/Mock__2.I2.fastq.gz,mock,1,0
-Mock__13,data/Mock__3.R1.fastq.gz,data/Mock__3.R2.fastq.gz,data/Mock__3.I1.fastq.gz,data/Mock__3.I2.fastq.gz,mock,1,1
-Mock__14,data/Mock__4.R1.fastq.gz,data/Mock__4.R2.fastq.gz,data/Mock__4.I1.fastq.gz,data/Mock__4.I2.fastq.gz,mock,0,0
-Mock__15,data/Mock__5.R1.fastq.gz,data/Mock__5.R2.fastq.gz,data/Mock__5.I1.fastq.gz,data/Mock__5.I2.fastq.gz,mock,1,1
-Stool_Fasta,data/SRS014459-Stool.fasta.gz,,,,metaphlan,1,1

@@ -1,0 +1,10 @@
+#SampleID	Metaphlan2_Analysis
+#clade_name	relative_abundance	coverage	average_genome_length_in_the_clade	estimated_number_of_reads_from_the_clade
+k__Bacteria	100.0	0.00026476039184537993	3060646.5783300134	810
+k__Bacteria|p__Proteobacteria	100.0	0.00026476039184537993	3135749.4117566776	830
+k__Bacteria|p__Proteobacteria|c__Gammaproteobacteria	100.0	0.00026476039184537993	3686133.8101186045	976
+k__Bacteria|p__Proteobacteria|c__Gammaproteobacteria|o__Enterobacteriales	100.0	0.00026476039184537993	4079009.895749976	1080
+k__Bacteria|p__Proteobacteria|c__Gammaproteobacteria|o__Enterobacteriales|f__Enterobacteriaceae	100.0	0.00026476039184537993	4079009.895749976	1080
+k__Bacteria|p__Proteobacteria|c__Gammaproteobacteria|o__Enterobacteriales|f__Enterobacteriaceae|g__Escherichia	100.0	0.00026476039184537993	4803810.298629981	1272
+k__Bacteria|p__Proteobacteria|c__Gammaproteobacteria|o__Enterobacteriales|f__Enterobacteriaceae|g__Escherichia|s__Escherichia_unclassified	100.0	0.00026476039184537993	4803810.298629981	1272
+#estimated total number of reads from known clades: 810
